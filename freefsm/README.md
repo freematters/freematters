@@ -36,6 +36,29 @@ freefsm install claude
 freefsm install codex
 ```
 
+## Usage
+
+FreeFSM is typically used through these skills:
+
+- `/freefsm:create` — guided Q&A to create a workflow YAML
+- `/freefsm:start <path>` — start a workflow run (also searches `./workflows/` by name)
+- `/freefsm:current` — show current state
+- `/freefsm:finish` — abort an active run
+
+Codex skill names use `$` instead of `/`.
+
+## Bundled Workflows
+
+- `pdd` — Plan-Driven Development: interactive requirements, research, design, and planning
+- `spec-to-code` — implements a spec directory (from PDD) into working code via TDD
+- `mr-lifecycle` — merge request lifecycle management
+
+Start a bundled workflow by name:
+
+```
+/freefsm:start pdd
+```
+
 ## How It Works
 
 A workflow is a YAML file that defines states, transitions, and per-state prompts:
@@ -66,29 +89,6 @@ The runtime works through three mechanisms:
 3. **Hooks inject reminders** — a PostToolUse hook runs `freefsm current` every 5 tool calls, re-injecting the current state card into the agent's context. This counteracts context drift in long conversations.
 
 All state changes are recorded as an append-only event log (JSONL), with a snapshot for fast reads. Runs are isolated by ID with directory-based file locking for concurrent safety.
-
-## Usage
-
-FreeFSM is typically used through these skills:
-
-- `/freefsm:create` — guided Q&A to create a workflow YAML
-- `/freefsm:start <path>` — start a workflow run (also searches `./workflows/` by name)
-- `/freefsm:current` — show current state
-- `/freefsm:finish` — abort an active run
-
-Codex skill names use `$` instead of `/`.
-
-## Bundled Workflows
-
-- `pdd` — Plan-Driven Development: interactive requirements, research, design, and planning
-- `spec-to-code` — implements a spec directory (from PDD) into working code via TDD
-- `mr-lifecycle` — merge request lifecycle management
-
-Start a bundled workflow by name:
-
-```
-/freefsm:start pdd
-```
 
 ## License
 
