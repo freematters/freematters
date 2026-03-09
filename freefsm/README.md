@@ -15,7 +15,7 @@ FreeFSM resolves this by separating **what the agent does** (flexible, LLM-drive
 
 ## Install
 
-Paste this to your coding agent: `Read https://github.com/freematters/freematters/blob/main/freefsm/README.md to install freefsm`.
+Tell this to your coding agent: `Read https://github.com/freematters/freematters/blob/main/freefsm/README.md to install freefsm`.
 
 Or install manually:
 
