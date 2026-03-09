@@ -50,6 +50,10 @@ jobs:
           node-version: '22'
           cache: 'npm'
           cache-dependency-path: freefsm/package-lock.json
+      - name: Install Claude Code
+        run: curl -fsSL https://claude.ai/install.sh | bash
+      - name: Install Codex
+        run: npm install -g @openai/codex
       - run: npm ci
       - run: npm run build
       - run: npm run test:integration
