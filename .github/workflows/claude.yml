@@ -19,6 +19,52 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Resolve old Claude review threads
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // Bot user IDs: github-actions[bot]=41898282, claude[bot] may vary
+            const BOT_LOGINS = ['github-actions[bot]', 'claude[bot]'];
+
+            const { repository } = await github.graphql(`
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  pullRequest(number: $number) {
+                    reviewThreads(first: 100) {
+                      nodes {
+                        id
+                        isResolved
+                        comments(first: 1) {
+                          nodes { author { login } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              number: context.issue.number,
+            });
+
+            const threads = repository.pullRequest.reviewThreads.nodes;
+            for (const thread of threads) {
+              if (thread.isResolved) continue;
+              const author = thread.comments.nodes[0]?.author?.login;
+              if (!BOT_LOGINS.includes(author)) continue;
+
+              await github.graphql(`
+                mutation($threadId: ID!) {
+                  resolveReviewThread(input: { threadId: $threadId }) {
+                    thread { id }
+                  }
+                }
+              `, { threadId: thread.id });
+
+              core.info(`Resolved thread ${thread.id} by ${author}`);
+            }
+
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
