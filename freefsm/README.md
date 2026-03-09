@@ -46,6 +46,8 @@ All state changes are recorded as an append-only event log (JSONL), with a snaps
 
 ## Install
 
+Just tell your coding agent to follow the instructions below, or run manually:
+
 ```bash
 git clone https://github.com/freematters/freematters.git
 cd freematters/freefsm
