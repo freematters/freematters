@@ -1,6 +1,13 @@
-import { existsSync, mkdirSync, readFileSync, readlinkSync, symlinkSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readlinkSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 
 type Platform = "claude" | "codex";
 
@@ -36,7 +43,10 @@ function installClaude(packageRoot: string): void {
   }
 
   // Add marketplace pointing to the installed package directory
-  const marketplaces = (settings.extraKnownMarketplaces ?? {}) as Record<string, unknown>;
+  const marketplaces = (settings.extraKnownMarketplaces ?? {}) as Record<
+    string,
+    unknown
+  >;
   marketplaces[MARKETPLACE_NAME] = {
     source: {
       source: "directory",
@@ -53,12 +63,14 @@ function installClaude(packageRoot: string): void {
 
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
 
-  console.log(`FreeFSM plugin installed for Claude Code.`);
+  console.log("FreeFSM plugin installed for Claude Code.");
   console.log(`  Marketplace: ${MARKETPLACE_NAME} -> ${packageRoot}`);
   console.log(`  Plugin: ${pluginKey}`);
   console.log(`  Settings: ${settingsPath}`);
-  console.log(`\nSkills: /freefsm:create, /freefsm:start, /freefsm:current, /freefsm:finish`);
-  console.log(`Hook: PostToolUse state reminder (every 5 tool calls)`);
+  console.log(
+    "\nSkills: /freefsm:create, /freefsm:start, /freefsm:current, /freefsm:finish",
+  );
+  console.log("Hook: PostToolUse state reminder (every 5 tool calls)");
 }
 
 function installCodex(packageRoot: string): void {
@@ -90,5 +102,7 @@ function installCodex(packageRoot: string): void {
 
   symlinkSync(skillsSource, target);
   console.log(`FreeFSM skills linked for Codex: ${target} -> ${skillsSource}`);
-  console.log(`\nNote: Codex does not support hooks. The agent won't get periodic state reminders.`);
+  console.log(
+    `\nNote: Codex does not support hooks. The agent won't get periodic state reminders.`,
+  );
 }

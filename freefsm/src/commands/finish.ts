@@ -6,7 +6,7 @@ function formatTransitionChain(events: StoreEvent[]): string {
   const parts: string[] = [];
   for (const e of events) {
     if (e.event === "start") {
-      parts.push(e.to_state!);
+      parts.push(e.to_state ?? "unknown");
     } else if (e.event === "goto") {
       parts.push(`-[${e.on_label}]-> ${e.to_state}`);
     } else if (e.event === "finish") {

@@ -6,8 +6,8 @@ import { Command } from "commander";
 import { current } from "./commands/current.js";
 import { finish } from "./commands/finish.js";
 import { goto } from "./commands/goto.js";
-import { start } from "./commands/start.js";
 import { install } from "./commands/install.js";
+import { start } from "./commands/start.js";
 import { main as postToolUseMain } from "./hooks/post-tool-use.js";
 
 function resolveRoot(flagRoot?: string): string {
@@ -52,7 +52,7 @@ program
     const { root, json } = getGlobalOpts(cmd);
     start({
       fsmPath: resolve(_fsmPath),
-      runId: opts["runId"] as string | undefined,
+      runId: opts.runId as string | undefined,
       root: resolveRoot(root),
       json: json ?? false,
     });
@@ -65,7 +65,7 @@ program
   .action((opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     current({
-      runId: opts["runId"] as string,
+      runId: opts.runId as string,
       root: resolveRoot(root),
       json: json ?? false,
     });
@@ -81,8 +81,8 @@ program
     const { root, json } = getGlobalOpts(cmd);
     goto({
       target: _target,
-      runId: opts["runId"] as string,
-      on: opts["on"] as string,
+      runId: opts.runId as string,
+      on: opts.on as string,
       root: resolveRoot(root),
       json: json ?? false,
     });
@@ -95,7 +95,7 @@ program
   .action((opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     finish({
-      runId: opts["runId"] as string,
+      runId: opts.runId as string,
       root: resolveRoot(root),
       json: json ?? false,
     });

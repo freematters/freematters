@@ -201,7 +201,7 @@ describe("CLI — current command", () => {
   });
 
   test("RUN_NOT_FOUND error (exit 2)", () => {
-    const { envelope, exitCode } = runJson(`current --run-id nonexistent`, {
+    const { envelope, exitCode } = runJson("current --run-id nonexistent", {
       expectFail: true,
     });
     expect(exitCode).toBe(2);
@@ -245,7 +245,7 @@ describe("CLI — goto command", () => {
     expect(exitCode).toBe(2);
     expect(envelope.ok).toBe(false);
     expect(envelope.code).toBe("INVALID_TRANSITION");
-    expect((envelope.message as string)).toContain("ready → review");
+    expect(envelope.message as string).toContain("ready → review");
   });
 
   test("STATE_NOT_FOUND error", () => {
@@ -264,14 +264,13 @@ describe("CLI — goto command", () => {
     const id = uniqueRunId("goto-completed");
     run(`start ${fsmMinimal} --run-id ${id}`);
     run(`goto done --run-id ${id} --on next`);
-    const { envelope, exitCode } = runJson(
-      `goto done --run-id ${id} --on next`,
-      { expectFail: true },
-    );
+    const { envelope, exitCode } = runJson(`goto done --run-id ${id} --on next`, {
+      expectFail: true,
+    });
     expect(exitCode).toBe(2);
     expect(envelope.ok).toBe(false);
     expect(envelope.code).toBe("RUN_NOT_ACTIVE");
-    expect((envelope.message as string)).toContain("completed");
+    expect(envelope.message as string).toContain("completed");
   });
 });
 
@@ -314,7 +313,7 @@ describe("CLI — finish command", () => {
     expect(exitCode).toBe(2);
     expect(envelope.ok).toBe(false);
     expect(envelope.code).toBe("RUN_NOT_ACTIVE");
-    expect((envelope.message as string)).toContain("aborted");
+    expect(envelope.message as string).toContain("aborted");
   });
 });
 
@@ -449,8 +448,8 @@ describe("Hook — post-tool-use", () => {
       unknown
     >;
     expect(ctx.hookEventName).toBe("PostToolUse");
-    expect((ctx.additionalContext as string)).toContain("[FSM Reminder]");
-    expect((ctx.additionalContext as string)).toContain("State: start");
+    expect(ctx.additionalContext as string).toContain("[FSM Reminder]");
+    expect(ctx.additionalContext as string).toContain("State: start");
   });
 
   test("emits reminder every 5th call", () => {
@@ -501,8 +500,8 @@ describe("Hook — post-tool-use", () => {
       string,
       unknown
     >;
-    expect((ctx.additionalContext as string)).toContain("[FSM Reminder]");
-    expect((ctx.additionalContext as string)).toContain("Begin work.");
+    expect(ctx.additionalContext as string).toContain("[FSM Reminder]");
+    expect(ctx.additionalContext as string).toContain("Begin work.");
   });
 
   test("unbinds session on freefsm finish detection", () => {
