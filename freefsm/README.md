@@ -7,7 +7,10 @@ Works with **Claude Code** and **Codex**.
 ## Install
 
 ```bash
-npm i -g freefsm
+git clone https://github.com/freematters/freematters.git
+cd freematters/freefsm
+npm install && npm run build
+npm install -g .
 
 # Claude Code — registers skills + PostToolUse hook
 freefsm install claude

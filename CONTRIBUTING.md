@@ -9,6 +9,7 @@ git clone git@github.com:freematters/freematters.git
 cd freematters/freefsm
 npm install
 npm run build
+npm link          # symlinks freefsm to PATH (reflects changes immediately)
 ```
 
 ## Workflow
