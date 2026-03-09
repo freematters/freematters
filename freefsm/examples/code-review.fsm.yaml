@@ -1,0 +1,28 @@
+version: 1
+guide: Code review workflow.
+initial: review
+states:
+  review:
+    prompt: |
+      Review the code changes. Look for bugs, style issues,
+      and architectural concerns. Provide clear, actionable feedback.
+    todos:
+      - Read the diff carefully
+      - Check for correctness and edge cases
+      - Verify naming and style consistency
+    transitions:
+      changes requested: revise
+      approved: done
+  revise:
+    prompt: |
+      Address the review feedback. Make the requested changes
+      and explain what was updated.
+    todos:
+      - Fix each issue raised in review
+      - Run tests to verify changes
+    transitions:
+      changes made: review
+      give up: done
+  done:
+    prompt: Review complete.
+    transitions: {}

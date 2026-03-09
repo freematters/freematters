@@ -1,0 +1,68 @@
+version: 1
+guide: |
+  Monitor a GitLab MR until it is fully approved and all pipelines pass.
+  Automatically fix CI failures and address review comments marked "please address".
+
+initial: create-mr
+
+states:
+  create-mr:
+    prompt: |
+      - 先 commit 所有 local changes
+      - 检查当前分支是否已有 open 的 MR（通过 GitLab API 查询），如果有则 push branch，直接记录 MR URL 和 IID，并且看是否需要 update MR description
+      - 如果没有，创建新的 MR：
+        - Target branch：如果用户指定了就用指定的，否则用 repo 的 default branch
+        - 对比 target branch，总结变更内容作为 MR description
+        - MR title 使用 conventional commit 格式
+
+      记录 MR URL 和 IID，后续状态会用到。
+    transitions:
+      MR ready: poll
+
+  poll:
+    prompt: |
+      用 python 轮询 GitLab MR 状态（通过 GitLab API），每 20 秒检查一次，while loop 一直 poll 下去直到 MR 被 merge 或关闭。
+
+      检查项：
+      - MR 是否已被 merge
+      - Pipeline 状态：所有 job 是否都已完成（pending/running 继续等待）
+      - 是否需要 rebase（有 merge conflict 或 target branch 已更新）
+      - Review comments：是否有用户要求处理的 comment（模糊匹配，如 "please address"、"pls fix"、"请处理" 等）
+
+      判断逻辑：
+      - MR 已 merged → done
+      - 发现 failed job、待处理 review comment 或需要 rebase → fix
+      - 其他 → 继续轮询
+    transitions:
+      issues found: fix
+      MR merged: done
+      MR closed: done
+
+  fix:
+    prompt: |
+      根据 poll 发现的问题进行修复：
+      - CI 失败：通过 GitLab API 获取 failed job 的日志，分析失败原因并修复代码
+      - Review comment：阅读用户要求处理的 comment，理解意图并修改代码
+      - 需要 rebase：fetch 最新的 target branch，git rebase，有 conflict 自主解决
+
+      如果检查后发现没有需要修复的内容，直接回到轮询。
+    transitions:
+      fixed: push
+      nothing to fix: poll
+
+  push:
+    prompt: |
+      将修复提交并推送：
+      - Commit 并 push 到远程分支（如果是 rebase 则 force push）
+      - 如果本次修复 address 了 review comment，通过 GitLab API resolve 对应的 discussion
+      - 视情况更新 MR description，特别是当 address 了 review 意见导致实现方式有变化时
+    transitions:
+      pushed: poll
+
+  done:
+    prompt: |
+      MR 已被 merge。输出总结：
+      - MR URL
+      - 总共经历了多少轮修复
+      - 主要修复内容概要
+    transitions: {}
