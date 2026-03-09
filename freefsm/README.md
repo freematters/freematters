@@ -4,6 +4,46 @@ CLI-first FSM runtime for agent workflows. Define states and transitions in YAML
 
 Works with **Claude Code** and **Codex**.
 
+## Why
+
+AI coding agents are powerful but unreliable at following multi-step workflows. The core tension:
+
+- **Natural language prompts** are flexible but non-deterministic — agents drift from instructions, skip steps, and ignore constraints no matter how many "MUST" and "ALWAYS" directives you add.
+- **Hardcoded logic** is deterministic but rigid — every workflow change requires code changes, and bugs are inevitable.
+
+FreeFSM resolves this by separating **what the agent does** (flexible, LLM-driven) from **where the agent goes** (deterministic, FSM-enforced). The agent stays in control of reasoning and tool use within each state, but the FSM governs which states exist and which transitions are legal.
+
+## How It Works
+
+A workflow is a YAML file that defines states, transitions, and per-state prompts:
+
+```yaml
+version: 1
+guide: "Code review workflow"
+initial: analyze
+states:
+  analyze:
+    prompt: "Read the diff and identify issues."
+    transitions:
+      found_issues: feedback
+      looks_good: done
+  feedback:
+    prompt: "Post review comments on each issue."
+    transitions:
+      next: done
+  done:
+    prompt: "Summarize the review."
+    transitions: {}
+```
+
+The runtime works through three mechanisms:
+
+1. **Skills** invoke the CLI — `/freefsm:start` loads the YAML, validates the schema, and enters the initial state. The agent sees a state card with the current prompt and available transitions.
+2. **CLI enforces transitions** — when the agent calls `freefsm goto feedback --on found_issues`, the CLI validates the transition against the YAML before committing it. Illegal transitions are rejected.
+3. **Hooks inject reminders** — a PostToolUse hook runs `freefsm current` every 5 tool calls, re-injecting the current state card into the agent's context. This counteracts context drift in long conversations.
+
+All state changes are recorded as an append-only event log (JSONL), with a snapshot for fast reads. Runs are isolated by ID with directory-based file locking for concurrent safety.
+
 ## Install
 
 ```bash
