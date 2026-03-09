@@ -1,10 +1,11 @@
+import { execFileSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
-  readFileSync,
   readlinkSync,
+  renameSync,
   symlinkSync,
-  writeFileSync,
+  unlinkSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -30,47 +31,27 @@ export function install(platform: Platform): void {
   }
 }
 
+function run(cmd: string, args: string[]): void {
+  execFileSync(cmd, args, { stdio: "inherit" });
+}
+
 function installClaude(packageRoot: string): void {
-  const settingsPath = join(homedir(), ".claude", "settings.json");
-  const settingsDir = join(homedir(), ".claude");
-
-  // Read existing settings or start fresh
-  let settings: Record<string, unknown> = {};
-  if (existsSync(settingsPath)) {
-    settings = JSON.parse(readFileSync(settingsPath, "utf-8"));
-  } else {
-    mkdirSync(settingsDir, { recursive: true });
-  }
-
-  // Add marketplace pointing to the installed package directory
-  const marketplaces = (settings.extraKnownMarketplaces ?? {}) as Record<
-    string,
-    unknown
-  >;
-  marketplaces[MARKETPLACE_NAME] = {
-    source: {
-      source: "directory",
-      path: packageRoot,
-    },
-  };
-  settings.extraKnownMarketplaces = marketplaces;
-
-  // Enable the plugin
-  const enabled = (settings.enabledPlugins ?? {}) as Record<string, boolean>;
   const pluginKey = `${PLUGIN_NAME}@${MARKETPLACE_NAME}`;
-  enabled[pluginKey] = true;
-  settings.enabledPlugins = enabled;
 
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf-8");
+  // Register the local directory as a marketplace
+  console.log(`Adding marketplace ${MARKETPLACE_NAME} -> ${packageRoot}`);
+  run("claude", ["plugin", "marketplace", "add", packageRoot]);
 
-  console.log("FreeFSM plugin installed for Claude Code.");
-  console.log(`  Marketplace: ${MARKETPLACE_NAME} -> ${packageRoot}`);
-  console.log(`  Plugin: ${pluginKey}`);
-  console.log(`  Settings: ${settingsPath}`);
+  // Install the plugin from the marketplace
+  console.log(`\nInstalling plugin ${pluginKey}`);
+  run("claude", ["plugin", "install", pluginKey]);
+
+  console.log("\nFreeFSM plugin installed for Claude Code.");
   console.log(
     "\nSkills: /freefsm:create, /freefsm:start, /freefsm:current, /freefsm:finish",
   );
   console.log("Hook: PostToolUse state reminder (every 5 tool calls)");
+  console.log("\nRestart Claude Code to activate the plugin.");
 }
 
 function installCodex(packageRoot: string): void {
@@ -85,19 +66,19 @@ function installCodex(packageRoot: string): void {
 
   mkdirSync(agentsDir, { recursive: true });
 
-  // Check if symlink already exists
+  // Replace existing target, backing up if it's not a symlink
   if (existsSync(target)) {
     try {
-      const current = readlinkSync(target);
-      if (current === skillsSource) {
-        console.log("FreeFSM skills already linked for Codex.");
-        return;
-      }
+      readlinkSync(target);
+      // It's a symlink — safe to remove and update
+      unlinkSync(target);
+      console.log(`Updating existing symlink: ${target}`);
     } catch {
-      // not a symlink
+      // Not a symlink — back it up
+      const backup = `${target}.bak`;
+      renameSync(target, backup);
+      console.log(`Backed up ${target} -> ${backup}`);
     }
-    console.error(`${target} already exists. Remove it first to reinstall.`);
-    process.exit(2);
   }
 
   symlinkSync(skillsSource, target);

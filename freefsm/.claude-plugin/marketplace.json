@@ -8,7 +8,7 @@
       "name": "freefsm",
       "description": "CLI-first FSM runtime for agent workflows",
       "version": "0.1.0",
-      "source": ".."
+      "source": "./"
     }
   ]
 }
