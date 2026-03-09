@@ -51,7 +51,9 @@ function installClaude(packageRoot: string): void {
     "\nSkills: /freefsm:create, /freefsm:start, /freefsm:current, /freefsm:finish",
   );
   console.log("Hook: PostToolUse state reminder (every 5 tool calls)");
-  console.log("\nRestart Claude Code to activate the plugin.");
+  console.log(
+    "\nRestart Claude Code to activate the plugin. Run /freefsm:create to get started.",
+  );
 }
 
 function installCodex(packageRoot: string): void {
