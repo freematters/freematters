@@ -11,11 +11,11 @@ For normal completion, use `freefsm goto done` instead — that happens automati
 
 ## Usage
 
-`/fsm:finish` — uses the run ID from the most recent `/fsm:start` in this conversation.
+`/freefsm:finish` — uses the run ID from the most recent `/freefsm:start` in this conversation.
 
 ## Process
 
-1. **Retrieve the run ID** — Use the `run_id` remembered from the previous `/fsm:start` call in this conversation.
+1. **Retrieve the run ID** — Use the `run_id` remembered from the previous `/freefsm:start` call in this conversation.
 
 2. **Run the CLI command:**
 

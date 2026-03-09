@@ -9,11 +9,11 @@ Display the current state of an active FSM run.
 
 ## Usage
 
-`/fsm:current` — uses the run ID from the most recent `/fsm:start` in this conversation.
+`/freefsm:current` — uses the run ID from the most recent `/freefsm:start` in this conversation.
 
 ## Process
 
-1. **Retrieve the run ID** — Use the `run_id` remembered from the previous `/fsm:start` call in this conversation.
+1. **Retrieve the run ID** — Use the `run_id` remembered from the previous `/freefsm:start` call in this conversation.
 
 2. **Run the CLI command:**
 
@@ -25,9 +25,9 @@ freefsm current --run-id <run_id>
    - Current state name
    - State prompt (instructions)
    - Todo items (if any)
-   - Available transitions (label → target state)
+   - Available transitions (label -> target state)
 
 ## Error Handling
 
-- **`RUN_NOT_FOUND`** — The run doesn't exist. The user may need to start a workflow first with `/fsm:start`.
-- **No run_id in context** — Ask the user which run to query, or suggest `/fsm:start` to begin a new workflow.
+- **`RUN_NOT_FOUND`** — The run doesn't exist. The user may need to start a workflow first with `/freefsm:start`.
+- **No run_id in context** — Ask the user which run to query, or suggest `/freefsm:start` to begin a new workflow.

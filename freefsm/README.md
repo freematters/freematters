@@ -6,25 +6,14 @@ Works with **Claude Code** and **Codex**.
 
 ## Install
 
-### CLI
-
 ```bash
 npm i -g freefsm
-```
 
-### Claude Code
+# Claude Code — registers skills + PostToolUse hook
+freefsm install claude
 
-```bash
-claude --plugin-dir /path/to/freefsm
-```
-
-### Codex
-
-Codex uses native skill discovery via `~/.agents/skills`.
-
-```bash
-mkdir -p ~/.agents/skills
-ln -sfn /path/to/freefsm/skills ~/.agents/skills/freefsm
+# Codex — links skills (no hook support)
+freefsm install codex
 ```
 
 ## Usage
@@ -36,18 +25,19 @@ FreeFSM is typically used through these skills:
 - `/freefsm:current` — show current state
 - `/freefsm:finish` — abort an active run
 
-Codex skill names are the same with the leading `$` instead of `/`.
+Codex skill names use `$` instead of `/`.
 
-#### Codex Limitations
+## Bundled Workflows
 
-- **No hooks.** Codex does not support PostToolUse hooks. The automatic state reminder every 5 tool calls is not available. The agent must rely on the skill instructions to periodically run `freefsm current` itself.
-- **No PreToolUse validation.** Illegal transitions are caught by the CLI at execution time, not before. This is the same behavior as Claude Code v1 (PreToolUse hook is also not used in v1).
+- `pdd` — Plan-Driven Development: interactive requirements, research, design, and planning
+- `spec-to-code` — implements a spec directory (from PDD) into working code via TDD
+- `mr-lifecycle` — merge request lifecycle management
 
-In practice, the CLI still enforces valid transitions — the agent just won't get periodic nudges to stay in the FSM workflow.
+Start a bundled workflow by name:
 
-## Examples
-
-See [examples/](examples/) for sample workflows and [docs/](docs/) for the design spec.
+```
+/freefsm:start pdd
+```
 
 ## License
 

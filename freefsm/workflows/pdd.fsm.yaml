@@ -1,0 +1,302 @@
+# Credit: State machine inspired by ralph-orchestrator's prompts.
+#
+# Flow:
+#
+#   create-structure
+#       |           \
+#   requirements ← → research
+#       |               |
+#       +-------+-------+
+#               |
+#          checkpoint
+#         /    |     \
+#   requirements  research  design
+#                           |     \
+#                          plan    requirements (gaps)
+#                         /    \
+#                      done    design (revision)
+
+version: 1
+guide: |
+  Plan-Driven Development (PDD) workflow. Inspired by ralph-orchestrator.
+  Produces a complete spec directory (./specs/<slug>/) through interactive requirements gathering,
+  research, design, and implementation planning. No code is written — output is pure documentation.
+
+  Rules that apply across ALL states:
+
+  - User-driven flow: You MUST NOT proceed to the next state without explicit user confirmation.
+    At each transition point, present the options and wait for the user's choice.
+  - Iterative: The user can move between requirements and research at any time.
+    You MUST always offer this option at state transitions.
+  - Record as you go: Append questions, answers, and findings to project files in real time.
+    You MUST NOT batch-write content at the end of a phase.
+  - Mermaid diagrams: Include diagrams for architectures, data flows, and component relationships
+    in research and design documents.
+  - Sources: Cite references and links in research documents when based on external materials.
+  - Planning only: This workflow produces planning artifacts. You MUST NOT implement code,
+    run containers, execute scripts, or begin any implementation work.
+  - When proposing options to user, always provide a numbered list of options.
+
+  Artifacts produced in ./specs/<slug>/:
+    - rough-idea.md    — original user input
+    - requirements.md  — Q&A record (appended in real-time)
+    - research/*.md    — per-topic research findings
+    - design.md        — architecture, components, data models, acceptance criteria
+    - plan.md          — numbered incremental implementation steps
+    - summary.md       — artifact listing and next steps
+
+initial: create-structure
+
+states:
+  create-structure:
+    prompt: |
+      ## Create Project Structure
+
+      Ask the user to describe their idea or paste any existing context (text, file path, or URL).
+
+      Generate a slug name from the user's description (lowercase, hyphen-separated, short,
+      e.g., `user-auth`, `event-bus`). Use the user-specified name if one is provided.
+
+      Then:
+      1. Create the `./specs/<slug>/` directory and `./specs/<slug>/research/` subdirectory
+      2. Save the user's raw input verbatim to `./specs/<slug>/rough-idea.md`
+      3. Create an empty `./specs/<slug>/requirements.md`
+
+      You MUST support multiple input methods: direct text, file path, or URL.
+      You MUST NOT overwrite an existing `./specs/<slug>/` directory — if it exists, ask the user
+      whether to reuse it or choose a different path.
+
+      After saving, ask the user where they'd like to start:
+      - **Requirements clarification** (recommended) — refine the idea through Q&A
+      - **Research first** — investigate specific technical topics before refining requirements
+
+      You MUST NOT proceed without the user's explicit choice.
+    transitions:
+      start with requirements: requirements
+      start with research: research
+
+  requirements:
+    prompt: |
+      ## Requirements Clarification
+
+      Guide the user through questions to refine the rough idea into concrete requirements.
+
+      You MUST follow this cycle for each question:
+      1. Formulate a question based on what's unclear, ambiguous, or underspecified
+      2. Append the question to `./specs/<slug>/requirements.md` under a `### Q<index>: <question>` heading, index is a number starting from 1.
+      3. Present the question to the user and wait for their complete response
+      4. Append the user's answer below the question in `./specs/<slug>/requirements.md`
+      5. Proceed to the next question
+
+      Constraints:
+      - You MUST ask ONE question at a time. You MUST NOT list multiple questions in a single message.
+      - You MUST NOT pre-populate or assume answers.
+      - You MUST focus on: ambiguities, trade-offs, edge cases, non-functional constraints
+        (performance, security, compatibility), success criteria, and verification methods.
+      - You MUST NOT ask obvious questions — the user's rough idea already conveys basic intent.
+        Read the rough-idea.md first to understand what's already been stated.
+      - When the user seems unsure, suggest concrete options rather than leaving it open-ended.
+
+      Troubleshooting:
+      - If requirements stall, suggest switching to a different aspect of the project,
+        provide example answers, or pivot to research to unblock decisions.
+
+      When you believe you have enough clarity on goals, constraints, and verification criteria,
+      present a brief summary of what you've captured and ask the user:
+      - "Requirements complete, ready to review progress?" → checkpoint
+      - "I need to research something first" → research
+
+      You MUST NOT move on until the user explicitly confirms requirements are complete.
+    transitions:
+      requirements complete: checkpoint
+      need research: research
+
+  research:
+    prompt: |
+      ## Research
+
+      Investigate specific technical topics relevant to the project.
+
+      Process:
+      1. Propose a research plan (2-4 topics) to the user. Incorporate their suggestions.
+      2. For each topic, investigate and write findings to a separate file:
+         `./specs/<slug>/research/<topic-name>.md`
+      3. Periodically check in with the user to share findings and confirm direction.
+      4. Summarize key findings before transitioning.
+
+      You MUST structure each research file with:
+      - **Summary** — one-paragraph overview of the topic
+      - **Key Findings** — numbered list of important discoveries
+      - **Trade-offs** — pros/cons of different approaches
+      - **Recommendations** — what you suggest and why
+      - **References** — links, docs, or sources consulted
+
+      You MUST include Mermaid diagrams when documenting architectures or data flows.
+
+      Optimization: If your runtime supports parallel agent dispatch, consider investigating
+      multiple topics concurrently — one agent per topic, each writing to its own research file.
+      Merge and reconcile findings afterward.
+
+      Troubleshooting:
+      - If research hits dead ends, document what's missing, suggest alternatives with
+        available information, and ask the user for additional context. Do not block progress.
+
+      When research is sufficient, ask the user:
+      - "Research sufficient, let's review progress" → checkpoint
+      - "New questions came up, let's clarify requirements" → requirements
+
+      You MUST NOT proceed until the user confirms research is sufficient.
+    transitions:
+      research sufficient: checkpoint
+      new questions arose: requirements
+
+  checkpoint:
+    prompt: |
+      ## Iteration Checkpoint
+
+      Read all existing artifacts and produce a structured summary:
+      1. Read `./specs/<slug>/requirements.md` — list key decisions made and open questions remaining
+      2. Read all files in `./specs/<slug>/research/` — summarize findings per topic
+      3. Identify any gaps, contradictions, or areas where requirements and research don't align
+
+      Present this summary to the user. Then ask them to choose:
+      - **Proceed to design** — requirements and research are sufficient
+      - **Back to requirements** — need to clarify more
+      - **More research** — need to investigate additional topics
+
+      You MUST NOT proceed to design without explicit user approval.
+      You MUST support iterating between requirements and research as many times as needed.
+    transitions:
+      proceed to design: design
+      back to requirements: requirements
+      more research: research
+
+  design:
+    prompt: |
+      ## Detailed Design
+
+      Create `./specs/<slug>/design.md` — a standalone, comprehensive design document.
+      "Standalone" means it MUST be fully understandable without reading any other file.
+
+      Required sections:
+      1. **Overview** — one-paragraph summary of what we're building and why
+      2. **Detailed Requirements** — consolidated and synthesized from requirements.md
+         (not a copy — restructure into coherent categories)
+      3. **Architecture Overview** — high-level structure with a Mermaid diagram
+      4. **Components & Interfaces** — each component's responsibility, API surface,
+         and how components interact
+      5. **Data Models** — key data structures, schemas, state, and their relationships
+      6. **Error Handling** — failure modes, recovery strategies, and degradation behavior
+      7. **Acceptance Criteria** — Given/When/Then format, specific enough for machine verification
+      8. **Testing Strategy** — what to test, how to test, and coverage expectations
+      9. **Appendices** — technology choices with rationale, research findings summary,
+         alternative approaches considered and why they were rejected
+
+      Constraints:
+      - You MUST consolidate all requirements from requirements.md into section 2.
+        The design document replaces requirements.md as the authoritative spec.
+      - You MUST include an appendix summarizing research findings, technology choices,
+        and alternatives considered.
+      - You MUST include Mermaid diagrams for architecture and data flow.
+      - You MUST iterate on feedback until the user explicitly approves the complete design.
+
+      Troubleshooting:
+      - If design reveals complexity beyond the original scope, break into smaller components,
+        focus on core functionality first, and suggest phased implementation.
+        Return to requirements to re-scope if needed.
+
+      You MUST NOT proceed to planning until the user explicitly approves the design.
+      If significant gaps are found, offer to return to requirements or research.
+    todos:
+      - Write Overview and Detailed Requirements sections
+      - Write Architecture Overview with Mermaid diagram
+      - Write Components & Interfaces section
+      - Write Data Models section
+      - Write Error Handling section
+      - Write Acceptance Criteria (Given/When/Then)
+      - Write Testing Strategy
+      - Write Appendices (tech choices, research, alternatives)
+      - Present to user and get explicit approval
+    transitions:
+      design approved: plan
+      gaps found: requirements
+
+  plan:
+    prompt: |
+      ## Implementation Plan
+
+      Create `./specs/<slug>/plan.md` — a numbered, incremental implementation plan.
+
+      Guiding principle: Each step builds on previous steps, results in working demoable
+      functionality, and follows TDD practices. No orphaned code — every step ends with
+      integration. Core end-to-end functionality MUST be available as early as possible.
+
+      Required format:
+      ```markdown
+      # Implementation Plan: <Feature Name>
+
+      ## Checklist
+      - [ ] Step 1: <title>
+      - [ ] Step 2: <title>
+      ...
+
+      ---
+
+      ## Step N: <Title>
+
+      **Objective**: What this step achieves and why it matters.
+
+      **Implementation Guidance**: Specific technical instructions — what to create,
+      modify, or wire up. Reference design.md sections where relevant.
+
+      **Test Requirements**: What tests to write BEFORE implementation (TDD).
+      Include both unit and integration tests where applicable.
+
+      **Integration Notes**: How this connects to previous steps. What should still
+      work after this step. Any migration or compatibility concerns.
+
+      **Demo**: Concrete description of what to demonstrate when this step is complete.
+      Must be verifiable — not "it works" but "run X, observe Y".
+      ```
+
+      Constraints:
+      - You MUST NOT duplicate design details — reference design.md sections instead.
+      - You MUST ensure each step results in working, demoable functionality.
+        No step should leave the system in a broken state.
+      - You MUST include test requirements BEFORE implementation guidance (TDD).
+      - You MUST ensure core end-to-end flow is available by step 2 or 3 at latest.
+      - Steps MUST be small enough to complete in one focused session.
+      - You MUST include at least one step for integration testing and cleanup.
+      - You MUST present the plan to the user and iterate on feedback until approved.
+
+      You MUST NOT proceed until the user explicitly approves the implementation plan.
+    todos:
+      - Draft implementation steps with TDD ordering
+      - Verify each step produces demoable functionality
+      - Ensure core E2E flow is available early
+      - Verify no orphaned code between steps
+      - Get user approval on the plan
+    transitions:
+      plan approved: done
+      needs design revision: design
+
+  done:
+    prompt: |
+      ## Summary
+
+      Create `./specs/<slug>/summary.md` with:
+      1. **Project Overview** — one-paragraph description of what was planned
+      2. **Artifacts** — list of all files produced with paths and one-line descriptions
+      3. **Key Decisions** — important decisions made during planning and their rationale
+      4. **Next Steps** — concrete actions for implementation
+
+      Present the summary to the user.
+
+      All PDD artifacts are in `./specs/<slug>/`:
+      - `rough-idea.md` — original input
+      - `requirements.md` — Q&A record
+      - `research/*.md` — research findings
+      - `design.md` — detailed design (authoritative spec)
+      - `plan.md` — implementation plan
+      - `summary.md` — this summary
+    transitions: {}

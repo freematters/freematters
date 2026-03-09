@@ -1,0 +1,213 @@
+# Flow:
+#
+#   load-spec → implement ←--+←--------+
+#                   |         |          |
+#                   +-----(failed, max 5)
+#                   |                    |
+#                   +---(spec issue)→ spec-error
+#                   |
+#                 commit
+#                   |
+#               implement (next step)
+#                   |
+#                 done (all complete)
+#
+# Credit: State machine inspired by ralph-orchestrator's spec-driven.yml and pdd-to-code-assist.yml prompts.
+# Picks up where PDD left off — reads ./specs/<slug>/ artifacts and implements them.
+
+version: 1
+guide: |
+  Spec-to-Code workflow. Implements a spec directory (typically produced by the PDD workflow)
+  into working, tested code through strict TDD practices.
+
+  Input: A `./specs/<slug>/` directory containing at minimum:
+    - design.md — authoritative design document with components, interfaces, data models
+    - plan.md   — numbered implementation steps with test requirements and demo criteria
+
+  Rules that apply across ALL states:
+
+  - TDD discipline: Write tests BEFORE implementation. RED → GREEN → REFACTOR cycle.
+  - One step at a time: Implement exactly one plan.md step per cycle.
+  - Spec is authoritative: design.md is the source of truth. Flag issues rather than deviate.
+  - Demoable after each step: Every completed step MUST leave the system working.
+  - YAGNI & KISS: Only what the spec requires, simplest solution that works.
+  - Commit atomically: Each completed step gets its own git commit.
+  - Sub-agents: Each step is dispatched to a sub-agent that implements AND validates.
+    On Claude, the sub agent is called with the Agent tool.
+    The main agent orchestrates — it selects tasks, reviews results, marks progress, and commits.
+  - Progress log: `./specs/<slug>/progress.md` is an append-only log of completed steps.
+    After each step is committed, append a summary. Sub-agents MUST read this file
+    for context on what has been built so far.
+
+initial: load-spec
+
+states:
+  load-spec:
+    prompt: |
+      ## Load Specification
+
+      Read the spec directory and understand what needs to be built.
+
+      Process:
+      1. Read `./specs/<slug>/plan.md` — parse the checklist and identify all implementation steps
+      2. Read `./specs/<slug>/design.md` — understand architecture, components, interfaces, and data models
+      3. Optionally read `./specs/<slug>/requirements.md` and `./specs/<slug>/research/*.md` for additional context
+
+      Present to the user:
+      - Project summary (one paragraph)
+      - Number of implementation steps
+      - Current progress (which steps are already checked off, if any)
+      - The first uncompleted step title
+
+      If `./specs/<slug>/plan.md` or `./specs/<slug>/design.md` does not exist, inform the user and suggest
+      running the PDD workflow first.
+
+      Create a todo item for each uncompleted step (using the step title). Mark already-completed steps as done.
+
+      You MUST NOT begin any implementation work in this state.
+    transitions:
+      spec loaded: implement
+      spec missing: done
+
+  implement:
+    prompt: |
+      ## Implement & Validate Next Step
+
+      ### 1. Select
+
+      Read `./specs/<slug>/plan.md`, find the first unchecked step (`- [ ]`).
+      If all steps are checked, transition to done.
+
+      Present to the user: step number, title, and objective.
+
+      ### 2. Execute (TDD + Validate via Sub-Agent)
+
+      Dispatch a sub-agent to implement AND validate the step:
+
+      > Implement Step N of ./specs/<slug>/plan.md using strict TDD (RED → GREEN → REFACTOR).
+      > Read ./specs/<slug>/design.md for component interfaces and data models.
+      > Read the last 300 lines of ./specs/<slug>/progress.md for context on recent steps (if it exists).
+      > Before coding, explore existing code for patterns, conventions, and style to follow.
+      >
+      > Create a todo list and work through it:
+      > 1. Write failing tests (RED)
+      > 2. Write minimum implementation to pass (GREEN)
+      > 3. Refactor — clean up, run linter/formatter
+      > 4. Run full test suite (not just new tests) — check for regressions
+      > 5. Execute the step's Demo criteria from plan.md — verify expected output
+      > 6. Report: tests passed/failed, demo result, lint issues, any spec deviations
+
+      The sub-agent reads the spec files itself — do NOT paste their content.
+
+      If sub-agents are not available in your runtime, do the work directly.
+      Do NOT skip sub-agent dispatch just because the task seems simple.
+
+      ### 3. Review result
+
+      Review the sub-agent's output:
+      - **All tests pass + demo verified** → commit
+      - **Validation failed (< 5 attempts)** → dispatch sub-agent again with failure feedback
+      - **Validation failed (>= 5 attempts)** → stop and flag to user, ask how to proceed
+      - **Spec issue found** → spec-error (fix spec before continuing)
+
+      ### Constraints
+      - You MUST NOT write implementation before tests exist
+      - You MUST reference design.md — do not invent interfaces
+      - If the spec is ambiguous or wrong, STOP and flag
+      - Implement ONLY the current step — no future steps
+      - You MUST dispatch a sub-agent, even if the task seems simple.
+        The orchestrator's job is to manage workflow state, not to write code itself.
+    todos:
+      - Find next unchecked step in plan.md
+      - Dispatch sub-agent to implement and validate the step
+      - Review sub-agent output
+    transitions:
+      step done: commit
+      all steps complete: done
+      spec issue found: spec-error
+      max retries exceeded: done
+
+  commit:
+    prompt: |
+      ## Commit & Mark Complete
+
+      The current step has been implemented and validated.
+
+      Process:
+      1. Stage all relevant files (new and modified)
+      2. Create a git commit: `feat(scope): step N - <step title>`
+      3. Update `./specs/<slug>/plan.md` — change `- [ ] Step N` to `- [x] Step N`
+      4. Append a step summary to `./specs/<slug>/progress.md` (create if not exists):
+         ```
+         ## Step N: <title>
+         - **Commit**: <hash>
+         - **Files changed**: <list of key files added/modified>
+         - **What was built**: <1-2 sentence summary of implementation>
+         - **Tests**: <number of tests added, all passing/failing>
+         - **Notes**: <any gotchas, workarounds, or deviations from spec>
+         ```
+      5. Commit plan.md + progress.md update
+
+      Present to the user:
+      - Commit hash and message
+      - Files changed summary
+      - Progress: "Step N/M complete"
+
+      Then transition back to implement for the next step.
+      If this was the last step, transition to done.
+    transitions:
+      more tasks remain: implement
+      all tasks complete: done
+
+  spec-error:
+    prompt: |
+      ## Spec Issue Detected
+
+      A problem was found in the spec during implementation. Fix it before continuing.
+
+      Process:
+      1. **Backup** the current spec file before modifying:
+         - Copy `./specs/<slug>/design.md` → `./specs/<slug>/design.md.bak.<timestamp>`
+         - If plan.md also needs changes, back it up similarly
+      2. **Describe the issue** — explain what was found and why the spec is wrong or ambiguous
+      3. **Fix the spec** — update design.md (and plan.md if needed) to resolve the issue
+      4. **Record the modification** in `./specs/<slug>/progress.md`:
+         ```
+         ## Spec Modification (Step N context)
+         - **Issue**: <what was wrong>
+         - **Fix**: <what was changed>
+         - **Backup**: <backup file path>
+         - **Affected steps**: <which plan steps are impacted>
+         ```
+      5. Log a brief summary of the change (no need to wait for user confirmation)
+
+      After recording the fix, transition back to implement to continue autonomously.
+    transitions:
+      spec fixed: implement
+
+  done:
+    prompt: |
+      ## Implementation Complete
+
+      All steps from plan.md have been implemented, tested, and committed.
+
+      **Check for spec modifications**: Look for `## Spec Modification` entries in
+      `./specs/<slug>/progress.md` and `.bak.*` files in `./specs/<slug>/`. If any exist,
+      prominently report to the user:
+      - What spec changes were made during implementation
+      - Which backup files were created
+      - Suggest the user review the updated spec to ensure it still reflects intent
+
+      Write `./specs/<slug>/implementation-summary.md` with:
+      1. **Overview** — one paragraph describing what was built
+      2. **Steps completed** — table of all steps with status and commit hash
+      3. **Test summary** — total tests written, all passing, coverage notes
+      4. **Files created/modified** — list of key files with one-line descriptions
+      5. **How to run** — commands to run the project and tests
+      6. **Remaining work** — any manual testing, deployment, documentation, or known limitations
+
+      Present the summary to the user.
+
+      If the workflow was started because the spec was missing, remind the user to run
+      the PDD workflow (`/freefsm:start pdd`) first.
+    transitions: {}

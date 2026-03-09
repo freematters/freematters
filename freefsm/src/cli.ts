@@ -7,6 +7,7 @@ import { current } from "./commands/current.js";
 import { finish } from "./commands/finish.js";
 import { goto } from "./commands/goto.js";
 import { start } from "./commands/start.js";
+import { install } from "./commands/install.js";
 import { main as postToolUseMain } from "./hooks/post-tool-use.js";
 
 function resolveRoot(flagRoot?: string): string {
@@ -98,6 +99,18 @@ program
       root: resolveRoot(root),
       json: json ?? false,
     });
+  });
+
+program
+  .command("install")
+  .description("register freefsm with an agent platform")
+  .argument("<platform>", "target platform: claude or codex")
+  .action((platform: string) => {
+    if (platform !== "claude" && platform !== "codex") {
+      console.error(`Unknown platform "${platform}". Use "claude" or "codex".`);
+      process.exit(2);
+    }
+    install(platform as "claude" | "codex");
   });
 
 // Hidden hook commands (not shown in --help)

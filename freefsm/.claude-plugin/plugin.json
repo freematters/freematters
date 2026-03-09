@@ -1,0 +1,11 @@
+{
+  "name": "freefsm",
+  "version": "0.1.0",
+  "description": "CLI-first FSM runtime for agent workflows",
+  "author": {
+    "name": "freematters"
+  },
+  "repository": "https://github.com/freematters/freematters",
+  "license": "MIT",
+  "keywords": ["fsm", "workflow", "agent"]
+}

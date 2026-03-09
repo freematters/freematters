@@ -1,68 +1,159 @@
+# Flow:
+#
+#   create-mr → wait-for-pipeline ←--+
+#                |            \       |
+#              check          done    |
+#              /   \                  |
+#           fix ← wait-for-input     |
+#             |        \              |
+#           push       done          |
+#             |                      |
+#             +----------------------+
+#
+
 version: 1
 guide: |
-  Monitor a GitLab MR until it is fully approved and all pipelines pass.
-  Automatically fix CI failures and address review comments marked "please address".
+  Monitor a MR/PR until it is merged or closed.
+  Automatically fix CI failures, bot review findings, and author-marked `!fix` comments.
+
+  Supports GitLab (MR) and GitHub (PR). Platform is auto-detected from git remote URL:
+  - GitLab: Uses GitLab REST API (requires PRIVATE-TOKEN)
+  - GitHub: Prefers `gh` CLI, falls back to GitHub REST API
 
 initial: create-mr
 
 states:
   create-mr:
     prompt: |
-      - 先 commit 所有 local changes
-      - 检查当前分支是否已有 open 的 MR（通过 GitLab API 查询），如果有则 push branch，直接记录 MR URL 和 IID，并且看是否需要 update MR description
-      - 如果没有，创建新的 MR：
-        - Target branch：如果用户指定了就用指定的，否则用 repo 的 default branch
-        - 对比 target branch，总结变更内容作为 MR description
-        - MR title 使用 conventional commit 格式
+      First, detect the platform from git remote URL (gitlab.* → GitLab, github.com → GitHub).
 
-      记录 MR URL 和 IID，后续状态会用到。
+      Verify authentication:
+      - GitLab: Check for PRIVATE-TOKEN (environment variable or config file). If not found, prompt user to configure it.
+      - GitHub: Check `gh auth status`. If not logged in, prompt user to run `gh auth login`.
+
+      Once authenticated:
+      - Run lint/format checks (refer to project CLAUDE.md for check commands). Fix any failures first.
+      - Commit all local changes.
+      - Check if the current branch already has an open MR/PR:
+        - GitLab: Query via GitLab API
+        - GitHub: Query via `gh pr list` or GitHub API
+        If one exists, push the branch, record the URL and ID, and check if the description needs updating.
+      - If none exists, create a new MR/PR:
+        - Target branch: Use user-specified branch if provided, otherwise use the repo's default branch.
+        - Compare against target branch and summarize changes as the description.
+        - Use conventional commit format for the title.
+        - GitLab: Create via GitLab API
+        - GitHub: Create via `gh pr create` or GitHub API
+
+      Record the MR/PR URL and ID — subsequent states will need them.
     transitions:
-      MR ready: poll
+      MR ready: wait-for-pipeline
 
-  poll:
+  wait-for-pipeline:
     prompt: |
-      用 python 轮询 GitLab MR 状态（通过 GitLab API），每 20 秒检查一次，while loop 一直 poll 下去直到 MR 被 merge 或关闭。
+      Poll MR/PR status using python, checking every 20 seconds in a while loop.
+      - GitLab: Query pipeline and MR status via GitLab API
+      - GitHub: Query checks and PR status via `gh pr view` and `gh run list`
 
-      检查项：
-      - MR 是否已被 merge
-      - Pipeline 状态：所有 job 是否都已完成（pending/running 继续等待）
-      - 是否需要 rebase（有 merge conflict 或 target branch 已更新）
-      - Review comments：是否有用户要求处理的 comment（模糊匹配，如 "please address"、"pls fix"、"请处理" 等）
+      On first entry to this state, run a single poll to verify the script works
+      (API token/auth valid, correct IDs, etc.) before starting the loop.
 
-      判断逻辑：
-      - MR 已 merged → done
-      - 发现 failed job、待处理 review comment 或需要 rebase → fix
-      - 其他 → 继续轮询
+      Monitor only two things:
+      - Whether the MR/PR has been merged or closed
+      - Whether all CI (GitLab pipelines / GitHub Actions checks) have completed (keep waiting if pending/running)
+
+      Exit conditions:
+      - MR/PR merged or closed → done
+      - All CI completed (regardless of pass/fail) → check
+    transitions:
+      pipelines finished: check
+      MR merged: done
+      MR closed: done
+
+  check:
+    prompt: |
+      All CI has completed. Check for issues that need attention:
+
+      Check items:
+      - CI results: Are there any failed jobs (GitLab pipeline / GitHub Actions checks)?
+      - Bot review: Comments posted by bots after CI (e.g., code scanning, lint reports). Are there any severe issues (error/critical level)?
+      - Review comments: Only handle items marked with `!fix`. Two scenarios:
+        1. A reviewer left a review comment on the diff, and the author replied with `!fix [optional description]`
+        2. The author posted a `!fix [optional description]` comment directly on the MR/PR
+        Do NOT handle reviewer comments without `!fix` markers.
+      - Rebase: Is the current branch behind the target branch?
+
+      Decision logic:
+      - Any issues found → fix
+      - No issues → wait-for-input
+    todos:
+      - Check pipeline for failed jobs
+      - Check bot review for error/critical findings
+      - Check for !fix-marked comments
+      - Check if rebase is needed
     transitions:
       issues found: fix
+      all clear: wait-for-input
+
+  wait-for-input:
+    prompt: |
+      CI has passed with no pending issues. Poll for user actions (check every 20 seconds):
+
+      Monitor:
+      - Whether the MR/PR has been merged or closed
+      - Whether new `!fix` markers appear (author replies or comments containing `!fix`)
+
+      Exit conditions:
+      - MR/PR merged or closed → done
+      - `!fix` found → fix
+    transitions:
+      fix requested: fix
       MR merged: done
       MR closed: done
 
   fix:
     prompt: |
-      根据 poll 发现的问题进行修复：
-      - CI 失败：通过 GitLab API 获取 failed job 的日志，分析失败原因并修复代码
-      - Review comment：阅读用户要求处理的 comment，理解意图并修改代码
-      - 需要 rebase：fetch 最新的 target branch，git rebase，有 conflict 自主解决
+      Fix issues found during check or wait-for-input:
+      - CI failure: Fetch failed job logs (GitLab API / `gh run view --log-failed`), analyze root cause, and fix the code.
+      - Bot review: Read bot comment findings. Only fix severe issues (error/critical level). Ignore warnings and info.
+      - Review comments: Find author-marked `!fix` comments, read the corresponding reviewer comment or author's description, understand the intent, and modify the code.
+      - Rebase needed: Fetch the latest target branch, git rebase. Resolve conflicts autonomously.
 
-      如果检查后发现没有需要修复的内容，直接回到轮询。
+      After fixing, run lint/format/unit tests to confirm the fix doesn't introduce new issues.
+
+      If upon inspection there is nothing to fix, transition back to polling.
+    todos:
+      - Fix CI failures (if any)
+      - Fix bot review severe issues (if any)
+      - Handle !fix-marked comments (if any)
+      - Rebase (if needed)
+      - Run lint/format/unit tests to verify
     transitions:
       fixed: push
-      nothing to fix: poll
+      nothing to fix: wait-for-pipeline
 
   push:
     prompt: |
-      将修复提交并推送：
-      - Commit 并 push 到远程分支（如果是 rebase 则 force push）
-      - 如果本次修复 address 了 review comment，通过 GitLab API resolve 对应的 discussion
-      - 视情况更新 MR description，特别是当 address 了 review 意见导致实现方式有变化时
+      Commit and push the fixes:
+      - Commit and push to the remote branch (force push if rebased).
+      - Only resolve review threads that were actually fixed in this round (bot review findings or `!fix`-marked comments).
+        Do NOT resolve unfixed threads.
+        - GitLab: Resolve discussions via API
+        - GitHub: Reply to review comments explaining the fix
+      - Update the MR/PR description if needed, especially when addressing review feedback changed the implementation approach.
+    todos:
+      - Reply to and resolve addressed !fix comments (explain what was fixed)
+      - Reply to and resolve bot review discussions where critical issues were fixed (explain the fix)
+      - Reply to and resolve bot review discussions that had no critical issues (acknowledge review)
+      - Update MR/PR description — append a summary of what was fixed in this round
+      - Push to remote (force push if rebased)
     transitions:
-      pushed: poll
+      pushed: wait-for-pipeline
 
   done:
     prompt: |
-      MR 已被 merge。输出总结：
-      - MR URL
-      - 总共经历了多少轮修复
-      - 主要修复内容概要
+      The MR/PR has been merged or closed. Output a summary:
+      - MR/PR URL
+      - Total number of fix rounds
+      - Brief overview of main fixes applied
     transitions: {}

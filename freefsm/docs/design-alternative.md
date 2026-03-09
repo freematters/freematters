@@ -1,4 +1,4 @@
-# FreeFSM Design Alternative
+# FreeFSM Design
 
 > FSM-based agent workflow plugin for Claude Code.
 > Marries natural language flexibility with FSM determinism.
@@ -19,14 +19,15 @@ Code is deterministic but rigid, hard to extend, and bug-prone.
 
 | Decision               | Choice                                   | Rationale                                                                  |
 | ---------------------- | ---------------------------------------- | -------------------------------------------------------------------------- |
-| Target platform        | Claude Code (v0), general-purpose later  | Hooks are essential for enforcement; Codex lacks hooks                     |
+| Target platform        | Claude Code (v1), Codex support added    | Hooks are essential for enforcement; Codex has limited hook support         |
 | Architecture           | CLI + Hooks                              | Simple, debuggable, no MCP overhead                                        |
 | Language               | TypeScript                               | npm distribution, Claude Code plugin ecosystem, hooks script compatibility |
-| State persistence      | JSONL + run_id (event sourcing)          | Append-only, audit trail, multi-run support                                |
+| State persistence      | Event sourcing (JSONL + snapshot)         | Append-only audit trail, fast reads via snapshot                           |
 | Todos                  | Soft constraint (warn, don't block)      | Hard enforcement deferred to future `strict: true` flag                    |
-| Transitions            | Hard constraint                          | Illegal transitions rejected by PreToolUse hook before CLI execution       |
+| Transitions            | Hard constraint (CLI rejects illegal)    | `goto` validates against FSM definition before committing                  |
 | Hook reminder interval | Every 5 tool calls (PostToolUse)         | Fixed interval, configurable later                                         |
-| Scope (v0)             | `init`, `current`, `goto`, `finish` only | No `todo`, `viz`, `log`, `compile`                                         |
+| Terminal state         | Fixed as `done`                          | Must exist in schema; `goto done` completes the run                        |
+| Scope (v1)             | `start`, `current`, `goto`, `finish`     | No `todo`, `viz`, `log`, `compile`                                         |
 
 ## Architecture
 
@@ -35,59 +36,73 @@ Code is deterministic but rigid, hard to extend, and bug-prone.
 |              Claude Code Plugin              |
 |                                              |
 |  skills/              hooks/                 |
-|  +-- draft/           +-- hooks.json         |
-|  +-- run/                                    |
-|  +-- finish/           PreToolUse:           |
-|                         - fsm goto: validate |
-|                           transition, reject |
-|                           if illegal         |
-|                                              |
-|                        PostToolUse:           |
-|                         - every 5 tool calls |
+|  +-- create/          +-- hooks.json         |
+|  +-- start/                                  |
+|  +-- current/          PostToolUse:           |
+|  +-- finish/            - every 5 tool calls |
 |                           inject state       |
 |                           reminder           |
 |                                              |
 +----------------------------------------------+
-|              fsm CLI (TypeScript)             |
+|              freefsm CLI (TypeScript)         |
 |                                              |
-|  fsm init <yaml>     load FSM, enter initial |
-|  fsm current         query current state     |
-|  fsm goto <state>    validate + transition   |
-|  fsm finish          end run                 |
+|  freefsm start <yaml>   load FSM, enter     |
+|                          initial state       |
+|  freefsm current         query current state |
+|  freefsm goto <state>    validate+transition |
+|  freefsm finish          abort run           |
 |                                              |
 +----------------------------------------------+
-|              .freefsm/                        |
-|  events.jsonl    <- append-only event log     |
-|  active_run      <- current run_id + yaml path|
-|  hook_counter    <- PostToolUse call counter   |
+|              ~/.freefsm/                      |
+|  runs/<run_id>/                               |
+|    fsm.meta.json  <- run metadata             |
+|    events.jsonl   <- append-only event log    |
+|    snapshot.json  <- current state snapshot    |
+|    lock/          <- directory-based file lock |
+|  sessions/                                    |
+|    <session_id>.json     <- session->run bind |
+|    <session_id>.counter  <- hook call counter  |
 +----------------------------------------------+
 ```
 
 **Data flow:**
 
-1. `/fsm:run workflow.yaml` -> skill instructs agent to call `fsm init`
-2. `fsm init` -> writes init event to JSONL, outputs guide + initial state prompt
-3. Agent works -> PostToolUse hook every 5 tool calls injects state reminder via `fsm current`
-4. Agent calls `fsm goto X` -> PreToolUse hook validates transition legality; if legal, CLI executes, writes event, outputs new state info
-5. `/fsm:finish` -> outputs run summary
+1. `/freefsm:start workflow.yaml` -> skill instructs agent to call `freefsm start`
+2. `freefsm start` -> writes start event, outputs guide + initial state card
+3. Agent works -> PostToolUse hook every 5 tool calls injects state reminder via `freefsm current`
+4. Agent calls `freefsm goto X --on "label"` -> CLI validates transition legality; if legal, writes event, outputs new state card
+5. Agent reaches `done` state -> run completes (`run_status=completed`)
+6. `/freefsm:finish` -> aborts an active run (`run_status=aborted`)
+
+## Run Lifecycle
+
+```
+active -> completed   (goto done)
+active -> aborted     (finish)
+completed/aborted     terminal, no further operations
+```
+
+`finish` is abort-only. Normal completion is `goto done`.
 
 ## FSM YAML Schema
 
 ```yaml
-# guide: initial instructions for the agent entering the FSM
+version: 1
+
 guide: |
   You are in an FSM workflow.
-  Use fsm goto <State> --on "<condition>" to transition.
-  Use fsm current to check current state.
+  Use freefsm goto <State> --on "<condition>" to transition.
+  Use freefsm current to check current state.
 
-# initial: must be a key in states
 initial: Plan
 
-# states: state definitions
 states:
   Plan:
     prompt: |
       Understand requirements, break into subtasks, confirm with user before proceeding. Do not write code.
+    todos:
+      - Review requirements document
+      - Break into subtasks
     transitions:
       plan confirmed: Execute
       requirements unclear: Plan
@@ -110,63 +125,94 @@ states:
     prompt: |
       Review code quality, robustness, security.
     transitions:
-      no issues: Done
+      no issues: done
       has issues: Execute
       requirements misunderstood: Plan
 
-  Done:
+  done:
     prompt: |
       Output completion summary (features, test coverage, review conclusions).
-    # No transitions = terminal state
+    transitions: {}
 ```
 
 **Schema rules:**
 
+- `version` must be `1`
+- `guide` is optional; if provided, must be a non-empty string
 - `initial` must reference an existing state in `states`
-- All transition target values must reference existing states in `states`
-- State names must match `[A-Za-z_-][A-Za-z0-9_-]*` (no spaces)
-- A state with no `transitions` (or empty) is a terminal state
-- `prompt` is plain text, no template variables in v0
-- `fsm init` validates the schema and rejects invalid YAML
+- `done` state must exist (terminal state)
+- All transition target values must reference existing states
+- State names must match `[A-Za-z_-][A-Za-z0-9_-]*`
+- Non-`done` states must have at least one transition; `done` may have empty transitions
+- `prompt` is required, plain text, no template variables
+- `todos` is optional; items must be non-empty, unique strings (soft constraint only)
+- `freefsm start` validates the schema and rejects invalid YAML (`SCHEMA_INVALID`)
 
-## JSONL Event Log
+## Storage
 
-**File:** `.freefsm/events.jsonl`
+**Default root:** `~/.freefsm/` (override via `--root` flag or `FREEFSM_ROOT` env var).
 
-**Event types:**
+### Data contracts
 
-```jsonl
-{"run_id":"a1b2c3","type":"init","state":"Plan","yaml":"workflow.yaml","ts":1709100000}
-{"run_id":"a1b2c3","type":"goto","from":"Plan","to":"Execute","on":"plan confirmed","ts":1709100120}
-{"run_id":"a1b2c3","type":"goto","from":"Execute","to":"Test","on":"implementation complete","ts":1709100300}
-{"run_id":"a1b2c3","type":"finish","state":"Done","ts":1709100500}
+**`fsm.meta.json`** — run metadata:
+
+```json
+{
+  "run_id": "plan-execute-auth",
+  "fsm_path": "./workflows/plan-execute.fsm.yaml",
+  "created_at": "2026-02-28T09:00:00.000Z",
+  "version": 1
+}
 ```
 
-**Design decisions:**
+**`events.jsonl`** — append-only event log:
 
-- `run_id`: generated by `fsm init` (nanoid short ID) or provided via `--run-id` flag, shared by all events in a run
-- `type`: only three values — `init`, `goto`, `finish`
-- `on`: records which transition condition was used (explicitly provided via `--on` flag on `fsm goto`)
-- Current state reconstruction: read last event with matching run_id, take `state` (init/finish) or `to` (goto)
-- Multiple runs coexist in the same JSONL file, isolated by run_id
-- After `fsm finish`, the run_id no longer accepts any operations
+```jsonl
+{"seq":1,"ts":"...","run_id":"a1b2c3","event":"start","from_state":null,"to_state":"Plan","on_label":null,"actor":"agent","reason":null,"metadata":null}
+{"seq":2,"ts":"...","run_id":"a1b2c3","event":"goto","from_state":"Plan","to_state":"Execute","on_label":"plan confirmed","actor":"agent","reason":null,"metadata":null}
+{"seq":3,"ts":"...","run_id":"a1b2c3","event":"goto","from_state":"Execute","to_state":"done","on_label":"implementation complete","actor":"agent","reason":null,"metadata":null}
+```
+
+**`snapshot.json`** — current state (read optimization):
+
+```json
+{
+  "run_id": "a1b2c3",
+  "run_status": "active",
+  "state": "Execute",
+  "last_seq": 2,
+  "updated_at": "2026-02-28T09:10:22.000Z"
+}
+```
+
+### Write path
+
+For state-changing operations (`start`, `goto`, `finish`):
+
+1. Acquire per-run directory lock (`lock/`)
+2. Read `snapshot.json`
+3. Validate command
+4. Append event to `events.jsonl`
+5. Update `snapshot.json` (`last_seq`)
+6. Release lock
+
+### Concurrency
+
+- Lock granularity: per `run_id` (directory-based)
+- Guarantees: no duplicate seq, no interleaved writes, consistent snapshot
 
 ## CLI Commands
 
-### `fsm init <yaml> [--run-id <id>]`
+### `freefsm start <yaml> [--run-id <id>] [-j]`
 
 ```
-$ fsm init workflow.yaml
-$ fsm init workflow.yaml --run-id my-session-1
-```
-
-```
+$ freefsm start workflow.yaml
 OK FSM initialized (run_id: a1b2c3)
 
 Guide:
   You are in an FSM workflow.
-  Use fsm goto <State> to transition.
-  Use fsm current to check current state.
+  Use freefsm goto <State> to transition.
+  Use freefsm current to check current state.
 
 State: Plan
   Understand requirements, break into subtasks, confirm with user.
@@ -176,16 +222,15 @@ Transitions:
   requirements unclear -> Plan
 ```
 
-- Generates run_id (nanoid), or uses the provided `--run-id` value
-- Stores active run_id in `.freefsm/active_run` for hooks to reference
-- Validates YAML schema (initial exists, transition targets exist, state names match `[A-Za-z_-][A-Za-z0-9_-]*`)
-- Outputs guide + initial state prompt + transitions
-- Rejects if an active run already exists; use `fsm init --force` to override a stale run
+- Generates `run_id` (nanoid), or uses provided `--run-id`
+- Validates YAML schema
+- Outputs guide + initial state card + transitions
+- Rejects if `run_id` already exists (`RUN_EXISTS`)
 
-### `fsm current`
+### `freefsm current --run-id <id> [-j]`
 
 ```
-$ fsm current
+$ freefsm current --run-id a1b2c3
 
 State: Execute
   Implement according to plan. Do not run tests.
@@ -195,15 +240,14 @@ Transitions:
   plan incorrect -> Plan
 ```
 
-- Reconstructs current state from JSONL
-- Outputs state prompt + transitions
-- Errors if no active run
+- Reads snapshot, resolves state definition
+- Outputs state card (state, prompt, todos, transitions)
+- Errors if run not found (`RUN_NOT_FOUND`)
 
-### `fsm goto <state> --on <condition>`
+### `freefsm goto <state> --run-id <id> --on <label> [-j]`
 
 ```
-$ fsm goto Test --on "implementation complete"
-
+$ freefsm goto Test --run-id a1b2c3 --on "implementation complete"
 OK Execute -> Test (on: implementation complete)
 
 State: Test
@@ -214,56 +258,46 @@ Transitions:
   failures exist -> Execute
 ```
 
-- `--on` is required: explicitly specifies which transition condition is being taken
-- Validates: the condition exists in current state's transitions AND points to the target state
-- Writes goto event with `on` field
-- Outputs new state info
-- Errors with available transitions if illegal
+- `--on` is required: specifies which transition label is being taken
+- Validates: label exists in current state's transitions AND maps to target state
+- If target is `done`: sets `run_status=completed`, `completion_reason=done_auto`
+- Errors with available transitions if illegal (`INVALID_TRANSITION`)
 
-### `fsm finish`
+### `freefsm finish --run-id <id> [-j]`
 
 ```
-$ fsm finish
-
-OK FSM finished (run_id: a1b2c3)
-Final state: Done
-Path: Plan -> Execute -> Test -> Review -> Done
+$ freefsm finish --run-id a1b2c3
+OK FSM aborted (run_id: a1b2c3)
+Final state: Execute
 ```
 
-- Writes finish event
-- Outputs run summary (state path)
-- Errors if no active run
+- Abort-only; sets `run_status=aborted`, `completion_reason=manual_abort`
+- Errors if run not active (`RUN_NOT_ACTIVE`)
 
 **Common behavior:**
 
-- Exit code 0 = success, non-zero = failure
+- Exit code `0` = success, `2` = failure
+- `-j/--json` wraps output in `{"ok":true,"code":null,"message":"...","data":{...}}`
+- `--root <path>` overrides storage root
 - Errors to stderr, normal output to stdout
 
-## Hooks
+**Error codes:** `SCHEMA_INVALID`, `RUN_EXISTS`, `RUN_NOT_FOUND`, `RUN_NOT_ACTIVE`, `STATE_NOT_FOUND`, `INVALID_TRANSITION`, `ARGS_INVALID`
+
+## PostToolUse Hook
 
 ### hooks.json
 
 ```json
 {
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "fsm _hook pre-tool-use"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
-        "matcher": ".*",
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "fsm _hook post-tool-use"
+            "command": "freefsm _hook post-tool-use",
+            "timeout": 10
           }
         ]
       }
@@ -272,44 +306,15 @@ Path: Plan -> Execute -> Test -> Review -> Done
 }
 ```
 
-Hook logic is implemented as hidden CLI subcommands (`fsm _hook pre-tool-use`, `fsm _hook post-tool-use`) rather than standalone scripts. This eliminates path resolution issues when the plugin is distributed via npm.
+Hook logic is a hidden CLI subcommand (`freefsm _hook post-tool-use`), eliminating path resolution issues when distributed via npm.
 
-### PreToolUse: Reject Illegal Transitions
+### Logic
 
-**Trigger:** Agent calls Bash with `fsm goto <state>`
-
-**Logic:**
-
-1. Read hook input JSON from stdin, extract `tool_input.command`
-2. Regex match `fsm goto (\S+).*--on\s+"([^"]+)"`, extract target state and condition
-3. If no active run (`.freefsm/active_run` missing) -> exit 0, pass through
-4. Read JSONL to reconstruct current state
-5. Read YAML to get current state's transitions
-6. Validate: condition exists in transitions AND maps to target state
-7. If invalid -> **exit non-zero, stderr:**
-
-```
-ERR illegal transition: Plan -> Review
-Current state: Plan
-Available transitions:
-  plan confirmed -> Execute
-  requirements unclear -> Plan
-```
-
-8. If valid -> exit 0, allow execution
-
-**Non-`fsm goto` Bash commands pass through unconditionally.**
-
-### PostToolUse: Periodic State Reminder
-
-**Trigger:** Any tool call completion
-
-**Logic:**
-
-1. Read counter file `.freefsm/hook_counter` (init to 0 if missing)
-2. Increment counter, write back
-3. If `count % 5 !== 0` -> exit, no output
-4. If `count % 5 === 0` -> read JSONL + YAML internally (shared library code), write to stdout as prompt injection:
+1. Resolve session ID from environment
+2. Read counter from `sessions/<session_id>.counter` (init to 0 if missing)
+3. Increment counter, write back
+4. If `count % 5 !== 0` -> exit, no output
+5. If `count % 5 === 0` -> read snapshot + FSM, output state reminder:
 
 ```
 FSM State Reminder
@@ -322,147 +327,80 @@ Transitions:
 
 **Design decisions:**
 
-- Counter uses a separate file (not JSONL) — it's hook-internal state, not an FSM event
-- `fsm init` resets the counter, `fsm finish` cleans it up
-- PostToolUse matcher uses `.*` to match all tools for accurate counting
+- Counter lives in `sessions/` (not JSONL) — it's hook-internal state, not an FSM event
+- Matcher uses `""` (matches all tools) for accurate counting
+- No PreToolUse validation hook in v1; transitions are validated at CLI execution time
 
 ## Skills
 
-### `/fsm:draft <path>`
+### `/freefsm:create [PATH]`
 
-Interactively draft an FSM workflow YAML file through conversation. Lowers the barrier — users describe workflows in natural language, agent generates the YAML.
+Interactively create an FSM workflow YAML through conversation. User describes workflows in natural language, agent generates schema-compliant YAML.
 
-**SKILL.md:**
+Does not depend on `freefsm` CLI. Pure conversation, agent writes YAML via Write tool.
 
-```markdown
----
-name: draft
-description: Interactively draft an FSM workflow YAML file through conversation.
----
+### `/freefsm:start PATH`
 
-User wants to create an FSM workflow file: $ARGUMENTS
+Start an FSM workflow run. Generates a descriptive slug as `run_id`, calls `freefsm start`, and guides the agent into the state machine.
 
-1. Ask the user about the workflow's goal and main steps
-2. Generate an FSM yaml draft based on the conversation
-3. Present to user for review
-4. Modify based on feedback until user confirms
-5. Write to file
+### `/freefsm:current`
 
-Output yaml must follow FreeFSM schema:
+Show current FSM state. Calls `freefsm current` and displays the state card.
 
-- guide: initial instructions for the agent
-- initial: initial state name
-- states: each state has prompt and transitions
-```
+### `/freefsm:finish`
 
-Does not depend on `fsm` CLI. Pure conversation, agent writes yaml via Write tool.
-
-### `/fsm:run <path>`
-
-Start an FSM workflow. Calls `fsm init` and guides the agent into the state machine.
-
-**SKILL.md:**
-
-```markdown
----
-name: run
-description: Start running an FSM workflow. Initializes the FSM and guides agent behavior.
----
-
-Start FSM workflow: $ARGUMENTS
-
-1. Call `fsm init $ARGUMENTS` to initialize the state machine
-2. Follow the guide output by fsm init
-3. Work according to the current state's prompt
-4. When current state work is done, use `fsm goto <State> --on "<condition>"` to transition
-5. After reaching a terminal state, call `fsm finish`
-```
-
-Hooks are not installed by the skill. They are statically declared in the plugin's `hooks/hooks.json` and always active. When no active run exists (before `fsm init`), hooks detect this and pass through without action.
-
-### `/fsm:finish`
-
-End the current FSM run and output a summary.
-
-**SKILL.md:**
-
-```markdown
----
-name: finish
-description: Finish the current FSM workflow run.
----
-
-End the current FSM workflow.
-
-1. Call `fsm finish`
-2. Present the run summary to the user
-```
+Abort the current FSM run. Calls `freefsm finish` and displays the terminal summary.
 
 ### Skills design decisions
 
-- **Hooks are always mounted, activated on demand** — no dynamic install/uninstall of hooks. Hooks check for an active run and no-op if none exists. Simplifies implementation, avoids runtime modification of hooks.json.
-- **`/fsm:draft` does not depend on CLI** — pure conversation to generate yaml
-- **`/fsm:run` is a prompt wrapper** — translates `fsm init` output into agent behavioral instructions
+- **Hooks are always mounted, activated on demand** — hooks check for an active session/run and no-op if none exists. No dynamic install/uninstall.
+- **`/freefsm:create` does not depend on CLI** — pure conversation to generate YAML
+- **`goto` is not a skill** — transitions are driven by agent via CLI, not exposed as slash commands
 
 ## Plugin Structure
 
 ```
 freefsm/
-├── .claude-plugin/
-│   └── plugin.json
 ├── skills/
-│   ├── draft/
+│   ├── create/
 │   │   └── SKILL.md
-│   ├── run/
+│   ├── start/
+│   │   └── SKILL.md
+│   ├── current/
 │   │   └── SKILL.md
 │   └── finish/
 │       └── SKILL.md
 ├── hooks/
 │   └── hooks.json
 ├── bin/
-│   └── fsm
+│   └── freefsm
 ├── src/
 │   ├── cli.ts                 # CLI command routing
 │   ├── commands/
-│   │   ├── init.ts
+│   │   ├── start.ts
 │   │   ├── current.ts
 │   │   ├── goto.ts
 │   │   └── finish.ts
 │   ├── hooks/
-│   │   ├── pre-tool-use.ts
-│   │   └── post-tool-use.ts
-│   ├── fsm.ts                 # core FSM logic (load yaml, validate, transition)
-│   └── store.ts               # JSONL read/write
+│   │   └── post-tool-use.ts   # periodic reminder hook
+│   ├── fsm.ts                 # core FSM logic (load yaml, validate)
+│   ├── store.ts               # storage (events, snapshot, lock, sessions)
+│   ├── errors.ts              # CliError + FsmError
+│   └── output.ts              # formatStateCard() + jsonEnvelope()
 ├── package.json
 └── tsconfig.json
 ```
 
-### plugin.json
-
-```json
-{
-  "name": "freefsm",
-  "description": "FSM-based agent workflow control for Claude Code",
-  "version": "0.1.0",
-  "author": {
-    "name": "freefsm"
-  }
-}
-```
-
 ### Distribution
 
-- **Development:** `claude --plugin-dir ./freefsm` for local testing
-- **npm publish:** `npm i -g freefsm` installs the CLI globally, then Claude Code `/plugin install` for plugin features
-- Hook commands use `fsm _hook pre-tool-use` / `fsm _hook post-tool-use` (hidden CLI subcommands), so no path resolution issues after npm install
+- **npm:** `npm i -g freefsm` installs CLI globally
+- Hook commands use `freefsm _hook post-tool-use` (hidden CLI subcommand), so no path resolution issues after npm install
 
 ## Future Work (TBD)
 
-- Codex support (orchestrator mode — FSM as outer loop calling agent)
 - `strict: true` for hard todo enforcement
 - `vars` for state-scoped variables
-- `fsm todo done <idx>` for explicit todo tracking
-- `fsm viz` for state graph visualization
-- `fsm log` for event history viewing
-- `fsm compile` for markdown-to-yaml conversion
+- `freefsm viz` for state graph visualization
+- `freefsm log` for event history viewing
 - Configurable hook reminder interval per state
+- PreToolUse validation hook (reject illegal transitions before CLI execution)

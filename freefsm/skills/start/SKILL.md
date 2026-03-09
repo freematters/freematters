@@ -19,7 +19,11 @@ Initialize a new FSM run from a workflow YAML file.
    - If the user chooses to abort, run `freefsm finish --run-id <run_id>` first, then clean up pending/in-progress tasks (set to `deleted`).
    - If the state is `done` or the run doesn't exist, skip this step silently.
 
-2. **Resolve the workflow path** — If PATH is not provided or is just a name (no `/` or `.yaml`), search for a matching file in `./workflows/` (e.g., `code-review` resolves to `./workflows/code-review.fsm.yaml`).
+2. **Resolve the workflow path** — If PATH is not provided or is just a name (no `/` or `.yaml`), search for a matching `<name>.fsm.yaml` file in this order:
+   1. `./workflows/` (project-local workflows)
+   2. The freefsm package's bundled `workflows/` directory (find it via `dirname $(which freefsm)/../workflows/`)
+
+   Example: `pdd` resolves to `./workflows/pdd.fsm.yaml` if it exists locally, otherwise to the bundled `<freefsm-package>/workflows/pdd.fsm.yaml`.
 
 3. **Generate a descriptive run ID** (required) — Use the format `<fsm-name>-$(date '+%Y%m%d%H%M%S')` where fsm-name is derived from the workflow filename and $(date) is the bash command that outputs the current date in YYYY-MM-DD format (e.g., `code-review-2024-12-19`, `plan-execute-2024-12-19`). Use lowercase letters, numbers, and hyphens. You MUST always pass `--run-id`.
 
