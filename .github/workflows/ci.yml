@@ -57,6 +57,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: freefsm/package-lock.json
       - run: npm ci
+      - run: npm install -g npm@latest
       - run: npm run build
       - name: Publish if version changed
         run: |
@@ -67,5 +68,3 @@ jobs:
           else
             echo "Version $CURRENT already published, skipping."
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
