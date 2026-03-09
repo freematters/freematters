@@ -12,6 +12,7 @@
     "prepublishOnly": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "fmt": "biome format --write .",
     "lint": "biome lint .",
@@ -32,13 +33,7 @@
   "engines": {
     "node": ">=18"
   },
-  "files": [
-    "dist/",
-    "workflows/",
-    "skills/",
-    "hooks/",
-    ".claude-plugin/"
-  ],
+  "files": ["dist/", "workflows/", "skills/", "hooks/", ".claude-plugin/"],
   "repository": {
     "type": "git",
     "url": "https://github.com/freematters/freematters",
