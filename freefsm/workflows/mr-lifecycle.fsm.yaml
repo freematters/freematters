@@ -179,8 +179,9 @@ states:
       - Commit and push to the remote branch (force push if rebased).
       - Only resolve review threads that were actually fixed in this round (bot review findings or `!fix`-marked comments).
         Do NOT resolve unfixed threads.
-        - GitLab: Resolve discussions via API
-        - GitHub: Reply to review comments explaining the fix
+        - GitLab: Resolve discussions via PUT `$GITLAB/projects/:id/merge_requests/:iid/discussions/:discussion_id` with `{ "resolved": true }`
+        - GitHub: Reply to the review comment explaining the fix, then resolve the thread via GraphQL `resolveReviewThread` mutation.
+          To resolve: query `repository.pullRequest.reviewThreads` to get thread IDs, then call `resolveReviewThread(input: {threadId: $id})`.
       - Update the MR/PR description if needed, especially when addressing review feedback changed the implementation approach.
     todos:
       - Reply to and resolve addressed !fix comments (explain what was fixed)
