@@ -21,8 +21,10 @@ states:
       ```python
       from pathlib import Path
       from datetime import datetime
+      from textwrap import dedent
 
-      save_content = f"""# Abandoned Hospital - Save File
+      save_content = dedent(f"""\
+      # Abandoned Hospital - Save File
       Created: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 
       ## Current State
@@ -42,7 +44,7 @@ states:
 
       ## Death Count
       0
-      """
+      """)
       Path("saves/abandoned-hospital").mkdir(parents=True, exist_ok=True)
       Path("saves/abandoned-hospital/current.md").write_text(save_content)
       print("Save file reset")
