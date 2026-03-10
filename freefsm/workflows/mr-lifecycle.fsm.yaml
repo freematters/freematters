@@ -20,6 +20,35 @@ guide: |
   - GitLab: Uses GitLab REST API (requires PRIVATE-TOKEN)
   - GitHub: Prefers `gh` CLI, falls back to GitHub REST API
 
+  ## GitLab API Reference
+
+  Base URL varies by instance. Use `$GITLAB` as placeholder (e.g. `https://gitlab.example.com/api/v4`).
+  `:id` is URL-encoded project path (e.g. `group%2Frepo`), `:iid` is the MR number.
+
+  ### Pipeline
+  - `GET $GITLAB/projects/:id/merge_requests/:iid/pipelines` — list MR pipelines
+
+  ### Discussions (threaded comments, including diff comments)
+  - `GET $GITLAB/projects/:id/merge_requests/:iid/discussions` — list all discussions
+  - `GET $GITLAB/projects/:id/merge_requests/:iid/discussions/:discussion_id` — get single discussion
+  - `POST $GITLAB/projects/:id/merge_requests/:iid/discussions/:discussion_id/notes` — reply to thread
+      body: `{ "body": "..." }`
+  - `PUT $GITLAB/projects/:id/merge_requests/:iid/discussions/:discussion_id` — resolve/unresolve thread
+      body: `{ "resolved": true }`
+
+  ### Notes (flat comment list, no diff position info)
+  - `GET $GITLAB/projects/:id/merge_requests/:iid/notes` — list all notes
+  - `GET $GITLAB/projects/:id/merge_requests/:iid/notes/:note_id` — get single note
+  - `POST $GITLAB/projects/:id/merge_requests/:iid/notes` — create note
+      body: `{ "body": "..." }`
+
+  ### Other
+  - `GET $GITLAB/projects/:id/merge_requests/:iid` — MR details
+  - `GET $GITLAB/projects/:id/merge_requests/:iid/changes` — MR diff/changes
+  - `GET $GITLAB/projects/:id/merge_requests/:iid/commits` — MR commits
+  - `POST $GITLAB/projects/:id/merge_requests/:iid/approve` — approve MR
+  - `POST $GITLAB/projects/:id/merge_requests/:iid/unapprove` — unapprove MR
+
 initial: create-mr
 
 states:
@@ -102,12 +131,20 @@ states:
       Monitor:
       - Whether the MR/PR has been merged or closed
       - Whether new `!fix` markers appear (author replies or comments containing `!fix`)
+      - Whether new CI pipelines have started (e.g., from external pushes or rebases)
 
-      Exit conditions:
+      IMPORTANT: You MUST keep polling indefinitely. Do NOT stop, exit, or ask the user
+      whether to continue. The user may push new commits, a reviewer may comment, or the
+      MR may be merged/closed at any time — the only way to detect these events is to
+      keep the polling loop running.
+
+      Exit conditions (the ONLY reasons to stop polling):
       - MR/PR merged or closed → done
       - `!fix` found → fix
+      - New CI pipeline detected (running/pending) → wait-for-pipeline
     transitions:
       fix requested: fix
+      new pipeline detected: wait-for-pipeline
       MR merged: done
       MR closed: done
 
