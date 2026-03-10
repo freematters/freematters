@@ -11,7 +11,7 @@ states:
     prompt: |
       ## Check Save
 
-      Read `saves/current.md` to check for an existing game:
+      Read `saves/abandoned-hospital/current.md` to check for an existing game:
       - If time is not "00:00", there is progress to resume.
       - Ask the player: continue the previous game, or start a new one?
       - Detect the player's language and use it for all communication.
@@ -43,8 +43,8 @@ states:
       ## Death Count
       0
       """
-      Path("saves").mkdir(exist_ok=True)
-      Path("saves/current.md").write_text(save_content)
+      Path("saves/abandoned-hospital").mkdir(parents=True, exist_ok=True)
+      Path("saves/abandoned-hospital/current.md").write_text(save_content)
       print("Save file reset")
       ```
 
@@ -74,7 +74,7 @@ states:
 
       ### Before Each Response
 
-      1. Read `saves/current.md` for current state
+      1. Read `saves/abandoned-hospital/current.md` for current state
       2. Check if the current time triggers a scripted event (see spec.md timeline)
       3. Check if the player's action triggers an instant-death condition
       4. Calculate sanity changes (MUST use Python)

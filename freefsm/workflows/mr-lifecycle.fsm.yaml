@@ -1,14 +1,14 @@
 # Flow:
 #
-#   create-mr → wait-for-pipeline ←--+
-#                |            \       |
-#              check          done    |
-#              /   \                  |
-#           fix ← wait-for-input     |
-#             |        \              |
-#           push       done          |
-#             |                      |
-#             +----------------------+
+#   create-mr → wait-for-pipeline ←--+←-----------+
+#                |            \       |             |
+#              check          done    |             |
+#              /   \                  |             |
+#           fix ← wait-for-input ----+             |
+#             |        \        \                   |
+#           push       done   (new pipeline) ------+
+#             |
+#             +---→ wait-for-pipeline
 #
 
 version: 1
