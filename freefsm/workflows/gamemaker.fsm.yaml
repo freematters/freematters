@@ -196,5 +196,5 @@ states:
       - spec.md contains the full game design
       - README.md has setup instructions
 
-      The game can be found in `freefsm/examples/games/<game-name>/`.
+      The game can be found in `games/<game-name>/`.
     transitions: {}

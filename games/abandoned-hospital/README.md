@@ -20,7 +20,7 @@ Uncover the truth about what happened to 27 psychiatric patients and the nurse w
 ## How to Play
 
 ```bash
-freefsm start examples/games/abandoned-hospital/abandoned-hospital.fsm.yaml
+freefsm start games/abandoned-hospital/abandoned-hospital.fsm.yaml
 ```
 
 The game master (your AI agent) will describe scenes, track your stats, and enforce the rules. You interact by choosing numbered options or typing free-form actions.
