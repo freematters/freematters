@@ -138,6 +138,7 @@ states:
       2. Append a step summary to `./specs/<slug>/progress.md` (create if not exists):
          ```
          ## Step N: <title>
+         - **Commit**: <to be filled after commit>
          - **Files changed**: <list of key files added/modified>
          - **What was built**: <1-2 sentence summary of implementation>
          - **Tests**: <number of tests added, all passing/failing>
@@ -145,6 +146,7 @@ states:
          ```
       3. Stage all relevant files (code + plan.md + progress.md)
       4. Create a single git commit: `feat(scope): step N - <step title>`
+      5. Update the `- **Commit**:` line in progress.md with the actual commit hash, then amend the commit
 
       Present to the user:
       - Commit hash and message

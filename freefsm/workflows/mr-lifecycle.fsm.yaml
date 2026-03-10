@@ -133,6 +133,10 @@ states:
       - Whether new `!fix` markers appear (author replies or comments containing `!fix`)
       - Whether new CI pipelines have started (e.g., from external pushes or rebases)
 
+      Pipeline deduplication: Before entering this state, record the latest pipeline/check-run ID.
+      Only transition on `new pipeline detected` if you see a pipeline ID that is NEWER than the
+      recorded one. This prevents re-triggering on pipelines the agent already waited for.
+
       IMPORTANT: You MUST keep polling indefinitely. Do NOT stop, exit, or ask the user
       whether to continue. The user may push new commits, a reviewer may comment, or the
       MR may be merged/closed at any time — the only way to detect these events is to
@@ -141,7 +145,7 @@ states:
       Exit conditions (the ONLY reasons to stop polling):
       - MR/PR merged or closed → done
       - `!fix` found → fix
-      - New CI pipeline detected (running/pending) → wait-for-pipeline
+      - New CI pipeline detected (ID newer than last recorded) → wait-for-pipeline
     transitions:
       fix requested: fix
       new pipeline detected: wait-for-pipeline
