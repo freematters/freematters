@@ -134,19 +134,19 @@ states:
       The current step has been implemented and validated.
 
       Process:
-      1. Stage all relevant files (new and modified)
-      2. Create a git commit: `feat(scope): step N - <step title>`
-      3. Update `./specs/<slug>/plan.md` — change `- [ ] Step N` to `- [x] Step N`
-      4. Append a step summary to `./specs/<slug>/progress.md` (create if not exists):
+      1. Update `./specs/<slug>/plan.md` — change `- [ ] Step N` to `- [x] Step N`
+      2. Append a step summary to `./specs/<slug>/progress.md` (create if not exists):
          ```
          ## Step N: <title>
-         - **Commit**: <hash>
+         - **Commit**: <to be filled after commit>
          - **Files changed**: <list of key files added/modified>
          - **What was built**: <1-2 sentence summary of implementation>
          - **Tests**: <number of tests added, all passing/failing>
          - **Notes**: <any gotchas, workarounds, or deviations from spec>
          ```
-      5. Commit plan.md + progress.md update
+      3. Stage all relevant files (code + plan.md + progress.md)
+      4. Create a single git commit: `feat(scope): step N - <step title>`
+      5. Update the `- **Commit**:` line in progress.md with the actual commit hash, then amend the commit
 
       Present to the user:
       - Commit hash and message

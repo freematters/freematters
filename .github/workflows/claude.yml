@@ -14,13 +14,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
       - name: Resolve old Claude review threads
         uses: actions/github-script@v7
         with:
           script: |
-            // Bot user IDs: github-actions[bot]=41898282, claude[bot] may vary
             const BOT_LOGINS = ['github-actions[bot]', 'claude[bot]'];
 
             const { repository } = await github.graphql(`
@@ -62,23 +61,83 @@ jobs:
               core.info(`Resolved thread ${thread.id} by ${author}`);
             }
 
-      - uses: anthropics/claude-code-action@v1
+      - name: Determine review scope
+        id: scope
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const action = context.payload.action;
+            if (action === 'synchronize') {
+              const before = context.payload.before;
+              const after = context.payload.after;
+              core.setOutput('mode', 'incremental');
+              core.setOutput('before', before);
+              core.setOutput('after', after);
+              core.info(`Incremental review: ${before}..${after}`);
+            } else {
+              core.setOutput('mode', 'full');
+              core.setOutput('before', '');
+              core.setOutput('after', '');
+              core.info('Full review');
+            }
+
+      - name: Full review (opened/reopened)
+        if: steps.scope.outputs.mode == 'full'
+        uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
 
-            Please review this pull request with a focus on:
-            - Code quality and best practices
-            - Potential bugs or issues
-            - Security implications
-            - Performance considerations
+            Review this pull request. Focus on the most critical issues only:
+            - Bugs and correctness problems
+            - Security vulnerabilities
+            - Performance issues that would affect users
+            - Code quality issues that indicate deeper design problems
 
-            Use `gh pr comment` for top-level feedback.
+            Do NOT comment on: style nits, naming preferences, minor refactoring suggestions,
+            or issues that are subjective. Only flag things that are clearly wrong or risky.
+
+            Use `gh pr comment` for top-level summary.
             Use `mcp__github_inline_comment__create_inline_comment` to highlight specific code issues.
             Only post GitHub comments - don't submit review text as messages.
 
           claude_args: |
             --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*)"
 
+      - name: Incremental review (synchronize)
+        if: steps.scope.outputs.mode == 'incremental'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            This is an incremental review. Only review changes in the latest push:
+            ```
+            git diff ${{ steps.scope.outputs.before }}..${{ steps.scope.outputs.after }}
+            ```
+
+            Run that diff command to see exactly what changed. Only comment on NEW issues
+            introduced in this push. Do NOT re-review code that was already present.
+
+            Focus on the most critical issues only:
+            - Bugs and correctness problems
+            - Security vulnerabilities
+            - Performance issues that would affect users
+            - Code quality issues that indicate deeper design problems
+
+            Do NOT comment on: style nits, naming preferences, minor refactoring suggestions,
+            or issues that are subjective. Only flag things that are clearly wrong or risky.
+
+            If the push is a clean fix with no new issues, post a brief top-level comment
+            acknowledging the changes (e.g., "LGTM - fixes look good") instead of staying silent.
+
+            Use `gh pr comment` for top-level feedback.
+            Use `mcp__github_inline_comment__create_inline_comment` to highlight specific code issues.
+            Only post GitHub comments - don't submit review text as messages.
+
+          claude_args: |
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(git diff:*),Bash(git log:*)"

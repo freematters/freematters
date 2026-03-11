@@ -1,14 +1,14 @@
 # Flow:
 #
-#   create-mr → wait-for-pipeline ←--+
-#                |            \       |
-#              check          done    |
-#              /   \                  |
-#           fix ← wait-for-input     |
-#             |        \              |
-#           push       done          |
-#             |                      |
-#             +----------------------+
+#   create-mr → wait-for-pipeline ←--+←-----------+
+#                |            \       |             |
+#              check          done    |             |
+#              /   \                  |             |
+#           fix ← wait-for-input ----+             |
+#             |        \        \                   |
+#           push       done   (new pipeline) ------+
+#             |
+#             +---→ wait-for-pipeline
 #
 
 version: 1
@@ -102,12 +102,24 @@ states:
       Monitor:
       - Whether the MR/PR has been merged or closed
       - Whether new `!fix` markers appear (author replies or comments containing `!fix`)
+      - Whether new CI pipelines have started (e.g., from external pushes or rebases)
 
-      Exit conditions:
+      Pipeline deduplication: Before entering this state, record the latest pipeline/check-run ID.
+      Only transition on `new pipeline detected` if you see a pipeline ID that is NEWER than the
+      recorded one. This prevents re-triggering on pipelines the agent already waited for.
+
+      IMPORTANT: You MUST keep polling indefinitely. Do NOT stop, exit, or ask the user
+      whether to continue. The user may push new commits, a reviewer may comment, or the
+      MR may be merged/closed at any time — the only way to detect these events is to
+      keep the polling loop running.
+
+      Exit conditions (the ONLY reasons to stop polling):
       - MR/PR merged or closed → done
       - `!fix` found → fix
+      - New CI pipeline detected (ID newer than last recorded) → wait-for-pipeline
     transitions:
       fix requested: fix
+      new pipeline detected: wait-for-pipeline
       MR merged: done
       MR closed: done
 
@@ -138,8 +150,9 @@ states:
       - Commit and push to the remote branch (force push if rebased).
       - Only resolve review threads that were actually fixed in this round (bot review findings or `!fix`-marked comments).
         Do NOT resolve unfixed threads.
-        - GitLab: Resolve discussions via API
-        - GitHub: Reply to review comments explaining the fix
+        - GitLab: Resolve discussions via PUT `$GITLAB/projects/:id/merge_requests/:iid/discussions/:discussion_id` with `{ "resolved": true }`
+        - GitHub: Reply to the review comment explaining the fix, then resolve the thread via GraphQL `resolveReviewThread` mutation.
+          To resolve: query `repository.pullRequest.reviewThreads` to get thread IDs, then call `resolveReviewThread(input: {threadId: $id})`.
       - Update the MR/PR description if needed, especially when addressing review feedback changed the implementation approach.
     todos:
       - Reply to and resolve addressed !fix comments (explain what was fixed)
