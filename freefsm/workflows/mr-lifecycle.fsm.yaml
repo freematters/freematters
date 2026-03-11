@@ -20,35 +20,6 @@ guide: |
   - GitLab: Uses GitLab REST API (requires PRIVATE-TOKEN)
   - GitHub: Prefers `gh` CLI, falls back to GitHub REST API
 
-  ## GitLab API Reference
-
-  Base URL varies by instance. Use `$GITLAB` as placeholder (e.g. `https://gitlab.example.com/api/v4`).
-  `:id` is URL-encoded project path (e.g. `group%2Frepo`), `:iid` is the MR number.
-
-  ### Pipeline
-  - `GET $GITLAB/projects/:id/merge_requests/:iid/pipelines` — list MR pipelines
-
-  ### Discussions (threaded comments, including diff comments)
-  - `GET $GITLAB/projects/:id/merge_requests/:iid/discussions` — list all discussions
-  - `GET $GITLAB/projects/:id/merge_requests/:iid/discussions/:discussion_id` — get single discussion
-  - `POST $GITLAB/projects/:id/merge_requests/:iid/discussions/:discussion_id/notes` — reply to thread
-      body: `{ "body": "..." }`
-  - `PUT $GITLAB/projects/:id/merge_requests/:iid/discussions/:discussion_id` — resolve/unresolve thread
-      body: `{ "resolved": true }`
-
-  ### Notes (flat comment list, no diff position info)
-  - `GET $GITLAB/projects/:id/merge_requests/:iid/notes` — list all notes
-  - `GET $GITLAB/projects/:id/merge_requests/:iid/notes/:note_id` — get single note
-  - `POST $GITLAB/projects/:id/merge_requests/:iid/notes` — create note
-      body: `{ "body": "..." }`
-
-  ### Other
-  - `GET $GITLAB/projects/:id/merge_requests/:iid` — MR details
-  - `GET $GITLAB/projects/:id/merge_requests/:iid/changes` — MR diff/changes
-  - `GET $GITLAB/projects/:id/merge_requests/:iid/commits` — MR commits
-  - `POST $GITLAB/projects/:id/merge_requests/:iid/approve` — approve MR
-  - `POST $GITLAB/projects/:id/merge_requests/:iid/unapprove` — unapprove MR
-
 initial: create-mr
 
 states:
