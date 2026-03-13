@@ -155,7 +155,7 @@ states:
       - All 7 key clues collected
       - Ritual completed correctly
 
-      Display the True End text from spec.md.
+      Read spec.md to get the True End narrative, then display it.
       After the ending, ask if the player wants to restart or quit.
     transitions:
       restart: check_save
@@ -170,7 +170,7 @@ states:
       - Some clues collected
       - Chose to flee with evidence
 
-      Display the Good End text from spec.md.
+      Read spec.md to get the Good End narrative, then display it.
       After the ending, ask if the player wants to restart or quit.
     transitions:
       restart: check_save
@@ -185,7 +185,7 @@ states:
       - Triggered an instant-death condition, OR
       - Tried to force an escape
 
-      Display the Bad End text from spec.md.
+      Read spec.md to get the Bad End narrative, then display it.
       Update the Death Count in `saves/current.md`, then ask if the player
       wants to restart or quit.
     transitions:
@@ -202,7 +202,7 @@ states:
       - All hidden clues found
       - Discovered the dimensional rift secret
 
-      Display the Hidden End text from spec.md.
+      Read spec.md to get the Hidden End narrative, then display it.
       After the ending, ask if the player wants to restart or quit.
     transitions:
       restart: check_save
