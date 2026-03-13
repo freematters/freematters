@@ -24,16 +24,24 @@ Read https://github.com/freematters/freematters/blob/main/freefsm/README.md to i
 Or install manually:
 
 ```bash
-git clone https://github.com/freematters/freematters.git
-cd freematters/freefsm
-npm install && npm run build
-npm install -g .
+npm install -g @freematters/freefsm
 
 # Claude Code — registers skills + PostToolUse hook
 freefsm install claude
 
 # Codex — links skills (no hook support)
 freefsm install codex
+```
+
+### For Contributors
+
+```bash
+git clone https://github.com/freematters/freematters.git
+cd freematters/freefsm
+npm install && npm run build
+npm link
+
+freefsm install claude
 ```
 
 ## Usage
