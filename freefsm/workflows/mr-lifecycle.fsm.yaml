@@ -59,7 +59,12 @@ states:
 
       The script monitors:
       - Whether the MR/PR has been merged or closed
-      - Whether all CI (GitLab pipelines / GitHub Actions checks) have completed (keep waiting if pending/running)
+      - Whether all CI has completed (keep waiting if pending/running):
+        - GitLab: Check pipeline status via API
+        - GitHub: Use the check-runs API (`/commits/{sha}/check-runs`) ONLY.
+          Do NOT use the legacy commit status API (`/commits/{sha}/status`) — it returns
+          "pending" when no commit statuses exist (common with GitHub Actions), causing
+          false negatives. Pipelines are finished when all check runs have `status == "completed"`.
       - Whether the target branch has new commits since the current branch was last rebased/merged
         - GitLab: Compare target branch HEAD via API
         - GitHub: Compare via `git fetch` + `git rev-list --count HEAD..origin/<target>`
@@ -97,6 +102,10 @@ states:
         1. A reviewer left a review comment on the diff, and the author replied with `!fix [optional description]`
         2. The author posted a `!fix [optional description]` comment directly on the MR/PR
         Do NOT handle reviewer comments without `!fix` markers.
+        API endpoints to check (must check ALL of these):
+        - GitLab: MR discussions API (includes inline and general comments)
+        - GitHub: Both `pulls/{N}/comments` (inline review comments) AND `issues/{N}/comments` (PR-level comments)
+        When filtering with jq, use `contains("!fix")` not `test()` — the `!` character requires escaping in regex.
       - Rebase: Is the current branch behind the target branch?
 
       Decision logic:

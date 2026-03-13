@@ -11,9 +11,8 @@
 #               implement (next step)
 #                   |
 #                e2e-test (all steps complete)
-#                   |
+#                   |  (self-fix up to 5x on failure, then flag user)
 #            pass → review
-#            fail / cannot run → self-fix up to 5x, then flag user
 #                   |
 #            user approves → checkpoint → done
 #                   |              |
@@ -150,8 +149,8 @@ states:
       The current step has been implemented and validated.
 
       Process:
-      1. Stage all relevant files (new and modified, including progress.md)
-      2. Update `./specs/<slug>/plan.md` — change `- [ ] Step N` to `- [x] Step N`
+      1. Update `./specs/<slug>/plan.md` — change `- [ ] Step N` to `- [x] Step N`
+      2. Stage all relevant files (new and modified, including progress.md and plan.md)
       3. Create a git commit: `feat(scope): step N - <step title>`
 
       Present to the user:
@@ -213,14 +212,13 @@ states:
       > On failure: identify root cause, fix minimally, run full test suite, re-run full scenario.
 
       - **Pass** → transition to review
-      - **Fail (attempt < 5)** → sub-agent fixes and re-runs the full scenario
+      - **Fail (attempt < 5)** → sub-agent fixes and re-runs the full scenario within this state
       - **Fail (attempt >= 5) or cannot execute after attempting** → flag to user, ask how to proceed
 
       Update `./specs/<slug>/progress.md` with E2E result, attempt count, and notes.
     transitions:
       e2e passed: review
       no e2e design: review
-      needs fix: implement
       user says skip: review
 
   review:
