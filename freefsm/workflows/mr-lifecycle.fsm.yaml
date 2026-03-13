@@ -51,20 +51,40 @@ states:
 
   wait-for-pipeline:
     prompt: |
-      Poll MR/PR status using python, checking every 20 seconds in a while loop.
-      - GitLab: Query pipeline and MR status via GitLab API
-      - GitHub: Query checks and PR status via `gh pr view` and `gh run list`
+      Run the polling script as a **background bash job** so the conversation is not blocked.
 
-      On first entry to this state, run a single poll to verify the script works
-      (API token/auth valid, correct IDs, etc.) before starting the loop.
+      Write a Python polling script to `/tmp/poll_pipeline.py` and run it in the background.
+      The script should check every 20 seconds and print status lines. When an exit condition
+      is met, it should print a clear result line (e.g., "RESULT: pipelines finished") and exit.
 
-      Monitor only two things:
+      The script monitors:
       - Whether the MR/PR has been merged or closed
-      - Whether all CI (GitLab pipelines / GitHub Actions checks) have completed (keep waiting if pending/running)
+      - Whether all CI has completed (keep waiting if pending/running):
+        - GitLab: Check pipeline status via API
+        - GitHub: Use the check-runs API (`/commits/{sha}/check-runs`) ONLY.
+          Do NOT use the legacy commit status API (`/commits/{sha}/status`) — it returns
+          "pending" when no commit statuses exist (common with GitHub Actions), causing
+          false negatives. Pipelines are finished when all check runs have `status == "completed"`.
+      - Whether the target branch has new commits since the current branch was last rebased/merged
+        - GitLab: Compare target branch HEAD via API
+        - GitHub: Compare via `git fetch` + `git rev-list --count HEAD..origin/<target>`
 
-      Exit conditions:
-      - MR/PR merged or closed → done
-      - All CI completed (regardless of pass/fail) → check
+      If the target branch has been updated:
+      - Fetch latest target branch
+      - Rebase onto it and resolve any conflicts
+      - Force push to the remote branch
+      - Continue polling (the push will trigger a new pipeline)
+
+      On first entry, run a single poll inline to verify the script works
+      (API token/auth valid, correct IDs, etc.) before starting the background job.
+
+      Exit conditions (print as RESULT line):
+      - MR/PR merged or closed → "RESULT: MR merged" or "RESULT: MR closed"
+      - All CI completed (regardless of pass/fail) → "RESULT: pipelines finished"
+
+      When running the script in the background, do NOT redirect stdout/stderr to a file —
+      let output go to the terminal so the user can observe progress in real time.
+      When the job completes, read its output from the task output and transition based on the RESULT line.
     transitions:
       pipelines finished: check
       MR merged: done
@@ -76,11 +96,17 @@ states:
 
       Check items:
       - CI results: Are there any failed jobs (GitLab pipeline / GitHub Actions checks)?
-      - Bot review: Comments posted by bots after CI (e.g., code scanning, lint reports). Are there any severe issues (error/critical level)?
-      - Review comments: Only handle items marked with `!fix`. Two scenarios:
+      - Bot inline review comments: Fetch all unresolved review threads. Identify bot-authored
+        threads (`author.__typename == "Bot"` in GraphQL, or `user.type == "Bot"` in REST).
+        All unresolved bot inline comments (blocker/major) should be fixed.
+      - `!fix`-marked comments: Two scenarios:
         1. A reviewer left a review comment on the diff, and the author replied with `!fix [optional description]`
         2. The author posted a `!fix [optional description]` comment directly on the MR/PR
         Do NOT handle reviewer comments without `!fix` markers.
+        API endpoints to check (must check ALL of these):
+        - GitLab: MR discussions API (includes inline and general comments)
+        - GitHub: Both `pulls/{N}/comments` (inline review comments) AND `issues/{N}/comments` (PR-level comments)
+        When filtering with jq, use `contains("!fix")` not `test()` — the `!` character requires escaping in regex.
       - Rebase: Is the current branch behind the target branch?
 
       Decision logic:
@@ -88,7 +114,7 @@ states:
       - No issues → wait-for-input
     todos:
       - Check pipeline for failed jobs
-      - Check bot review for error/critical findings
+      - Check for unresolved bot inline review comments (blocker/major)
       - Check for !fix-marked comments
       - Check if rebase is needed
     transitions:
@@ -97,15 +123,25 @@ states:
 
   wait-for-input:
     prompt: |
-      CI has passed with no pending issues. Poll for user actions (check every 20 seconds):
+      CI has passed with no pending issues.
 
-      Monitor:
+      Run the polling script as a **background bash job** so the conversation is not blocked.
+
+      Write a Python polling script to `/tmp/poll_input.py` and run it in the background.
+      The script should check every 20 seconds and print status lines. When an exit condition
+      is met, it should print a clear result line and exit.
+
+      The script monitors:
       - Whether the MR/PR has been merged or closed
       - Whether new `!fix` markers appear (author replies or comments containing `!fix`)
 
-      Exit conditions:
-      - MR/PR merged or closed → done
-      - `!fix` found → fix
+      Exit conditions (print as RESULT line):
+      - MR/PR merged or closed → "RESULT: MR merged" or "RESULT: MR closed"
+      - `!fix` found → "RESULT: fix requested"
+
+      When running the script in the background, do NOT redirect stdout/stderr to a file —
+      let output go to the terminal so the user can observe progress in real time.
+      When the job completes, read its output from the task output and transition based on the RESULT line.
     transitions:
       fix requested: fix
       MR merged: done
@@ -115,8 +151,11 @@ states:
     prompt: |
       Fix issues found during check or wait-for-input:
       - CI failure: Fetch failed job logs (GitLab API / `gh run view --log-failed`), analyze root cause, and fix the code.
-      - Bot review: Read bot comment findings. Only fix severe issues (error/critical level). Ignore warnings and info.
-      - Review comments: Find author-marked `!fix` comments, read the corresponding reviewer comment or author's description, understand the intent, and modify the code.
+      - Bot inline review comments: Read each unresolved bot-authored review thread. Understand
+        the issue described, read the relevant code, and fix it. These are blocker/major issues
+        posted by automated code review — treat them as actionable items that must be addressed.
+      - `!fix`-marked comments: Find author-marked `!fix` comments, read the corresponding
+        reviewer comment or author's description, understand the intent, and modify the code.
       - Rebase needed: Fetch the latest target branch, git rebase. Resolve conflicts autonomously.
 
       After fixing, run lint/format/unit tests to confirm the fix doesn't introduce new issues.
@@ -124,7 +163,7 @@ states:
       If upon inspection there is nothing to fix, transition back to polling.
     todos:
       - Fix CI failures (if any)
-      - Fix bot review severe issues (if any)
+      - Fix unresolved bot inline review comments (if any)
       - Handle !fix-marked comments (if any)
       - Rebase (if needed)
       - Run lint/format/unit tests to verify

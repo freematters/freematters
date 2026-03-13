@@ -10,7 +10,14 @@
 #                   |
 #               implement (next step)
 #                   |
-#                 done (all complete)
+#                e2e-test (all steps complete)
+#                   |  (self-fix up to 5x on failure, then flag user)
+#            pass → review
+#                   |
+#            user approves → checkpoint → done
+#                   |              |
+#            user requests    re-run e2e / review
+#            fixes → fix-review → review (loop)
 #
 # Credit: State machine inspired by ralph-orchestrator's spec-driven.yml and pdd-to-code-assist.yml prompts.
 # Picks up where PDD left off — reads ./specs/<slug>/ artifacts and implements them.
@@ -95,7 +102,15 @@ states:
       > 3. Refactor — clean up, run linter/formatter
       > 4. Run full test suite (not just new tests) — check for regressions
       > 5. Execute the step's Demo criteria from plan.md — verify expected output
-      > 6. Report: tests passed/failed, demo result, lint issues, any spec deviations
+      > 6. Update ./specs/<slug>/progress.md — append a summary:
+      >    ## Step N: <title>
+      >    - **Files changed**: <list of key files added/modified>
+      >    - **What was built**: <1-2 sentence summary>
+      >    - **Tests**: <number of tests added, all passing/failing>
+      >    - **Notes**: <any gotchas, workarounds, or deviations from spec>
+      > 7. Report: tests passed/failed, demo result, lint issues, any spec deviations
+      >
+      > Do NOT modify plan.md — the orchestrator handles plan.md updates.
 
       The sub-agent reads the spec files itself — do NOT paste their content.
 
@@ -134,30 +149,19 @@ states:
       The current step has been implemented and validated.
 
       Process:
-      1. Stage all relevant files (new and modified)
-      2. Create a git commit: `feat(scope): step N - <step title>`
-      3. Update `./specs/<slug>/plan.md` — change `- [ ] Step N` to `- [x] Step N`
-      4. Append a step summary to `./specs/<slug>/progress.md` (create if not exists):
-         ```
-         ## Step N: <title>
-         - **Commit**: <hash>
-         - **Files changed**: <list of key files added/modified>
-         - **What was built**: <1-2 sentence summary of implementation>
-         - **Tests**: <number of tests added, all passing/failing>
-         - **Notes**: <any gotchas, workarounds, or deviations from spec>
-         ```
-      5. Commit plan.md + progress.md update
+      1. Update `./specs/<slug>/plan.md` — change `- [ ] Step N` to `- [x] Step N`
+      2. Stage all relevant files (new and modified, including progress.md and plan.md)
+      3. Create a git commit: `feat(scope): step N - <step title>`
 
       Present to the user:
-      - Commit hash and message
-      - Files changed summary
+      - Commit message
       - Progress: "Step N/M complete"
 
       Then transition back to implement for the next step.
       If this was the last step, transition to done.
     transitions:
       more tasks remain: implement
-      all tasks complete: done
+      all tasks complete: e2e-test
 
   spec-error:
     prompt: |
@@ -184,6 +188,184 @@ states:
       After recording the fix, transition back to implement to continue autonomously.
     transitions:
       spec fixed: implement
+
+  e2e-test:
+    prompt: |
+      ## End-to-End Test
+
+      All implementation steps are complete. Run E2E tests to verify the feature works end-to-end.
+
+      Read `./specs/<slug>/e2e.md` for the scenario, infrastructure, and how to run.
+      If `e2e.md` does not exist, skip directly to review.
+
+      If `e2e.md` exists, you MUST attempt to execute it. Do NOT skip because the setup
+      looks complex or you assume infrastructure is unavailable. Check whether the required
+      environment is available (e.g., run `docker info`, check for running services, verify
+      dependencies). Only flag to the user if execution genuinely fails, never preemptively.
+
+      Dispatch a sub-agent to execute the E2E scenario:
+
+      > Read `./specs/<slug>/e2e.md` for the full test plan.
+      > Follow the "How to Run" section for environment setup and commands.
+      > Execute each action, compare actual vs expected output, record PASS/FAIL.
+      > Write results to `./specs/<slug>/e2e-report.md`.
+      > On failure: identify root cause, fix minimally, run full test suite, re-run full scenario.
+
+      - **Pass** → transition to review
+      - **Fail (attempt < 5)** → sub-agent fixes and re-runs the full scenario within this state
+      - **Fail (attempt >= 5) or cannot execute after attempting** → flag to user, ask how to proceed
+
+      Update `./specs/<slug>/progress.md` with E2E result, attempt count, and notes.
+    transitions:
+      e2e passed: review
+      no e2e design: review
+      user says skip: review
+
+  review:
+    prompt: |
+      ## Code Review
+
+      Review the full diff for quality issues.
+
+      ### 1. Gather the diff
+
+      ```bash
+      git diff <base>...HEAD
+      ```
+
+      Where `<base>` is the commit before the first implementation step (check `./specs/<slug>/progress.md`
+      for the earliest commit hash, then use its parent).
+
+      ### 2. Dispatch review sub-agents (in parallel)
+
+      Dispatch these sub-agents concurrently, each reviewing `git diff <base>...HEAD`:
+
+      **Sub-agent A — Spec Compliance**
+      > Read ./specs/<slug>/design.md and ./specs/<slug>/progress.md.
+      > Check: Does the implementation match design.md? Any missing or extra functionality?
+      > Verify acceptance criteria are met. Flag any spec deviations.
+
+      **Sub-agent B — Code Quality**
+      > Review the diff for:
+      > - Readability, naming, duplication, complexity
+      > - YAGNI: Any code not required by the spec? Unused functions, future-proofing abstractions?
+      > - KISS: Is this the simplest solution? Unnecessary abstractions?
+      > - Idiomatic: Does code match existing codebase patterns?
+
+      **Sub-agent C — Correctness & Security**
+      > Review the diff for:
+      > - Edge cases, error handling, potential bugs
+      > - Architecture: separation of concerns, coupling, cohesion
+      > - Security: input validation, injection risks, secrets handling
+      > - Run the full test suite and linter — report results
+
+      Each sub-agent classifies issues as:
+      - 🔴 **Major** — must fix before completion (bugs, security, spec violations)
+      - 🟠 **Medium** — should fix, significant quality concern (YAGNI/KISS violations, poor error handling, architectural issues)
+      - 🟡 **Minor** — nice to fix but not blocking (style, naming, minor duplication)
+
+      ### 3. Dispatch merge sub-agent
+
+      Dispatch a sub-agent to combine the three review reports:
+
+      > Read the reports from sub-agents A, B, and C.
+      > Deduplicate overlapping findings across reports.
+      > Resolve any conflicting severity classifications (use the higher severity).
+      > Produce a single merged review report with:
+      > - Overall verdict: PASS (no major/medium) or FAIL
+      > - Combined major issues (deduplicated, with source sub-agent noted)
+      > - Combined medium issues
+      > - Combined minor issues
+      > - Total counts per severity
+
+      Write the merged report to `./specs/<slug>/review-round-N.md`
+      (where N is the current round number).
+
+      ### 4. Evaluate
+
+      If this is round 1 AND there are major issues → transition directly to fix-review
+      (no need to ask the user).
+
+      Otherwise, present the review report to the user with a summary of issues. Ask (in user's language):
+
+      > Review round N complete.
+      > - 🔴 Major: N
+      > - 🟠 Medium: N
+      > - 🟡 Minor: N
+      >
+      > 1. Looks good — proceed to done
+      > 2. Fix more issues — run another fix/re-review cycle
+      > 3. I'll handle the rest manually — proceed to done
+
+      Update `./specs/<slug>/progress.md` with review round summary.
+    transitions:
+      user approves: checkpoint
+      major issues in round 1: fix-review
+      user requests fixes: fix-review
+
+  fix-review:
+    prompt: |
+      ## Fix Review Issues
+
+      The user requested fixes for issues found in code review.
+
+      ### 1. Dispatch fix sub-agent
+
+      Dispatch a sub-agent with the latest review report (`./specs/<slug>/review-round-N.md`):
+
+      > Fix the following issues identified in code review.
+      > Read ./specs/<slug>/design.md for the intended architecture and interfaces.
+      > Read ./specs/<slug>/progress.md for context on what was built.
+      >
+      > You MUST fix all 🔴 Major issues.
+      > You MAY fix 🟠 Medium issues at your discretion — fix them if the effort is low
+      > and the improvement is clear, skip if the fix is risky or complex.
+      > Do NOT fix 🟡 Minor issues.
+      >
+      > For each issue you fix:
+      > 1. Read the relevant code
+      > 2. Fix the issue — keep changes minimal and focused
+      > 3. Run the full test suite to ensure no regressions
+      > 4. If the fix requires new tests, add them
+      >
+      > Report: what was fixed, what medium issues were skipped (with reason), test results.
+
+      ### 2. Summarize
+
+      Present a fix summary to the user:
+      - Issues fixed (with brief description of each fix)
+      - Medium issues skipped (with reason)
+      - Test results
+
+      ### 3. Commit
+
+      Stage and commit the fixes: `fix: address review issues (round N)`
+
+      ### 4. Re-review
+
+      Transition back to review for a fresh review of the updated code.
+    transitions:
+      fixes committed: review
+
+  checkpoint:
+    prompt: |
+      ## Checkpoint
+
+      Review has completed. Present the current status to the user:
+      - Steps completed (from plan.md)
+      - E2E test result (from e2e-report.md, if exists)
+      - Review result (from latest review-round-N.md)
+      - Any unresolved issues
+
+      Ask the user (in user's language):
+
+      > 1. Looks good — finalize
+      > 2. Re-run E2E tests
+      > 3. Run another review round
+    transitions:
+      finalize: done
+      re-run e2e: e2e-test
+      re-run review: review
 
   done:
     prompt: |
