@@ -264,15 +264,23 @@ states:
 
       ## Review Results
 
-      - **blocker**: X (posted as inline comments)
-      - **major**: X (posted as inline comments)
+      - **blocker**: X
+      - **major**: X
       - **minor**: X
       - **auto-resolved**: X (previous comments where code has been fixed)
       - **replies**: Scanned X bot threads, Y had user replies, responded to Z
 
-      ### Minor issues (not posted as inline comments)
+      ### Blocker
 
-      > Listed here for reference only
+      - `file/path:line` — [description] (also posted as inline comment)
+
+      ### Major
+
+      - `file/path:line` — [description] (also posted as inline comment)
+
+      ### Minor
+
+      > Not posted as inline comments, listed here for reference only
 
       - `file/path:line` — [description]
       ```
