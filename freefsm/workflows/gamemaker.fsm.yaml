@@ -54,6 +54,9 @@ states:
     prompt: |
       ## World Building
 
+      First, read `concept.md` and `rules.md` to stay consistent with the
+      agreed concept, tone, and mechanics.
+
       Create the game world:
 
       1. **Map** — all explorable areas with connections between them
@@ -81,6 +84,8 @@ states:
   puzzles:
     prompt: |
       ## Puzzle Design
+
+      Read `concept.md`, `rules.md`, and `spec.md` before designing puzzles.
 
       Design puzzles that gate progression:
 
@@ -110,6 +115,8 @@ states:
     prompt: |
       ## Ending Design
 
+      Read `concept.md`, `rules.md`, and `spec.md` before designing endings.
+
       Create multiple endings based on player choices and stats:
 
       1. **True End** — requires collecting all key clues and making optimal choices
@@ -136,6 +143,8 @@ states:
     prompt: |
       ## Narrative Writing
 
+      Read `concept.md`, `rules.md`, and `spec.md` before writing.
+
       Write the actual game narrative content:
 
       1. **Opening scene** — the first thing the player sees
@@ -161,6 +170,8 @@ states:
   package:
     prompt: |
       ## Package as FreeFSM Example
+
+      Read all design docs (`concept.md`, `rules.md`, `spec.md`) before packaging.
 
       Create the final game files:
 
