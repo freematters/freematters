@@ -58,7 +58,7 @@ states:
                       databaseId
                       body
                       createdAt
-                      author { login }
+                      author { login __typename }
                     }
                   }
                 }
@@ -74,8 +74,8 @@ states:
       - `isResolved` — skip resolved threads in later phases
       - `comments` — full conversation history
 
-      Bot-authored threads: `comments.nodes[0].author.login == "github-actions[bot]"`
-      (comments posted via `GITHUB_TOKEN` in GitHub Actions).
+      Bot-authored threads: `comments.nodes[0].author.__typename == "Bot"`
+      (covers `claude[bot]`, `github-actions[bot]`, and any other GitHub App).
 
       > Note: `first: 100` may not cover all threads on large PRs with many review rounds.
       > If the response indicates more pages exist, paginate using the `after` cursor.
@@ -164,7 +164,7 @@ states:
 
       ## 1. Respond to user replies on existing threads
 
-      For each unresolved review thread authored by `github-actions[bot]` from init:
+      For each unresolved bot-authored review thread from init (`author.__typename == "Bot"`):
       1. **Check for user replies**: In the thread's comments, look for human replies
          (entries after the first where `author.login` is not a bot)
       2. **Skip if already responded**: If the last comment is from the bot and its
@@ -185,7 +185,7 @@ states:
 
       ## 2. Auto-resolve fixed threads
 
-      For each unresolved `github-actions[bot]` review thread:
+      For each unresolved bot-authored review thread (`author.__typename == "Bot"`):
       1. Read the first comment to understand what issue was flagged
       2. Read the current version of the relevant file
       3. Determine if the flagged issue has been fixed (not just "file changed" —
@@ -202,7 +202,7 @@ states:
       ' -f threadId="{thread_node_id}"
       ```
 
-      Only resolve `github-actions[bot]` threads, never human-posted ones.
+      Only resolve bot-authored threads (`__typename == "Bot"`), never human-posted ones.
       Record auto-resolve count.
 
       ## 3. Post new inline comments
