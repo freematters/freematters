@@ -1,0 +1,8 @@
+{
+  "packages": {
+    "freefsm": {
+      "release-type": "node",
+      "component": "freefsm"
+    }
+  }
+}
