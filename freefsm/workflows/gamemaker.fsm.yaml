@@ -9,6 +9,11 @@ states:
     prompt: |
       ## Game Concept
 
+      First, ask the user for a **game name** (slug format, e.g. `abandoned-hospital`).
+      Create the directory `games/<game-name>/` (relative to the current working directory)
+      and use it as the base path for all file writes throughout this workflow
+      (`concept.md`, `rules.md`, `spec.md`, the game FSM, `README.md`, etc.).
+
       Work with the player to define the core game concept:
 
       1. **Genre** — horror, mystery, sci-fi, fantasy, etc.
@@ -18,8 +23,9 @@ states:
       5. **Perspective** — second-person (recommended for immersion), first-person, etc.
 
       Propose 2-3 concept directions and let the user choose.
-      Once agreed, write a one-paragraph summary to `concept.md`.
+      Once agreed, write a one-paragraph summary to `games/<game-name>/concept.md`.
     todos:
+      - Ask for game name and create games/<game-name>/ directory
       - Discuss genre and setting preferences
       - Identify the core mystery or conflict
       - Agree on tone and narrative perspective
@@ -40,7 +46,7 @@ states:
       5. **Save system** — checkpoints, free save, or permadeath?
       6. **Hidden mechanics** — rules the player must discover through play
 
-      Keep core rules to 3 or fewer. Write rules to `rules.md`.
+      Keep core rules to 3 or fewer. Write rules to `games/<game-name>/rules.md`.
     todos:
       - Define difficulty level and death mechanics
       - Design stat tracking system
@@ -68,7 +74,7 @@ states:
       - Instant-death triggers (if applicable)
       - Correct survival behavior
 
-      Write the complete world design to `spec.md`.
+      Write the complete world design to `games/<game-name>/spec.md`.
     todos:
       - Design the map with all areas
       - Create NPC profiles and behaviors
@@ -96,7 +102,7 @@ states:
       - Failure consequences
       - At least 2-3 foreshadowing hints planted in prior areas
 
-      Append puzzle designs to `spec.md`.
+      Append puzzle designs to `games/<game-name>/spec.md`.
     todos:
       - Design tutorial puzzle
       - Design progression puzzles with distributed clues
@@ -122,7 +128,7 @@ states:
       - Full narrative text (2-3 paragraphs minimum)
       - Emotional tone and resolution
 
-      Append ending designs to `spec.md`.
+      Append ending designs to `games/<game-name>/spec.md`.
     todos:
       - Write True End with trigger conditions
       - Write Good End
@@ -148,7 +154,7 @@ states:
       temperature) to build atmosphere. Control pacing — alternate tension
       with calm moments.
 
-      Add narrative samples to `spec.md` or create a separate `scenes.md`.
+      Add narrative samples to `games/<game-name>/spec.md` or create a separate `games/<game-name>/scenes.md`.
     todos:
       - Write the opening scene
       - Write key area descriptions
@@ -162,7 +168,7 @@ states:
     prompt: |
       ## Package as FreeFSM Example
 
-      Create the final game files:
+      Create the final game files in `games/<game-name>/`:
 
       1. **`<game-name>.fsm.yaml`** — the game runtime FSM with states for
          save management, gameplay, and each ending
@@ -177,6 +183,10 @@ states:
 
       State prompts should contain all GM instructions needed to run the game.
       Reference `spec.md` for detailed content the GM needs to consult.
+
+      Save files should be stored in `saves/` relative to the FSM file's directory
+      (i.e. `games/<game-name>/saves/`). Add a `.gitignore` in the saves directory
+      to exclude save files from version control.
 
       Test the FSM with `freefsm start <path>` to verify it loads correctly.
     todos:
@@ -196,5 +206,5 @@ states:
       - spec.md contains the full game design
       - README.md has setup instructions
 
-      The game can be found in `freefsm/games/<game-name>/`.
+      The game can be found in `games/<game-name>/`.
     transitions: {}
