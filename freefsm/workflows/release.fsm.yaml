@@ -47,6 +47,7 @@ states:
       ```bash
       cd freefsm
       npm version <patch|minor|major> --no-git-tag-version
+      npx biome check --write .
       VERSION=$(node -p "require('./package.json').version")
       cd ..
       git checkout -b release/freefsm-v${VERSION}
@@ -86,7 +87,15 @@ states:
       ```
 
       - If all checks pass, merge the PR.
-      - If any check fails, show the failure and stop — ask the user how to proceed.
+      - If a **lint** or **format** check fails, auto-fix locally and push:
+        ```bash
+        cd freefsm
+        npx biome check --write .
+        cd ..
+        git add -u && git commit -m "fix: auto-fix lint" && git push
+        ```
+        Then re-poll.
+      - If any other check fails, show the failure and stop — ask the user how to proceed.
 
       ```bash
       gh pr merge <pr_number> --squash --delete-branch
