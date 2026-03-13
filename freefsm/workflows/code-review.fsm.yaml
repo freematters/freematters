@@ -30,19 +30,19 @@ states:
 
       Record owner, repo, PR number, base branch, head commit SHA, and URL for subsequent states.
 
-      ## 3. Get the changed files list
+      ## 3. Fetch diff + API data (parallel)
 
+      Run these commands **in parallel** (all are independent):
+
+      **a) Save the full diff and changed files list to temp files:**
       ```bash
-      gh pr diff --name-only
+      gh pr diff > /tmp/pr_diff.txt
+      ```
+      ```bash
+      gh pr diff --name-only > /tmp/pr_changed_files.txt
       ```
 
-      Record the list. The full diff is fetched by subagents during the review phase
-      to avoid context size issues on large PRs.
-
-      ## 4. Get existing review threads
-
-      Fetch review threads via GraphQL to get thread node IDs and conversation history:
-
+      **b) Fetch existing review threads** via GraphQL:
       ```bash
       gh api graphql -f query='
         query($owner: String!, $repo: String!, $pr: Int!) {
@@ -69,6 +69,11 @@ states:
       ' -f owner={owner} -f repo={repo} -F pr={pr_number}
       ```
 
+      **c) Fetch existing summary comment:**
+      ```bash
+      gh api repos/{owner}/{repo}/issues/{pr_number}/comments
+      ```
+
       For each thread, record:
       - `id` (node ID, e.g. `PRT_kwDOxxxx`) — needed for resolveReviewThread mutation
       - `isResolved` — skip resolved threads in later phases
@@ -79,14 +84,6 @@ states:
 
       > Note: `first: 100` may not cover all threads on large PRs with many review rounds.
       > If the response indicates more pages exist, paginate using the `after` cursor.
-
-      ## 5. Get existing summary comment
-
-      Fetch issue comments to find the existing review summary (if any):
-
-      ```bash
-      gh api repos/{owner}/{repo}/issues/{pr_number}/comments
-      ```
 
       Look for a comment whose body starts with `<!-- code-review -->`. Record its `id` if found.
 
@@ -124,11 +121,9 @@ states:
       Read your review instructions from: freefsm/workflows/code-review-agents/{agent}.md
 
       Steps:
-      1. Run `gh pr diff --name-only` to get the changed files list
-      2. Run `gh pr diff` to get the full diff (if the diff is very large,
-         review file-by-file using `gh pr diff -- {file}`)
-      3. For each changed file, read the full file to understand context
-      4. Review against your instructions
+      1. Read `/tmp/pr_changed_files.txt` to get the changed files list
+      2. Read `/tmp/pr_diff.txt` to get the full diff
+      3. Review against your instructions
 
       Existing unresolved review threads (do NOT raise issues already covered here):
       {EXISTING_THREADS}
@@ -136,7 +131,7 @@ states:
       Output ONLY the JSON array as specified in your instructions.
       ```
 
-      > Subagents fetch the diff themselves to avoid exceeding context limits on large PRs.
+      > The diff was pre-fetched in init and saved to temp files to avoid redundant API calls.
 
       Launch these 3 subagents concurrently (use model: sonnet for all):
 
