@@ -13,7 +13,7 @@ jobs:
       group: code-review-${{ github.event.pull_request.number }}
       cancel-in-progress: true
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
       id-token: write
     steps:
