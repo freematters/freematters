@@ -74,7 +74,7 @@ states:
       - Whether all CI has completed (keep waiting if pending/running):
         - GitLab: Check pipeline status via API
         - GitHub: Use `gh pr checks <N> --json name,state,bucket` to get check status.
-          All checks are finished when none have `state == "PENDING"`.
+          All checks are finished when none have `state == "PENDING"` or `state == "IN_PROGRESS"`.
           Do NOT use the legacy commit status API (`/commits/{sha}/status`) — it returns
           "pending" when no commit statuses exist (common with GitHub Actions).
       - Whether the target branch has new commits since the current branch was last rebased/merged
