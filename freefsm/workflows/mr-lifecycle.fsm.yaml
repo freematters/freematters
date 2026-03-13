@@ -58,9 +58,18 @@ states:
       On first entry to this state, run a single poll to verify the script works
       (API token/auth valid, correct IDs, etc.) before starting the loop.
 
-      Monitor only two things:
+      Monitor three things:
       - Whether the MR/PR has been merged or closed
       - Whether all CI (GitLab pipelines / GitHub Actions checks) have completed (keep waiting if pending/running)
+      - Whether the target branch has new commits since the current branch was last rebased/merged
+        - GitLab: Compare target branch HEAD via API
+        - GitHub: Compare via `git fetch` + `git rev-list --count HEAD..origin/<target>`
+
+      If the target branch has been updated:
+      - Fetch latest target branch
+      - Rebase onto it and resolve any conflicts
+      - Force push to the remote branch
+      - Continue polling (the push will trigger a new pipeline)
 
       Exit conditions:
       - MR/PR merged or closed → done
