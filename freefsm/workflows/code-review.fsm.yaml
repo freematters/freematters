@@ -69,11 +69,6 @@ states:
       ' -f owner={owner} -f repo={repo} -F pr={pr_number}
       ```
 
-      **c) Fetch existing summary comment:**
-      ```bash
-      gh api repos/{owner}/{repo}/issues/{pr_number}/comments
-      ```
-
       For each thread, record:
       - `id` (node ID, e.g. `PRT_kwDOxxxx`) — needed for resolveReviewThread mutation
       - `isResolved` — skip resolved threads in later phases
@@ -85,7 +80,13 @@ states:
       > Note: `first: 100` may not cover all threads on large PRs with many review rounds.
       > If the response indicates more pages exist, paginate using the `after` cursor.
 
-      Look for a comment whose body starts with `<!-- code-review -->`. Record its `id` if found.
+      **c) Fetch existing issue comments** to find the previous summary:
+      ```bash
+      gh api repos/{owner}/{repo}/issues/{pr_number}/comments --paginate
+      ```
+
+      Look for a bot-authored comment whose body starts with `<!-- code-review -->`.
+      Record its `id` for in-place updating in the post phase.
 
       ## Error handling
       - If any API call fails, skip and continue to the next step
@@ -103,7 +104,7 @@ states:
       - **Stay objective** — state facts, not opinions
       - **Suggest fixes** — give clear, actionable remediation
       - **Be precise** — attach findings to specific code lines
-      - **Separate outputs** — inline comments for specific line issues; summary goes in issue comment only
+      - **Separate outputs** — inline comments for specific line issues; summary goes in the review body
 
       **Avoid duplicate reviews**: Read all unresolved review threads fetched in init.
       Do not raise issues that are already covered by existing threads.
@@ -200,50 +201,19 @@ states:
       Only resolve bot-authored threads (`__typename == "Bot"`), never human-posted ones.
       Record auto-resolve count.
 
-      ## 3. Post new inline comments
+      ## 3. Submit new review (summary + inline comments bundled)
 
-      For each **blocker** or **major** issue from the review phase, post as an inline comment.
+      Build the summary and inline comments, then submit as a **single PR review**.
 
-      Before posting, do a final dedup check: compare each new finding against all
-      unresolved review threads (including those just responded to in step 1).
+      Before posting inline comments, do a final dedup check: compare each new finding
+      against all unresolved review threads (including those just responded to in step 1).
       If an existing thread already covers the same issue semantically, skip it.
 
       > This is a second dedup pass (the first was in the review phase when subagents
       > received existing threads). This pass catches duplicates across agents and
       > issues that survived the first pass.
 
-      Submit all new comments as a single review:
-
-      ```bash
-      gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-        --input /tmp/review_payload.json
-      ```
-
-      Payload:
-      ```json
-      {
-        "commit_id": "<head commit SHA from init step 2>",
-        "event": "COMMENT",
-        "comments": [
-          {
-            "path": "path/to/file",
-            "line": 42,
-            "side": "RIGHT",
-            "body": "**blocker**: [description]\n\n[detail and suggestion]"
-          }
-        ]
-      }
-      ```
-
-      Rules:
-      - Lead with severity: **blocker** / **major**
-      - Include specific fix suggestion when possible
-      - Don't repeat the same type of issue in multiple places — pick the most representative
-      - If no new comments to post, skip this step
-
-      ## 4. Update summary comment
-
-      Build the summary using this template:
+      Build the summary body using this template:
 
       ```markdown
       <!-- code-review -->
@@ -280,16 +250,54 @@ states:
       - `file/path:line` — [description]
       ```
 
-      If a summary comment was found in init (by `<!-- code-review -->` marker), update it:
+      ### 3a. Submit PR review with inline comments
+
+      Submit a PR review containing only inline comments (no body):
+
+      ```bash
+      gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
+        --input /tmp/review_payload.json
+      ```
+
+      Payload:
+      ```json
+      {
+        "commit_id": "<head commit SHA from init step 2>",
+        "event": "COMMENT",
+        "body": "",
+        "comments": [
+          {
+            "path": "path/to/file",
+            "line": 42,
+            "side": "RIGHT",
+            "body": "**blocker**: [description]\n\n[detail and suggestion]"
+          }
+        ]
+      }
+      ```
+
+      Rules for inline comments:
+      - Only post **blocker** or **major** issues as inline comments
+      - Lead with severity: **blocker** / **major**
+      - Include specific fix suggestion when possible
+      - Don't repeat the same type of issue in multiple places — pick the most representative
+      - If no inline comments to post, skip this step entirely
+
+      ### 3b. Create or update summary issue comment
+
+      If a previous summary issue comment was found in init (by `<!-- code-review -->` marker),
+      update it in place:
+
       ```bash
       gh api repos/{owner}/{repo}/issues/comments/{comment_id} \
-        -X PATCH -f body="$(cat /tmp/summary.md)"
+        -X PATCH -f body="<summary markdown>"
       ```
 
       Otherwise, create a new one:
+
       ```bash
       gh api repos/{owner}/{repo}/issues/{pr_number}/comments \
-        -f body="$(cat /tmp/summary.md)"
+        -f body="<summary markdown>"
       ```
 
       ## Error handling
@@ -300,8 +308,8 @@ states:
     todos:
       - Respond to user replies on bot threads
       - Auto-resolve threads where issues are confirmed fixed
-      - Post new inline comments (deduplicated against existing threads)
-      - Update or create summary issue comment
+      - Submit PR review with inline comments (deduplicated)
+      - Create or update summary issue comment
     transitions:
       complete: done
 
