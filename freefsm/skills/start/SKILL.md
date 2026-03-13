@@ -21,7 +21,7 @@ Initialize a new FSM run from a workflow YAML file.
 
 2. **Resolve the workflow path** — If PATH is not provided or is just a name (no `/` or `.yaml`), search for a matching `<name>.fsm.yaml` file in this order:
    1. `./workflows/` (project-local workflows)
-   2. The freefsm package's bundled `workflows/` directory (find it via `dirname $(which freefsm)/../workflows/`)
+   2. The freefsm package's bundled `workflows/` directory (find it via `$(dirname $(readlink -f $(which freefsm)))/../workflows/`)
 
    Example: `pdd` resolves to `./workflows/pdd.fsm.yaml` if it exists locally, otherwise to the bundled `<freefsm-package>/workflows/pdd.fsm.yaml`.
 
