@@ -14,7 +14,9 @@
 #                           |     \
 #                          plan    requirements (gaps)
 #                         /    \
-#                      done    design (revision)
+#               e2e-test-design  design (revision)
+#                  /      \
+#               done      skip → done
 
 version: 1
 guide: |
@@ -38,12 +40,13 @@ guide: |
   - When proposing options to user, always provide a numbered list of options.
 
   Artifacts produced in ./specs/<slug>/:
-    - rough-idea.md    — original user input
-    - requirements.md  — Q&A record (appended in real-time)
-    - research/*.md    — per-topic research findings
-    - design.md        — architecture, components, data models, acceptance criteria
-    - plan.md          — numbered incremental implementation steps
-    - summary.md       — artifact listing and next steps
+    - rough-idea.md         — original user input
+    - requirements.md       — Q&A record (appended in real-time)
+    - research/*.md         — per-topic research findings
+    - design.md             — architecture, components, data models, acceptance criteria
+    - plan.md               — numbered incremental implementation steps
+    - e2e.md    — E2E test infrastructure, scenario, and debugging guide (optional)
+    - summary.md            — artifact listing and next steps
 
 initial: create-structure
 
@@ -277,8 +280,58 @@ states:
       - Verify no orphaned code between steps
       - Get user approval on the plan
     transitions:
-      plan approved: done
+      plan approved: e2e-test-design
       needs design revision: design
+
+  e2e-test-design:
+    prompt: |
+      ## E2E Test Design (Optional)
+
+      The implementation plan is complete. Ask the user:
+
+      > Would you like to add an E2E test design? This will create a detailed end-to-end test plan
+      > that the spec-to-code workflow executes after implementation.
+      >
+      > 1. Yes — design E2E tests
+      > 2. Skip — proceed without E2E test design
+
+      If the user chooses to skip, transition to done immediately.
+
+      If the user chooses yes, create `./specs/<slug>/e2e.md` with these sections:
+
+      ### 1. E2E Infrastructure
+
+      Explore the project for existing E2E test infrastructure
+
+      Then document:
+      - **Existing infra**: What was found and how to integrate with it
+      - **Proposed setup** (if no existing infra): A minimal E2E setup appropriate for the project
+        type (e.g., shell script with assertions for CLI tools, Playwright for web apps,
+        HTTP client scripts for APIs, etc.)
+
+      ### 2. E2E Test Scenario
+
+      Define concrete steps to verify the feature end-to-end:
+      - Step-by-step actions with expected outputs
+
+      ### 3. How to Run
+
+      - Exact commands to execute the E2E tests
+      - Required environment setup (env vars, services, test data)
+
+      ### 4. Debugging Guide
+
+      - How to read E2E test output and identify which action failed.
+      - How to run individual actions in isolation for debugging
+      - How to inspect intermediate state (logs, database, files) during a failed run
+
+      Present the E2E test design to the user for approval before transitioning.
+
+      If user gets approved, refer to the e2e.md file in the plan.md's e2e-test-design section.
+    transitions:
+      e2e design approved: done
+      skip: done
+      needs revision: e2e-test-design
 
   done:
     prompt: |
@@ -298,5 +351,6 @@ states:
       - `research/*.md` — research findings
       - `design.md` — detailed design (authoritative spec)
       - `plan.md` — implementation plan
+      - `e2e.md` — E2E test design (if created)
       - `summary.md` — this summary
     transitions: {}
