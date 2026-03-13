@@ -63,9 +63,10 @@ with a large dataset, consider..." — don't assume the worst case.
 
 ## Instructions
 
-1. Read `/tmp/pr_changed_files.txt` and `/tmp/pr_diff.txt` (pre-fetched)
-2. Review the diff for issues listed above
-3. Output a JSON array of issues
+1. For each changed file, read the **full file** to understand context (not just the diff)
+2. Consider the expected scale and frequency of the code path
+3. Review the diff for issues listed above
+4. Output a JSON array of issues
 
 ## Output Format
 

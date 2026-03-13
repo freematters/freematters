@@ -30,19 +30,19 @@ states:
 
       Record owner, repo, PR number, base branch, head commit SHA, and URL for subsequent states.
 
-      ## 3. Fetch diff + API data (parallel)
+      ## 3. Get the changed files list
 
-      Run these commands **in parallel** (all are independent):
-
-      **a) Save the full diff and changed files list to temp files:**
       ```bash
-      gh pr diff > /tmp/pr_diff.txt
-      ```
-      ```bash
-      gh pr diff --name-only > /tmp/pr_changed_files.txt
+      gh pr diff --name-only
       ```
 
-      **b) Fetch existing review threads** via GraphQL:
+      Record the list. The full diff is fetched by subagents during the review phase
+      to avoid context size issues on large PRs.
+
+      ## 4. Get existing review threads
+
+      Fetch review threads via GraphQL to get thread node IDs and conversation history:
+
       ```bash
       gh api graphql -f query='
         query($owner: String!, $repo: String!, $pr: Int!) {
@@ -58,7 +58,7 @@ states:
                       databaseId
                       body
                       createdAt
-                      author { login __typename }
+                      author { login }
                     }
                   }
                 }
@@ -69,21 +69,24 @@ states:
       ' -f owner={owner} -f repo={repo} -F pr={pr_number}
       ```
 
-      **c) Fetch existing summary comment:**
-      ```bash
-      gh api repos/{owner}/{repo}/issues/{pr_number}/comments
-      ```
-
       For each thread, record:
       - `id` (node ID, e.g. `PRT_kwDOxxxx`) — needed for resolveReviewThread mutation
       - `isResolved` — skip resolved threads in later phases
       - `comments` — full conversation history
 
-      Bot-authored threads: `comments.nodes[0].author.__typename == "Bot"`
-      (covers `claude[bot]`, `github-actions[bot]`, and any other GitHub App).
+      Bot-authored threads: `comments.nodes[0].author.login == "github-actions[bot]"`
+      (comments posted via `GITHUB_TOKEN` in GitHub Actions).
 
       > Note: `first: 100` may not cover all threads on large PRs with many review rounds.
       > If the response indicates more pages exist, paginate using the `after` cursor.
+
+      ## 5. Get existing summary comment
+
+      Fetch issue comments to find the existing review summary (if any):
+
+      ```bash
+      gh api repos/{owner}/{repo}/issues/{pr_number}/comments
+      ```
 
       Look for a comment whose body starts with `<!-- code-review -->`. Record its `id` if found.
 
@@ -121,9 +124,11 @@ states:
       Read your review instructions from: freefsm/workflows/code-review-agents/{agent}.md
 
       Steps:
-      1. Read `/tmp/pr_changed_files.txt` to get the changed files list
-      2. Read `/tmp/pr_diff.txt` to get the full diff
-      3. Review against your instructions
+      1. Run `gh pr diff --name-only` to get the changed files list
+      2. Run `gh pr diff` to get the full diff (if the diff is very large,
+         review file-by-file using `gh pr diff -- {file}`)
+      3. For each changed file, read the full file to understand context
+      4. Review against your instructions
 
       Existing unresolved review threads (do NOT raise issues already covered here):
       {EXISTING_THREADS}
@@ -131,7 +136,7 @@ states:
       Output ONLY the JSON array as specified in your instructions.
       ```
 
-      > The diff was pre-fetched in init and saved to temp files to avoid redundant API calls.
+      > Subagents fetch the diff themselves to avoid exceeding context limits on large PRs.
 
       Launch these 3 subagents concurrently (use model: sonnet for all):
 
@@ -159,7 +164,7 @@ states:
 
       ## 1. Respond to user replies on existing threads
 
-      For each unresolved bot-authored review thread from init (`author.__typename == "Bot"`):
+      For each unresolved review thread authored by `github-actions[bot]` from init:
       1. **Check for user replies**: In the thread's comments, look for human replies
          (entries after the first where `author.login` is not a bot)
       2. **Skip if already responded**: If the last comment is from the bot and its
@@ -180,7 +185,7 @@ states:
 
       ## 2. Auto-resolve fixed threads
 
-      For each unresolved bot-authored review thread (`author.__typename == "Bot"`):
+      For each unresolved `github-actions[bot]` review thread:
       1. Read the first comment to understand what issue was flagged
       2. Read the current version of the relevant file
       3. Determine if the flagged issue has been fixed (not just "file changed" —
@@ -197,7 +202,7 @@ states:
       ' -f threadId="{thread_node_id}"
       ```
 
-      Only resolve bot-authored threads (`__typename == "Bot"`), never human-posted ones.
+      Only resolve `github-actions[bot]` threads, never human-posted ones.
       Record auto-resolve count.
 
       ## 3. Post new inline comments
@@ -259,23 +264,15 @@ states:
 
       ## Review Results
 
-      - **blocker**: X
-      - **major**: X
+      - **blocker**: X (posted as inline comments)
+      - **major**: X (posted as inline comments)
       - **minor**: X
       - **auto-resolved**: X (previous comments where code has been fixed)
       - **replies**: Scanned X bot threads, Y had user replies, responded to Z
 
-      ### Blocker
+      ### Minor issues (not posted as inline comments)
 
-      - `file/path:line` — [description] (also posted as inline comment)
-
-      ### Major
-
-      - `file/path:line` — [description] (also posted as inline comment)
-
-      ### Minor
-
-      > Not posted as inline comments, listed here for reference only
+      > Listed here for reference only
 
       - `file/path:line` — [description]
       ```

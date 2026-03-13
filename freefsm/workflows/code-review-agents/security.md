@@ -66,9 +66,10 @@ publicly accessible, then..." — let the author decide.
 
 ## Instructions
 
-1. Read `/tmp/pr_changed_files.txt` and `/tmp/pr_diff.txt` (pre-fetched)
-2. Review the diff for vulnerabilities listed above
-3. Output a JSON array of issues
+1. For each changed file, read the **full file** to understand context (not just the diff)
+2. Identify trust boundaries and data flow paths
+3. Review the diff for vulnerabilities listed above
+4. Output a JSON array of issues
 
 ## Output Format
 
