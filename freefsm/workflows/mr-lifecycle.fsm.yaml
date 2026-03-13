@@ -20,6 +20,18 @@ guide: |
   - GitLab: Uses GitLab REST API (requires PRIVATE-TOKEN)
   - GitHub: Prefers `gh` CLI, falls back to GitHub REST API
 
+  ## GitHub CLI tips (avoid common pitfalls)
+
+  - **Prefer `gh pr` / `gh run` high-level commands** over raw `gh api` calls when possible.
+  - **GraphQL queries**: Always inline owner/repo/PR values directly into the query string.
+    Do NOT use `-f owner=... -f repo=...` variable binding — shell escaping breaks it.
+    Example: `query { repository(owner: "myorg", name: "myrepo") { ... } }`
+  - **jq and `!fix`**: The `!` character triggers bash history expansion in double-quoted strings.
+    Always use single quotes for jq expressions, or pipe through `grep` instead.
+    Good: `gh api ... -q '.[] | .body'` then pipe to `grep '!fix'`
+    Bad: `gh api ... --jq '.[] | select(.body | contains("!fix"))'`
+  - **Check runs**: Use `gh pr checks <N>` instead of raw `/commits/{sha}/check-runs` API.
+
 initial: create-mr
 
 states:
@@ -61,10 +73,10 @@ states:
       - Whether the MR/PR has been merged or closed
       - Whether all CI has completed (keep waiting if pending/running):
         - GitLab: Check pipeline status via API
-        - GitHub: Use the check-runs API (`/commits/{sha}/check-runs`) ONLY.
+        - GitHub: Use `gh pr checks <N> --json name,state,bucket` to get check status.
+          All checks are finished when none have `state == "PENDING"`.
           Do NOT use the legacy commit status API (`/commits/{sha}/status`) — it returns
-          "pending" when no commit statuses exist (common with GitHub Actions), causing
-          false negatives. Pipelines are finished when all check runs have `status == "completed"`.
+          "pending" when no commit statuses exist (common with GitHub Actions).
       - Whether the target branch has new commits since the current branch was last rebased/merged
         - GitLab: Compare target branch HEAD via API
         - GitHub: Compare via `git fetch` + `git rev-list --count HEAD..origin/<target>`
@@ -96,8 +108,14 @@ states:
 
       Check items:
       - CI results: Are there any failed jobs (GitLab pipeline / GitHub Actions checks)?
-      - Bot inline review comments: Fetch all unresolved review threads. Identify bot-authored
-        threads (`author.__typename == "Bot"` in GraphQL, or `user.type == "Bot"` in REST).
+      - Bot inline review comments: Fetch all unresolved review threads.
+        - GitHub: Use a single-line GraphQL query with owner/repo/PR inlined directly (no `-f` variables).
+          Filter for bot-authored threads: `comments.nodes[0].author.__typename == "Bot"`.
+          Example:
+          ```bash
+          gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: N) { reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login __typename } body } } } } } } }'
+          ```
+        - GitLab: Use MR discussions API, filter for `user.type == "Bot"`.
         All unresolved bot inline comments (blocker/major) should be fixed.
       - `!fix`-marked comments: Two scenarios:
         1. A reviewer left a review comment on the diff, and the author replied with `!fix [optional description]`
@@ -106,7 +124,8 @@ states:
         API endpoints to check (must check ALL of these):
         - GitLab: MR discussions API (includes inline and general comments)
         - GitHub: Both `pulls/{N}/comments` (inline review comments) AND `issues/{N}/comments` (PR-level comments)
-        When filtering with jq, use `contains("!fix")` not `test()` — the `!` character requires escaping in regex.
+        To search for `!fix`, pipe the API output through `grep '!fix'` instead of using jq `contains` —
+        the `!` in `"!fix"` triggers bash history expansion inside double-quoted strings.
       - Rebase: Is the current branch behind the target branch?
 
       Decision logic:
