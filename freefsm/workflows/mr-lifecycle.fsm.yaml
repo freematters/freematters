@@ -90,8 +90,14 @@ states:
       On first entry, run a single poll inline to verify the script works
       (API token/auth valid, correct IDs, etc.) before starting the background job.
 
-      Exit conditions (print as RESULT line):
+      The script also monitors for `!fix` comments (high priority — author is waiting):
+      - Check both `pulls/{N}/comments` (inline) and `issues/{N}/comments` (PR-level)
+      - Pipe through `grep '!fix'` (do NOT use jq contains — `!` breaks in double quotes)
+      - If `!fix` is found and CI is still running, exit immediately — don't wait for CI
+
+      Exit conditions (print as RESULT line, checked in this priority order):
       - MR/PR merged or closed → "RESULT: MR merged" or "RESULT: MR closed"
+      - `!fix` found → "RESULT: fix requested" (exit immediately, even if CI is pending)
       - All CI completed (regardless of pass/fail) → "RESULT: pipelines finished"
 
       When running the script in the background, do NOT redirect stdout/stderr to a file —
@@ -99,6 +105,7 @@ states:
       When the job completes, read its output from the task output and transition based on the RESULT line.
     transitions:
       pipelines finished: check
+      fix requested: fix
       MR merged: done
       MR closed: done
 
@@ -131,10 +138,13 @@ states:
       Decision logic:
       - Any issues found → fix
       - No issues → wait-for-input
+
+      **Priority**: `!fix` comments from the author take highest priority — the author is
+      waiting for a response. Check and handle them before bot review comments.
     todos:
+      - Check for !fix-marked comments (highest priority)
       - Check pipeline for failed jobs
       - Check for unresolved bot inline review comments (blocker/major)
-      - Check for !fix-marked comments
       - Check if rebase is needed
     transitions:
       issues found: fix
@@ -181,9 +191,9 @@ states:
 
       If upon inspection there is nothing to fix, transition back to polling.
     todos:
+      - Handle !fix-marked comments (highest priority — author is waiting)
       - Fix CI failures (if any)
       - Fix unresolved bot inline review comments (if any)
-      - Handle !fix-marked comments (if any)
       - Rebase (if needed)
       - Run lint/format/unit tests to verify
     transitions:
