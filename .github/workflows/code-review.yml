@@ -5,6 +5,12 @@ on:
     types: [opened, synchronize, reopened]
 
 jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "association: ${{ github.event.pull_request.author_association }}"
+          echo "author: ${{ github.event.pull_request.user.login }}"
   review:
     if: >-
       github.event.pull_request.author_association == 'MEMBER' ||
