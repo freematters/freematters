@@ -1,6 +1,6 @@
 {
   "name": "@freematters/freefsm",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "CLI-first FSM runtime for agent workflows",
   "type": "module",
   "main": "dist/cli.js",
