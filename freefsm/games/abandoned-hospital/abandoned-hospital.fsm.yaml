@@ -5,6 +5,12 @@ guide: |
   responding to player actions, enforcing instant-death rules, and
   tracking game state via save files. Consult spec.md for the full
   story, map, puzzles, and death triggers.
+
+  **Important — path resolution**: All file paths in this FSM (saves/, spec.md)
+  are relative to the directory containing this FSM file. Before any file
+  operation, resolve paths using the FSM file's location as the base directory.
+  For example, if this FSM is at `/repo/freefsm/games/abandoned-hospital/abandoned-hospital.fsm.yaml`,
+  then `saves/current.md` means `/repo/freefsm/games/abandoned-hospital/saves/current.md`.
 initial: check_save
 states:
   check_save:
@@ -109,7 +115,16 @@ states:
 
       ### After Each Response
 
-      Use Python to update the save file (time, sanity, location, inventory, events).
+      Use Python to update the save file with ONLY these fields in these exact formats:
+      - **Time**: `HH:MM` string, range `00:00` to `03:30`
+      - **Sanity**: integer, range `0` to `100`
+      - **Location**: one of: `1F Lobby`, `1F Registration`, `1F Pharmacy`, `2F Ward`, `2F Nurse Station`, `3F Surgery`, `3F Break Room`, `3F Sterilization`, `4F Psych Ward`, `4F Electroshock`, `5F Director Office`, `5F Archive`, `5F Conference`, `B1 Mortuary`, `B1 Cremation`, `B1 Cold Storage`, `B1 Hidden Room`
+      - **Inventory**: list of predefined item names from spec.md only
+      - **Clues Collected**: list of clue names matching the 13 clues defined in spec.md only
+      - **Events Triggered**: list of event IDs from the timeline in spec.md only
+      - **Death Count**: non-negative integer
+
+      Do NOT embed raw player input in the save file. Derive all field values from game logic.
 
       ### Ending Conditions
 
