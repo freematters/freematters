@@ -14,7 +14,9 @@
 version: 1
 guide: |
   Monitor a MR/PR until it is merged or closed.
-  Automatically fix CI failures, bot review findings, and author-marked `!fix` comments.
+  Automatically fix CI failures, **blocker**-level bot review findings, and author-marked `!fix` comments.
+  **Major**-level bot comments are left open for the author to review — fix them only when
+  the author marks them with `!fix`.
 
   Supports GitLab (MR) and GitHub (PR). Platform is auto-detected from git remote URL:
   - GitLab: Uses GitLab REST API (requires PRIVATE-TOKEN)
@@ -123,7 +125,8 @@ states:
           gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: N) { reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login __typename } body } } } } } } }'
           ```
         - GitLab: Use MR discussions API, filter for `user.type == "Bot"`.
-        All unresolved bot inline comments (blocker/major) should be fixed.
+        Only **blocker** bot comments should be auto-fixed. **Major** comments are left
+        open for the author to review — they will be fixed only when the author adds `!fix`.
       - `!fix`-marked comments: Two scenarios:
         1. A reviewer left a review comment on the diff, and the author replied with `!fix [optional description]`
         2. The author posted a `!fix [optional description]` comment directly on the MR/PR
@@ -144,7 +147,7 @@ states:
     todos:
       - Check for !fix-marked comments (highest priority)
       - Check pipeline for failed jobs
-      - Check for unresolved bot inline review comments (blocker/major)
+      - Check for unresolved bot inline review comments (blocker only — major left for author)
       - Check if rebase is needed
     transitions:
       issues found: fix
@@ -180,9 +183,9 @@ states:
     prompt: |
       Fix issues found during check or wait-for-input:
       - CI failure: Fetch failed job logs (GitLab API / `gh run view --log-failed`), analyze root cause, and fix the code.
-      - Bot inline review comments: Read each unresolved bot-authored review thread. Understand
-        the issue described, read the relevant code, and fix it. These are blocker/major issues
-        posted by automated code review — treat them as actionable items that must be addressed.
+      - Bot inline review comments (**blocker only**): Read each unresolved bot-authored review
+        thread. Only fix threads whose comment starts with `**blocker**`. Leave `**major**` threads
+        open — the author will review and mark with `!fix` if they want them addressed.
       - `!fix`-marked comments: Find author-marked `!fix` comments, read the corresponding
         reviewer comment or author's description, understand the intent, and modify the code.
       - Rebase needed: Fetch the latest target branch, git rebase. Resolve conflicts autonomously.
@@ -193,7 +196,7 @@ states:
     todos:
       - Handle !fix-marked comments (highest priority — author is waiting)
       - Fix CI failures (if any)
-      - Fix unresolved bot inline review comments (if any)
+      - Fix unresolved **blocker** bot inline review comments (if any; skip major)
       - Rebase (if needed)
       - Run lint/format/unit tests to verify
     transitions:
