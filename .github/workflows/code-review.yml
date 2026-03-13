@@ -6,6 +6,7 @@ on:
 
 jobs:
   review:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     concurrency:
       group: code-review-${{ github.event.pull_request.number }}
@@ -29,16 +30,18 @@ jobs:
         working-directory: freefsm
         run: npm ci && npm run build && npm link && echo "$(npm root -g)/.bin" >> $GITHUB_PATH
 
-      - uses: anthropics/claude-code-action@v1
-        timeout-minutes: 15
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: '--dangerously-skip-permissions'
-          prompt: |
-            First, install the freefsm plugin:
-            ```bash
-            freefsm install claude
-            ```
+      - name: Install Claude Code
+        run: curl -fsSL https://claude.ai/install.sh | bash
 
-            Then use /freefsm:start code-review to run the code review workflow.
-            Drive it to completion — do not stop between states.
+      - name: Install freefsm plugin
+        run: freefsm install claude
+
+      - name: Run code review
+        timeout-minutes: 15
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          claude -p "Use /freefsm:start code-review to run the code review workflow. Drive it to completion — do not stop between states." \
+            --dangerously-skip-permissions \
+            --output-format text
