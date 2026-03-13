@@ -51,14 +51,13 @@ states:
 
   wait-for-pipeline:
     prompt: |
-      Poll MR/PR status using python, checking every 20 seconds in a while loop.
-      - GitLab: Query pipeline and MR status via GitLab API
-      - GitHub: Query checks and PR status via `gh pr view` and `gh run list`
+      Run the polling script as a **background bash job** so the conversation is not blocked.
 
-      On first entry to this state, run a single poll to verify the script works
-      (API token/auth valid, correct IDs, etc.) before starting the loop.
+      Write a Python polling script to `/tmp/poll_pipeline.py` and run it in the background.
+      The script should check every 20 seconds and print status lines. When an exit condition
+      is met, it should print a clear result line (e.g., "RESULT: pipelines finished") and exit.
 
-      Monitor three things:
+      The script monitors:
       - Whether the MR/PR has been merged or closed
       - Whether all CI (GitLab pipelines / GitHub Actions checks) have completed (keep waiting if pending/running)
       - Whether the target branch has new commits since the current branch was last rebased/merged
@@ -71,9 +70,15 @@ states:
       - Force push to the remote branch
       - Continue polling (the push will trigger a new pipeline)
 
-      Exit conditions:
-      - MR/PR merged or closed → done
-      - All CI completed (regardless of pass/fail) → check
+      On first entry, run a single poll inline to verify the script works
+      (API token/auth valid, correct IDs, etc.) before starting the background job.
+
+      Exit conditions (print as RESULT line):
+      - MR/PR merged or closed → "RESULT: MR merged" or "RESULT: MR closed"
+      - All CI completed (regardless of pass/fail) → "RESULT: pipelines finished"
+
+      After launching the background job, you may continue with other work.
+      When the job completes, read its output and transition based on the RESULT line.
     transitions:
       pipelines finished: check
       MR merged: done
@@ -106,15 +111,24 @@ states:
 
   wait-for-input:
     prompt: |
-      CI has passed with no pending issues. Poll for user actions (check every 20 seconds):
+      CI has passed with no pending issues.
 
-      Monitor:
+      Run the polling script as a **background bash job** so the conversation is not blocked.
+
+      Write a Python polling script to `/tmp/poll_input.py` and run it in the background.
+      The script should check every 20 seconds and print status lines. When an exit condition
+      is met, it should print a clear result line and exit.
+
+      The script monitors:
       - Whether the MR/PR has been merged or closed
       - Whether new `!fix` markers appear (author replies or comments containing `!fix`)
 
-      Exit conditions:
-      - MR/PR merged or closed → done
-      - `!fix` found → fix
+      Exit conditions (print as RESULT line):
+      - MR/PR merged or closed → "RESULT: MR merged" or "RESULT: MR closed"
+      - `!fix` found → "RESULT: fix requested"
+
+      After launching the background job, you may continue with other work.
+      When the job completes, read its output and transition based on the RESULT line.
     transitions:
       fix requested: fix
       MR merged: done
