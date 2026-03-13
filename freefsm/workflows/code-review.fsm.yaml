@@ -80,9 +80,13 @@ states:
       > Note: `first: 100` may not cover all threads on large PRs with many review rounds.
       > If the response indicates more pages exist, paginate using the `after` cursor.
 
-      **Identify previous summary review thread**: Look for an unresolved bot-authored
-      review thread whose first comment body starts with `<!-- code-review -->`.
-      This is the previous round's summary — record its `id` for auto-resolving later.
+      **c) Fetch existing issue comments** to find the previous summary:
+      ```bash
+      gh api repos/{owner}/{repo}/issues/{pr_number}/comments --paginate
+      ```
+
+      Look for a bot-authored comment whose body starts with `<!-- code-review -->`.
+      Record its `id` for in-place updating in the post phase.
 
       ## Error handling
       - If any API call fails, skip and continue to the next step
@@ -197,22 +201,7 @@ states:
       Only resolve bot-authored threads (`__typename == "Bot"`), never human-posted ones.
       Record auto-resolve count.
 
-      ## 3. Resolve previous summary thread
-
-      If a previous summary review thread was found in init (body starts with
-      `<!-- code-review -->`), resolve it — it's now outdated:
-
-      ```bash
-      gh api graphql -f query='
-        mutation($threadId: ID!) {
-          resolveReviewThread(input: {threadId: $threadId}) {
-            thread { isResolved }
-          }
-        }
-      ' -f threadId="{previous_summary_thread_id}"
-      ```
-
-      ## 4. Submit new review (summary + inline comments bundled)
+      ## 3. Submit new review (summary + inline comments bundled)
 
       Build the summary and inline comments, then submit as a **single PR review**.
 
@@ -261,7 +250,9 @@ states:
       - `file/path:line` — [description]
       ```
 
-      Submit the review with summary as `body` and inline findings as `comments`:
+      ### 3a. Submit PR review with inline comments
+
+      Submit a PR review containing only inline comments (no body):
 
       ```bash
       gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
@@ -273,7 +264,7 @@ states:
       {
         "commit_id": "<head commit SHA from init step 2>",
         "event": "COMMENT",
-        "body": "<summary markdown from template above>",
+        "body": "",
         "comments": [
           {
             "path": "path/to/file",
@@ -290,8 +281,24 @@ states:
       - Lead with severity: **blocker** / **major**
       - Include specific fix suggestion when possible
       - Don't repeat the same type of issue in multiple places — pick the most representative
-      - If no inline comments to post, submit the review with only the summary body
-        (empty `comments` array)
+      - If no inline comments to post, skip this step entirely
+
+      ### 3b. Create or update summary issue comment
+
+      If a previous summary issue comment was found in init (by `<!-- code-review -->` marker),
+      update it in place:
+
+      ```bash
+      gh api repos/{owner}/{repo}/issues/comments/{comment_id} \
+        -X PATCH -f body="<summary markdown>"
+      ```
+
+      Otherwise, create a new one:
+
+      ```bash
+      gh api repos/{owner}/{repo}/issues/{pr_number}/comments \
+        -f body="<summary markdown>"
+      ```
 
       ## Error handling
       - If any API call fails, skip and continue to the next one
@@ -301,8 +308,8 @@ states:
     todos:
       - Respond to user replies on bot threads
       - Auto-resolve threads where issues are confirmed fixed
-      - Resolve previous summary review thread (if exists)
-      - Submit single review: summary body + inline comments (deduplicated)
+      - Submit PR review with inline comments (deduplicated)
+      - Create or update summary issue comment
     transitions:
       complete: done
 
