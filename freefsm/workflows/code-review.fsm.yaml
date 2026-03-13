@@ -1,0 +1,307 @@
+version: 1
+guide: |
+  ## Issue Severity
+  - blocker: Must fix (bugs, security vulnerabilities, broken functionality)
+  - major: Strongly recommend (performance issues, bad practices, architectural flaws)
+  - minor: Optional improvement (naming, minor readability)
+
+initial: init
+states:
+  init:
+    prompt: |
+      # Phase: Gather Data
+
+      Collect all data needed for the PR review.
+
+      ## 1. Verify authentication
+
+      ```bash
+      gh auth status
+      ```
+
+      If not authenticated, stop and ask the user to run `gh auth login`.
+
+      ## 2. Identify the repo and PR
+
+      ```bash
+      gh repo view --json owner,name -q '"\(.owner.login)/\(.name)"'
+      gh pr view --json number,baseRefName,headRefName,headRefOid,url
+      ```
+
+      Record owner, repo, PR number, base branch, head commit SHA, and URL for subsequent states.
+
+      ## 3. Get the changed files list
+
+      ```bash
+      gh pr diff --name-only
+      ```
+
+      Record the list. The full diff is fetched by subagents during the review phase
+      to avoid context size issues on large PRs.
+
+      ## 4. Get existing review threads
+
+      Fetch review threads via GraphQL to get thread node IDs and conversation history:
+
+      ```bash
+      gh api graphql -f query='
+        query($owner: String!, $repo: String!, $pr: Int!) {
+          repository(owner: $owner, name: $repo) {
+            pullRequest(number: $pr) {
+              reviewThreads(first: 100) {
+                nodes {
+                  id
+                  isResolved
+                  comments(first: 20) {
+                    nodes {
+                      id
+                      databaseId
+                      body
+                      createdAt
+                      author { login }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ' -f owner={owner} -f repo={repo} -F pr={pr_number}
+      ```
+
+      For each thread, record:
+      - `id` (node ID, e.g. `PRT_kwDOxxxx`) — needed for resolveReviewThread mutation
+      - `isResolved` — skip resolved threads in later phases
+      - `comments` — full conversation history
+
+      Bot-authored threads: `comments.nodes[0].author.login == "github-actions[bot]"`
+      (comments posted via `GITHUB_TOKEN` in GitHub Actions).
+
+      > Note: `first: 100` may not cover all threads on large PRs with many review rounds.
+      > If the response indicates more pages exist, paginate using the `after` cursor.
+
+      ## 5. Get existing summary comment
+
+      Fetch issue comments to find the existing review summary (if any):
+
+      ```bash
+      gh api repos/{owner}/{repo}/issues/{pr_number}/comments
+      ```
+
+      Look for a comment whose body starts with `<!-- code-review -->`. Record its `id` if found.
+
+      ## Error handling
+      - If any API call fails, skip and continue to the next step
+
+      **Once data is collected**, transition to the next state.
+    transitions:
+      data ready: review
+
+  review:
+    prompt: |
+      # Phase: Review Code
+
+      ## Review philosophy
+      - **Focus on problems** — find and surface real issues, not praise
+      - **Stay objective** — state facts, not opinions
+      - **Suggest fixes** — give clear, actionable remediation
+      - **Be precise** — attach findings to specific code lines
+      - **Separate outputs** — inline comments for specific line issues; summary goes in issue comment only
+
+      **Avoid duplicate reviews**: Read all unresolved review threads fetched in init.
+      Do not raise issues that are already covered by existing threads.
+      Use semantic comparison — same issue phrased differently still counts as duplicate.
+
+      ## Concurrent subagent review
+
+      Use the Agent tool to **launch 3 subagents concurrently** (all in a single message).
+
+      Each subagent prompt follows this template:
+
+      ```
+      Review the code changes in PR #{pr_number}.
+
+      Read your review instructions from: freefsm/workflows/code-review-agents/{agent}.md
+
+      Steps:
+      1. Run `gh pr diff --name-only` to get the changed files list
+      2. Run `gh pr diff` to get the full diff (if the diff is very large,
+         review file-by-file using `gh pr diff -- {file}`)
+      3. For each changed file, read the full file to understand context
+      4. Review against your instructions
+
+      Existing unresolved review threads (do NOT raise issues already covered here):
+      {EXISTING_THREADS}
+
+      Output ONLY the JSON array as specified in your instructions.
+      ```
+
+      > Subagents fetch the diff themselves to avoid exceeding context limits on large PRs.
+
+      Launch these 3 subagents concurrently (use model: sonnet for all):
+
+      | Agent file | Focus |
+      |------------|-------|
+      | `code-quality.md` | Code quality, KISS, YAGNI |
+      | `security.md` | Security vulnerabilities |
+      | `performance.md` | Performance issues |
+
+      ## Consolidate results
+
+      Collect outputs from all 3 subagents and merge into a unified issues list.
+      Deduplicate: if multiple agents flag the same issue, keep only one.
+
+      **Once review is complete**, transition to the next state.
+    transitions:
+      review complete: post-and-resolve
+
+  post-and-resolve:
+    prompt: |
+      # Phase: Post Comments, Respond & Resolve
+
+      This phase handles all interactions with the PR in a single pass.
+      Execute the following steps in order.
+
+      ## 1. Respond to user replies on existing threads
+
+      For each unresolved review thread authored by `github-actions[bot]` from init:
+      1. **Check for user replies**: In the thread's comments, look for human replies
+         (entries after the first where `author.login` is not a bot)
+      2. **Skip if already responded**: If the last comment is from the bot and its
+         `createdAt` is after the last human reply, skip
+      3. **Analyze intent and respond**:
+         - **User disagrees** (e.g., "this is intentional"):
+           Re-examine the code. If user is right → reply acknowledging, then resolve the thread.
+           If still a problem → reply explaining why.
+         - **User asks for clarification**: Reply with reasoning and impact.
+         - **User asks for suggestion**: Reply with concrete fix and code example.
+
+      ```bash
+      gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
+        -f body="[reply content]"
+      ```
+
+      Record response statistics for the summary.
+
+      ## 2. Auto-resolve fixed threads
+
+      For each unresolved `github-actions[bot]` review thread:
+      1. Read the first comment to understand what issue was flagged
+      2. Read the current version of the relevant file
+      3. Determine if the flagged issue has been fixed (not just "file changed" —
+         verify the specific problem is resolved)
+      4. If confirmed fixed, resolve via GraphQL:
+
+      ```bash
+      gh api graphql -f query='
+        mutation($threadId: ID!) {
+          resolveReviewThread(input: {threadId: $threadId}) {
+            thread { isResolved }
+          }
+        }
+      ' -f threadId="{thread_node_id}"
+      ```
+
+      Only resolve `github-actions[bot]` threads, never human-posted ones.
+      Record auto-resolve count.
+
+      ## 3. Post new inline comments
+
+      For each **blocker** or **major** issue from the review phase, post as an inline comment.
+
+      Before posting, do a final dedup check: compare each new finding against all
+      unresolved review threads (including those just responded to in step 1).
+      If an existing thread already covers the same issue semantically, skip it.
+
+      > This is a second dedup pass (the first was in the review phase when subagents
+      > received existing threads). This pass catches duplicates across agents and
+      > issues that survived the first pass.
+
+      Submit all new comments as a single review:
+
+      ```bash
+      gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
+        --input /tmp/review_payload.json
+      ```
+
+      Payload:
+      ```json
+      {
+        "commit_id": "<head commit SHA from init step 2>",
+        "event": "COMMENT",
+        "comments": [
+          {
+            "path": "path/to/file",
+            "line": 42,
+            "side": "RIGHT",
+            "body": "**blocker**: [description]\n\n[detail and suggestion]"
+          }
+        ]
+      }
+      ```
+
+      Rules:
+      - Lead with severity: **blocker** / **major**
+      - Include specific fix suggestion when possible
+      - Don't repeat the same type of issue in multiple places — pick the most representative
+      - If no new comments to post, skip this step
+
+      ## 4. Update summary comment
+
+      Build the summary using this template:
+
+      ```markdown
+      <!-- code-review -->
+      # PR Code Review Summary
+
+      ## Changes Overview
+
+      [2-3 sentences describing the PR's purpose and contribution]
+
+      ## Key Files
+
+      - `file/path` — [why it needs attention]
+
+      ## Review Results
+
+      - **blocker**: X (posted as inline comments)
+      - **major**: X (posted as inline comments)
+      - **minor**: X
+      - **auto-resolved**: X (previous comments where code has been fixed)
+      - **replies**: Scanned X bot threads, Y had user replies, responded to Z
+
+      ### Minor issues (not posted as inline comments)
+
+      > Listed here for reference only
+
+      - `file/path:line` — [description]
+      ```
+
+      If a summary comment was found in init (by `<!-- code-review -->` marker), update it:
+      ```bash
+      gh api repos/{owner}/{repo}/issues/comments/{comment_id} \
+        -X PATCH -f body="$(cat /tmp/summary.md)"
+      ```
+
+      Otherwise, create a new one:
+      ```bash
+      gh api repos/{owner}/{repo}/issues/{pr_number}/comments \
+        -f body="$(cat /tmp/summary.md)"
+      ```
+
+      ## Error handling
+      - If any API call fails, skip and continue to the next one
+      - Record failure counts in the summary
+
+      **Once all steps are complete**, transition to the next state.
+    todos:
+      - Respond to user replies on bot threads
+      - Auto-resolve threads where issues are confirmed fixed
+      - Post new inline comments (deduplicated against existing threads)
+      - Update or create summary issue comment
+    transitions:
+      complete: done
+
+  done:
+    prompt: "Review complete."
+    transitions: {}
