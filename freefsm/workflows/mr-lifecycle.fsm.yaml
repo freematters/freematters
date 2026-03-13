@@ -82,8 +82,9 @@ states:
       - MR/PR merged or closed → "RESULT: MR merged" or "RESULT: MR closed"
       - All CI completed (regardless of pass/fail) → "RESULT: pipelines finished"
 
-      After launching the background job, you may continue with other work.
-      When the job completes, read its output and transition based on the RESULT line.
+      When running the script in the background, do NOT redirect stdout/stderr to a file —
+      let output go to the terminal so the user can observe progress in real time.
+      When the job completes, read its output from the task output and transition based on the RESULT line.
     transitions:
       pipelines finished: check
       MR merged: done
@@ -138,8 +139,9 @@ states:
       - MR/PR merged or closed → "RESULT: MR merged" or "RESULT: MR closed"
       - `!fix` found → "RESULT: fix requested"
 
-      After launching the background job, you may continue with other work.
-      When the job completes, read its output and transition based on the RESULT line.
+      When running the script in the background, do NOT redirect stdout/stderr to a file —
+      let output go to the terminal so the user can observe progress in real time.
+      When the job completes, read its output from the task output and transition based on the RESULT line.
     transitions:
       fix requested: fix
       MR merged: done
