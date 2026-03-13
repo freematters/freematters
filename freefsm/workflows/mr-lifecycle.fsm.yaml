@@ -90,8 +90,10 @@ states:
 
       Check items:
       - CI results: Are there any failed jobs (GitLab pipeline / GitHub Actions checks)?
-      - Bot review: Comments posted by bots after CI (e.g., code scanning, lint reports). Are there any severe issues (error/critical level)?
-      - Review comments: Only handle items marked with `!fix`. Two scenarios:
+      - Bot inline review comments: Fetch all unresolved review threads. Identify bot-authored
+        threads (`author.__typename == "Bot"` in GraphQL, or `user.type == "Bot"` in REST).
+        All unresolved bot inline comments (blocker/major) should be fixed.
+      - `!fix`-marked comments: Two scenarios:
         1. A reviewer left a review comment on the diff, and the author replied with `!fix [optional description]`
         2. The author posted a `!fix [optional description]` comment directly on the MR/PR
         Do NOT handle reviewer comments without `!fix` markers.
@@ -102,7 +104,7 @@ states:
       - No issues → wait-for-input
     todos:
       - Check pipeline for failed jobs
-      - Check bot review for error/critical findings
+      - Check for unresolved bot inline review comments (blocker/major)
       - Check for !fix-marked comments
       - Check if rebase is needed
     transitions:
@@ -138,8 +140,11 @@ states:
     prompt: |
       Fix issues found during check or wait-for-input:
       - CI failure: Fetch failed job logs (GitLab API / `gh run view --log-failed`), analyze root cause, and fix the code.
-      - Bot review: Read bot comment findings. Only fix severe issues (error/critical level). Ignore warnings and info.
-      - Review comments: Find author-marked `!fix` comments, read the corresponding reviewer comment or author's description, understand the intent, and modify the code.
+      - Bot inline review comments: Read each unresolved bot-authored review thread. Understand
+        the issue described, read the relevant code, and fix it. These are blocker/major issues
+        posted by automated code review — treat them as actionable items that must be addressed.
+      - `!fix`-marked comments: Find author-marked `!fix` comments, read the corresponding
+        reviewer comment or author's description, understand the intent, and modify the code.
       - Rebase needed: Fetch the latest target branch, git rebase. Resolve conflicts autonomously.
 
       After fixing, run lint/format/unit tests to confirm the fix doesn't introduce new issues.
@@ -147,7 +152,7 @@ states:
       If upon inspection there is nothing to fix, transition back to polling.
     todos:
       - Fix CI failures (if any)
-      - Fix bot review severe issues (if any)
+      - Fix unresolved bot inline review comments (if any)
       - Handle !fix-marked comments (if any)
       - Rebase (if needed)
       - Run lint/format/unit tests to verify
