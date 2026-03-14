@@ -32,3 +32,31 @@
   - Fix prompt contains: priority-ordered fix sources (CI > @bot > bot review blockers), user priority rule for @bot vs bot review conflicts
   - Push prompt contains: `[from bot]` comment instruction for addressed @bot threads, explicit "Do NOT resolve threads" rule
   - `freefsm finish --run-id test-step3` — run reached terminal `done` state (already completed)
+
+## Step 4: Bot review severity filtering and auto-fix round limit
+- **Files changed**: `freefsm/workflows/mr-lifecycle.fsm.yaml`, `specs/mr-lifecycle-v2/progress.md`
+- **What was built**: Added bot review severity filtering and auto-fix round limiting to the `check` and `fix` states. Two state prompts were updated:
+  - **check**: Added `## Auto-fix round tracking` section — `auto_fix_rounds` counter initialized on first entry, read from conversation history on subsequent entries, max 3 rounds. Added severity parsing instructions (detect `[BLOCKER]`, `[MAJOR]`, `<!-- severity: blocker -->` markers). Added severity filtering: blocker included only if `auto_fix_rounds < 3`, major never included. Added round-limit-reached behavior: post `[from bot]` summary comment listing remaining unresolved issues, then transition to `poll` idle mode. Updated todos to reflect severity parsing, counter tracking, and summary comment posting.
+  - **fix**: Added `## Auto-fix round counter` section — increment `auto_fix_rounds` by 1 only when fixing CI failures or bot review blockers (not `@bot` requests per design.md §4.4). Explicit instruction to state the new counter value for conversation history tracking. Updated todos to include counter increment step.
+  - **done**: Updated summary to say "auto-fix rounds used (out of 3 max)" for clarity.
+- **Tests**: All validation passed:
+  - `freefsm start freefsm/workflows/mr-lifecycle.fsm.yaml --run-id test-step4` — YAML parses correctly
+  - Walk-through `create-mr -> poll -> check -> fix` — all transitions valid
+  - Check state prompt contains: auto_fix_rounds tracking, severity parsing (BLOCKER/MAJOR markers), severity filtering (blocker only if < 3 rounds, major never), round limit summary comment instructions, idle mode transition
+  - Fix state prompt contains: auto_fix_rounds increment rule (CI/blocker only, not @bot), explicit value stating instruction for conversation history
+  - `freefsm finish --run-id test-step4` — clean up succeeded
+
+## Step 5: Remove resolve from push, add comment-only behavior
+- **Files changed**: `freefsm/workflows/mr-lifecycle.fsm.yaml`, `specs/mr-lifecycle-v2/progress.md`
+- **What was built**: Strengthened the `push` state to enforce comment-only behavior with an explicit "NEVER resolve threads" rule. Changes to the push state:
+  - Added a `## CRITICAL RULE: NEVER resolve threads` section at the top of the prompt, listing specific API mechanisms to avoid (GitLab `PUT /discussions/:id` with `resolved: true`, GitHub GraphQL `resolveReviewThread` mutation).
+  - Restructured the prompt into a clear numbered action list (commit/push, comment on review threads, comment on @bot threads, react, update description).
+  - Updated todos: reordered to put commit/push first, added explicit "NEVER resolve threads" reminder as the final todo item.
+  - Verified no resolve instructions exist anywhere in the push state — all "resolve" mentions are the prohibition rule itself.
+- **Tests**: All validation passed:
+  - `freefsm start freefsm/workflows/mr-lifecycle.fsm.yaml --run-id test-step5` — YAML parses correctly
+  - Full path walk-through: `create-mr -> poll -> fix -> push -> poll -> done` — all transitions valid
+  - Push state prompt contains: "CRITICAL RULE: NEVER resolve threads" with specific API examples, `[from bot]` comment instructions for both review threads and @bot threads, ✅ reaction instructions
+  - Push state prompt does NOT contain any resolve instructions (no resolve API calls, no resolveReviewThread mutations)
+  - Grep confirmed: all "resolve" mentions in push state are part of the prohibition rule
+  - `test-step5` run completed to terminal `done` state

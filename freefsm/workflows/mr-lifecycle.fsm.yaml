@@ -144,11 +144,21 @@ states:
 
   check:
     prompt: |
-      All CI has completed or the target branch has been updated. Check for issues that need attention:
+      All CI has completed or the target branch has been updated. Check for issues that need attention.
 
-      Check items:
-      - CI results: Are there any failed jobs (GitLab pipeline / GitHub Actions checks)?
-      - Bot inline review comments: Fetch all unresolved review threads.
+      ## Auto-fix round tracking
+
+      Track `auto_fix_rounds` as an in-conversation counter across check/fix/push/poll cycles.
+      - On first entry to check (no prior value mentioned in conversation), initialize `auto_fix_rounds = 0`.
+      - Read the current value from your conversation history each time you enter check.
+      - The max is 3. If `auto_fix_rounds >= 3`, skip bot review blockers entirely (see below).
+
+      ## Check items
+
+      **1. CI results**: Are there any failed jobs (GitLab pipeline / GitHub Actions checks)?
+      CI failures are always actionable regardless of round count.
+
+      **2. Bot inline review comments**: Fetch all unresolved review threads.
         - GitHub: Use a single-line GraphQL query with owner/repo/PR inlined directly (no `-f` variables).
           Filter for bot-authored threads: `comments.nodes[0].author.__typename == "Bot"`.
           Example:
@@ -156,17 +166,56 @@ states:
           gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: N) { reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login __typename } body } } } } } } }'
           ```
         - GitLab: Use MR discussions API, filter for `user.type == "Bot"`.
-        Only unresolved bot inline comments with blocker severity should be auto-fixed.
-        Skip major severity comments — leave for the user to address.
-      - Rebase needed: Is the current branch behind the target branch?
-        Use `git rev-list --count HEAD..origin/<target>` to detect.
 
-      Decision logic:
-      - Any issues found (CI failures, bot review blockers, rebase needed) → fix
-      - No issues → poll
+        **Severity parsing**: Bot review comments indicate severity via markers in the comment
+        body. Look for patterns like `[BLOCKER]`, `[MAJOR]`, or HTML comments like
+        `<!-- severity: blocker -->`, `<!-- severity: major -->`. Parse each unresolved
+        bot-authored comment to determine its severity.
+
+        **Severity filtering**:
+        - **Blocker**: Include in fix list ONLY if `auto_fix_rounds < 3`.
+        - **Major**: Do NOT include in fix list. Skip entirely — leave for the user to
+          address manually or via `@bot`. Never auto-fix major severity comments.
+
+        If `auto_fix_rounds >= 3`, skip ALL bot review comments (both blocker and major).
+        Bot review blockers are no longer actionable after 3 rounds.
+
+      **3. Rebase needed**: Is the current branch behind the target branch?
+        Use `git rev-list --count HEAD..origin/<target>` to detect.
+        Rebase is always actionable regardless of round count.
+
+      ## Decision logic
+
+      Actionable items are:
+      - CI failures (always)
+      - Bot review blockers (only if `auto_fix_rounds < 3`)
+      - Rebase needed (always)
+      Note: `@bot` requests do NOT come through check — they arrive via poll → fix directly.
+
+      If any actionable items exist → transition to `fix` with the list of issues.
+      If no actionable items → transition to `poll`.
+
+      ## Round limit reached (`auto_fix_rounds >= 3`)
+
+      When the round limit is reached and there are still unresolved bot review blockers:
+      1. Post a comment on the MR/PR summarizing the remaining unresolved bot review issues
+         (both blocker and major), prefixed with `[from bot]`. Example:
+         ```
+         [from bot] Auto-fix round limit (3/3) reached. Remaining unresolved review issues:
+         - [BLOCKER] <file>:<line> — <summary of issue>
+         - [MAJOR] <file>:<line> — <summary of issue>
+         These require manual attention or can be addressed via `@bot` requests.
+         ```
+      2. If no other actionable items (no CI failures, no rebase needed) → transition to `poll`
+         (idle mode). The workflow continues monitoring for `@bot` mentions, merge, and
+         close events but will not auto-fix bot review issues.
     todos:
       - Check pipeline for failed jobs
-      - Check for unresolved bot inline review comments (blocker severity only)
+      - Read current auto_fix_rounds counter from conversation history
+      - Check for unresolved bot inline review comments — parse severity (blocker vs major)
+      - Only include blocker-severity comments if auto_fix_rounds < 3
+      - Skip major-severity comments entirely (never auto-fix)
+      - If round limit reached with remaining blockers, post summary comment on MR
       - Check if rebase is needed (target branch ahead)
     transitions:
       issues found: fix
@@ -176,7 +225,23 @@ states:
     prompt: |
       Fix issues found during check or requested via `@bot`.
 
-      **Fix sources in priority order** (highest first):
+      ## Auto-fix round counter
+
+      Track `auto_fix_rounds` as an in-conversation counter. Read the current value from
+      your conversation history (it was set or last updated in the check state).
+
+      **Increment rule**: Increment `auto_fix_rounds` by 1 in this state ONLY when you
+      actually fix at least one of the following:
+      - CI failures
+      - Bot review blockers
+      Do NOT increment the counter when fixing `@bot` code change requests — those are
+      user-initiated and do not count toward the auto-fix limit.
+
+      After incrementing, state the new value explicitly (e.g., "auto_fix_rounds is now 2")
+      so the next check state can read it from conversation history.
+
+      ## Fix sources in priority order (highest first)
+
       1. **CI failures**: Fetch failed job logs (GitLab API / `gh run view --log-failed`),
          analyze root cause, and fix the code. Pipeline won't pass without these.
       2. **`@bot` code change requests**: If this state was entered via a `@bot` mention
@@ -201,6 +266,7 @@ states:
       - Fix CI failures (if any)
       - Fix unresolved bot inline review comments with blocker severity (if any)
       - Handle @bot code change requests (if any)
+      - Increment auto_fix_rounds counter if CI or blocker fixes were applied (not for @bot requests)
       - Rebase (if needed)
       - Run lint/format/unit tests to verify
     transitions:
@@ -209,26 +275,38 @@ states:
 
   push:
     prompt: |
-      Commit and push the fixes:
-      - Commit and push to the remote branch (force push if rebased).
-      - **Comment on addressed review threads**: For each bot review thread that was fixed,
-        reply explaining what was fixed, prefixed with `[from bot]`.
-      - **Comment on addressed `@bot` code change threads**: For each `@bot` mention that
-        requested a code change and was addressed in this fix cycle, reply in the same
-        thread (inline) or as a new comment (issue-level) with body starting with `[from bot]`,
-        explaining what was changed. Then add a ✅ reaction to the original `@bot` comment
-        as the dedup signal.
-      - **Do NOT resolve threads** — neither review threads nor `@bot` threads. Thread
-        resolution is the code-review pipeline's responsibility, not mr-lifecycle's.
-      - React to processed `@bot` comments as a visual indicator.
-      - Update the MR/PR description if needed, especially when addressing review feedback
-        changed the implementation approach.
+      Commit and push the fixes.
+
+      ## CRITICAL RULE: NEVER resolve threads
+      mr-lifecycle MUST NEVER resolve review threads. Do NOT use any thread resolution
+      mechanism — no GitLab resolve API (`PUT /discussions/:id` with `resolved: true`),
+      no GitHub GraphQL `resolveReviewThread` mutation, no `gh api` calls that resolve
+      threads. Thread resolution is exclusively the code-review pipeline's responsibility.
+      This applies to ALL threads: bot review threads, `@bot` threads, and any other
+      discussion threads.
+
+      ## Actions
+      1. **Commit and push** to the remote branch (force push if rebased).
+      2. **Comment on addressed review threads**: For each bot review thread that was fixed,
+         reply in the thread explaining what was fixed. The reply body MUST start with
+         `[from bot]` (e.g., `[from bot] Fixed by adding null check in foo.ts:42`).
+      3. **Comment on addressed `@bot` code change threads**: For each `@bot` mention that
+         requested a code change and was addressed in this fix cycle, reply in the same
+         thread (inline) or as a new comment (issue-level) with body starting with `[from bot]`,
+         explaining what was changed. Then add a ✅ reaction to the original `@bot` comment
+         as the dedup signal.
+      4. **React to processed `@bot` comments** with ✅ as a visual indicator that the
+         request was handled.
+      5. **Update the MR/PR description** if the implementation approach changed while
+         addressing review feedback or `@bot` requests.
     todos:
+      - Commit all changes
+      - Push to remote (force push if rebased)
       - Comment on addressed review threads with [from bot] prefix (explain what was fixed)
       - Comment on addressed @bot code change threads with [from bot] prefix
-      - React to processed @bot comments
+      - React to processed @bot comments with ✅
       - Update MR/PR description if implementation approach changed
-      - Push to remote (force push if rebased)
+      - "NEVER resolve threads — no resolve API calls, no resolveReviewThread mutations"
     transitions:
       pushed: poll
 
@@ -236,7 +314,7 @@ states:
     prompt: |
       The MR/PR has been merged or closed. Output a summary:
       - MR/PR URL
-      - Total number of fix rounds
+      - Total auto-fix rounds used (out of 3 max)
       - Total `@bot` interactions handled
       - Brief overview of main fixes applied
     transitions: {}

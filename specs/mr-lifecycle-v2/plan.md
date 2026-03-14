@@ -4,8 +4,8 @@
 - [x] Step 1: Restructure state flow (merge poll, remove !fix, update transitions)
 - [x] Step 2: Implement `@bot` detection and conversational reply in poll
 - [x] Step 3: Implement `@bot` code change flow (poll → fix → push → poll)
-- [ ] Step 4: Bot review severity filtering and auto-fix round limit
-- [ ] Step 5: Remove resolve from push, add comment-only behavior
+- [x] Step 4: Bot review severity filtering and auto-fix round limit
+- [x] Step 5: Remove resolve from push, add comment-only behavior
 - [ ] Step 6: Update code-review pipeline (respond-and-resolve + `/bot-review` trigger)
 - [ ] Step 7: Manual E2E testing (see manual-e2e.md)
 
