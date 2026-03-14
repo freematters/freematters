@@ -118,8 +118,11 @@ states:
 
       ## Handling code-change `@bot` mentions
 
+      Code-change is ONLY triggered by **issue-level comments** containing the word `FIX`
+      (case-sensitive). Inline thread @bot mentions are always conversational.
+
       When the script exits with `RESULT: bot mention code-change`, the script has printed
-      the mention details including file path and line for inline threads. Transition to fix.
+      the mention details. Transition to fix.
       Do NOT reply yet — the push state will comment after the fix is applied.
 
       When running the script in the background, do NOT redirect stdout/stderr to a file —

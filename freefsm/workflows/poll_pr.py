@@ -213,42 +213,18 @@ def find_unhandled_bot_mentions(
     return mentions
 
 
-# Code-change intent detection keywords
-_CODE_CHANGE_VERBS = re.compile(
-    r"\b(fix|add|remove|delete|change|update|refactor|rename|replace|rewrite|move|"
-    r"extract|inline|implement|create|modify|convert|migrate|swap|introduce|insert)\b",
-    re.IGNORECASE,
-)
-_CONVERSATIONAL_PATTERNS = re.compile(
-    r"\b(why|how|what|explain|describe|clarify|tell me|can you explain|"
-    r"what does|what is|how does|how do|could you)\b",
-    re.IGNORECASE,
-)
+_FIX_PATTERN = re.compile(r"\bFIX\b")
 
 
 def classify_mention(mention: BotMention) -> str:
     """
     Classify a @bot mention as 'conversational' or 'code-change'.
 
-    Priority: if the comment references specific code/files/lines, prefer code-change.
-    If it asks why/how questions without requesting modification, prefer conversational.
+    Code-change is ONLY triggered by issue-level comments containing 'FIX' (case-sensitive).
+    Everything else (inline threads, issue comments without FIX) is conversational.
     """
-    body = mention.comment_body
-
-    # If it's on an inline thread with a file path and has action verbs → code-change
-    if mention.source == "inline_thread" and mention.file_path:
-        if _CODE_CHANGE_VERBS.search(body):
-            return "code-change"
-
-    # Pure questions without action verbs → conversational
-    if _CONVERSATIONAL_PATTERNS.search(body) and not _CODE_CHANGE_VERBS.search(body):
-        return "conversational"
-
-    # Has action verbs → code-change
-    if _CODE_CHANGE_VERBS.search(body):
+    if mention.source == "issue_comment" and _FIX_PATTERN.search(mention.comment_body):
         return "code-change"
-
-    # Default to conversational
     return "conversational"
 
 
