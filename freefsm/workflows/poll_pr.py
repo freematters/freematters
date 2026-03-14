@@ -250,36 +250,28 @@ def find_unhandled_bot_mentions(
             break
         page += 1
 
-    # Build list of @bot mentions and pair each with the next [from bot] reply.
-    # Each [from bot] reply "consumes" only the immediately preceding @bot mention.
-    bot_indices: list[int] = []
-    for i, comment in enumerate(all_issue_comments):
+    # For issue comments, dedup via ✅ (+1) reaction on the comment.
+    # Unlike review threads, issue comments are flat — [from bot] reply pairing
+    # doesn't work because replies aren't linked to specific mentions.
+    for comment in all_issue_comments:
         body = comment.get("body", "")
         if body.startswith("[from bot]"):
             continue
+        # Skip bot-authored comments (e.g., code-review summary containing @bot)
+        if comment.get("user", {}).get("type") == "Bot":
+            continue
         if "@bot" not in body.lower():
             continue
-        bot_indices.append(i)
-
-    # Walk forward: for each @bot mention, check if the next [from bot] reply
-    # appears before the next @bot mention (meaning it responds to this one).
-    handled_set: set[int] = set()
-    for idx, bot_i in enumerate(bot_indices):
-        next_bot_i = bot_indices[idx + 1] if idx + 1 < len(bot_indices) else len(all_issue_comments)
-        for j in range(bot_i + 1, next_bot_i):
-            if all_issue_comments[j].get("body", "").startswith("[from bot]"):
-                handled_set.add(bot_i)
-                break
-
-    for bot_i in bot_indices:
-        if bot_i not in handled_set:
-            comment = all_issue_comments[bot_i]
-            mentions.append(BotMention(
-                source="issue_comment",
-                comment_body=comment.get("body", ""),
-                comment_id=comment.get("id"),
-                author=comment.get("user", {}).get("login", "unknown"),
-            ))
+        # Check for ✅ (+1) reaction as dedup signal
+        reactions = comment.get("reactions", {})
+        if reactions.get("+1", 0) > 0:
+            continue
+        mentions.append(BotMention(
+            source="issue_comment",
+            comment_body=body,
+            comment_id=comment.get("id"),
+            author=comment.get("user", {}).get("login", "unknown"),
+        ))
 
     return mentions
 
