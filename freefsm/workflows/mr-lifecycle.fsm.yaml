@@ -72,66 +72,59 @@ states:
 
   poll:
     prompt: |
-      Run the polling script as a **background bash job** so the conversation is not blocked.
+      Run the bundled polling script as a **background bash job** so the conversation is not blocked.
 
-      Write a Python polling script to `/tmp/poll_mr.py` and run it in the background.
-      The script should check every 20 seconds and print status lines. When an exit condition
-      is met, it should print a clear result line (e.g., "RESULT: pipelines finished") and exit.
+      The script is at `poll_mr.py` in the same directory as this workflow YAML. Find it via:
+      ```bash
+      SCRIPT_DIR="$(dirname "$(readlink -f "$(freefsm current --run-id <run_id> -j | jq -r '.data.fsm_path')")")"
+      ```
+      Or locate it relative to this workflow file: `freefsm/workflows/poll_mr.py`
 
-      The script monitors (checked on **every poll cycle**, not just at exit):
-      - Whether the MR/PR has been merged or closed
-      - Whether all CI has completed (keep waiting if pending/running):
-        - GitLab: Check pipeline status via API
-        - GitHub: Use `gh pr checks <N> --json name,state,bucket` to get check status.
-          All checks are finished when none have `state == "PENDING"`.
-          Do NOT use the legacy commit status API (`/commits/{sha}/status`) — it returns
-          "pending" when no commit statuses exist (common with GitHub Actions).
-      - Whether the target branch has new commits since the current branch was last rebased/merged
-        - Use `git fetch` + `git rev-list --count HEAD..origin/<target>` to detect.
-        - If new commits detected, exit with "RESULT: pipelines finished" so the check state
-          can handle rebase detection.
-      - **`@bot` mention detection** — scan for unhandled `@bot` mentions on every poll cycle:
+      ## Running the script
 
-        **Inline thread dedup** (GitHub GraphQL reviewThreads / GitLab discussions API):
-        Iterate notes in each thread in timestamp order. For each user note whose body
-        contains `@bot`, check if any subsequent note (later timestamp) has a body starting
-        with `[from bot]`. If no such note exists → this mention needs a reply.
+      ```bash
+      python3 "$SCRIPT_DIR/poll_mr.py" <owner> <repo> <pr_number> --target <target_branch> --interval 20
+      ```
 
-        **Issue/PR-level comment dedup** (GitHub issues comments / GitLab MR notes):
-        For each comment whose body contains `@bot`, check if a ✅ reaction from the
-        current user exists on that comment. If no ✅ reaction → this mention needs a reply.
+      Run a single inline poll first to verify the script works (API auth, correct IDs),
+      then start it as a background job.
 
-        **Handling conversational `@bot` mentions** (questions, explanations — no code change):
-        1. Reply in the same thread / as a new comment with body starting with `[from bot]`
-           followed by the conversational response.
-        2. After replying, add a ✅ reaction to the original `@bot` comment as the primary
-           dedup signal for issue-level comments. For inline threads, the `[from bot]` reply
-           note itself serves as the dedup signal.
-        3. Continue polling — conversational replies do NOT cause a state transition.
+      ## What the script monitors (every cycle)
 
-        **Handling code-change `@bot` mentions** (fix a bug, apply a suggestion, add/remove code):
-        When an unhandled `@bot` mention requires a code change (as determined by intent analysis
-        of the comment body — look for action verbs like "fix", "add", "remove", "change",
-        "update", "refactor", "rename", etc., or explicit requests to modify files/code):
-        1. Print the `@bot` context to stdout so the fix state can act on it:
-           - The comment body (full text of the `@bot` mention)
-           - If it's an inline thread: the file path and line range from the review thread
-           - Whether it's an inline thread or issue-level comment
-        2. Exit with "RESULT: fix requested"
-        3. Do NOT reply to the comment yet — the push state will comment after the fix is applied.
+      - **PR state**: merged or closed → exits
+      - **CI status**: all checks finished (no PENDING) → exits
+      - **Target branch**: new commits ahead of HEAD → exits
+      - **`@bot` mentions**: scans inline threads and issue comments for unhandled mentions
 
-        **Intent analysis priority**: If ambiguous whether a mention is conversational or
-        code-change, prefer code-change when the comment references specific code, files,
-        or lines. Prefer conversational when the comment asks "why" or "how" questions
-        without requesting modification.
+      ## `@bot` dedup rules (implemented in the script)
 
-      On first entry, run a single poll inline to verify the script works
-      (API token/auth valid, correct IDs, etc.) before starting the background job.
+      - **Inline threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
+      - **Issue comments**: a `@bot` mention is handled if a `+1` reaction exists on the comment
 
-      Exit conditions (print as RESULT line):
-      - MR/PR merged or closed → "RESULT: MR merged" or "RESULT: MR closed"
-      - All CI completed (regardless of pass/fail) → "RESULT: pipelines finished"
-      - `@bot` code change request detected → "RESULT: fix requested"
+      ## Exit RESULT lines
+
+      The script prints one of these and exits:
+      - `RESULT: MR merged` / `RESULT: MR closed` → transition to done
+      - `RESULT: pipelines finished` → transition to check
+      - `RESULT: bot mention code-change` → transition to fix (script prints @bot context)
+      - `RESULT: bot mention conversational` → handle in-place, then restart the script
+
+      ## Handling conversational `@bot` mentions
+
+      When the script exits with `RESULT: bot mention conversational`, the script has printed
+      the mention details (source, author, comment_id, body). You must:
+      1. Read the printed context to understand what was asked
+      2. Reply in the same thread / as a new comment with body starting with `[from bot]`
+      3. For issue comments: add a `+1` reaction to the original comment as the dedup signal:
+         `gh api repos/<owner>/<repo>/issues/comments/<id>/reactions -f content='+1'`
+      4. For inline threads: the `[from bot]` reply note itself serves as the dedup signal
+      5. Restart the polling script — conversational replies do NOT cause a state transition
+
+      ## Handling code-change `@bot` mentions
+
+      When the script exits with `RESULT: bot mention code-change`, the script has printed
+      the mention details including file path and line for inline threads. Transition to fix.
+      Do NOT reply yet — the push state will comment after the fix is applied.
 
       When running the script in the background, do NOT redirect stdout/stderr to a file —
       let output go to the terminal so the user can observe progress in real time.
