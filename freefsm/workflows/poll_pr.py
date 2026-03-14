@@ -33,13 +33,13 @@ from pathlib import Path
 # Helpers
 # ---------------------------------------------------------------------------
 
-def run(cmd: str) -> tuple[str, int]:
-    r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+def run(cmd: list[str]) -> tuple[str, int]:
+    r = subprocess.run(cmd, capture_output=True, text=True)
     return r.stdout.strip(), r.returncode
 
 
 def gh_api(endpoint: str) -> tuple[dict | list | None, int]:
-    out, rc = run(f"gh api {endpoint}")
+    out, rc = run(["gh", "api", endpoint])
     if rc != 0 or not out:
         return None, rc
     try:
@@ -49,7 +49,7 @@ def gh_api(endpoint: str) -> tuple[dict | list | None, int]:
 
 
 def gh_graphql(query: str) -> dict | None:
-    out, rc = run(f"gh api graphql -f query='{query}'")
+    out, rc = run(["gh", "api", "graphql", "-f", f"query={query}"])
     if rc != 0 or not out:
         return None
     try:
@@ -80,7 +80,7 @@ class BotMention:
 
 def check_pr_state(owner: str, repo: str, pr: int) -> str | None:
     """Return PR state: OPEN, MERGED, CLOSED, or None on error."""
-    out, rc = run(f"gh pr view {pr} -R {owner}/{repo} --json state -q '.state'")
+    out, rc = run(["gh", "pr", "view", str(pr), "-R", f"{owner}/{repo}", "--json", "state", "-q", ".state"])
     return out if rc == 0 else None
 
 
@@ -89,7 +89,7 @@ def check_ci(pr: int, owner: str, repo: str) -> dict:
     Return CI status dict:
       { "status": "pending"|"finished"|"none", "checks": [...] }
     """
-    out, rc = run(f"gh pr checks {pr} -R {owner}/{repo} --json name,state,bucket 2>/dev/null")
+    out, rc = run(["gh", "pr", "checks", str(pr), "-R", f"{owner}/{repo}", "--json", "name,state,bucket"])
     if rc != 0 or not out:
         return {"status": "none", "checks": []}
     try:
@@ -105,8 +105,8 @@ def check_ci(pr: int, owner: str, repo: str) -> dict:
 
 def check_target_branch_updated(target: str) -> bool:
     """Return True if the target branch has commits ahead of HEAD."""
-    run(f"git fetch origin {target} --quiet")
-    out, _ = run(f"git rev-list --count HEAD..origin/{target}")
+    run(["git", "fetch", "origin", target, "--quiet"])
+    out, _ = run(["git", "rev-list", "--count", f"HEAD..origin/{target}"])
     try:
         return int(out) > 0
     except (ValueError, TypeError):
@@ -133,8 +133,8 @@ def parse_severity(body: str) -> str:
     return "unknown"
 
 
-def fetch_bot_review_threads(owner: str, repo: str, pr: int) -> list[dict]:
-    """Fetch all unresolved bot-authored review threads with full comments and severity."""
+def fetch_review_threads_raw(owner: str, repo: str, pr: int) -> list[dict]:
+    """Fetch all review threads with full comments via GraphQL (single round-trip)."""
     query = (
         f'query {{ repository(owner: "{owner}", name: "{repo}") {{ '
         f'pullRequest(number: {pr}) {{ '
@@ -147,14 +147,17 @@ def fetch_bot_review_threads(owner: str, repo: str, pr: int) -> list[dict]:
     data = gh_graphql(query)
     if not data:
         return []
-    threads = (
+    return (
         data.get("data", {})
         .get("repository", {})
         .get("pullRequest", {})
         .get("reviewThreads", {})
         .get("nodes", [])
     )
-    # Return unresolved bot-authored threads
+
+
+def extract_bot_review_threads(threads: list[dict]) -> list[dict]:
+    """Extract unresolved bot-authored review threads with severity from raw threads."""
     result = []
     for thread in threads:
         if thread.get("isResolved"):
@@ -185,36 +188,23 @@ def fetch_bot_review_threads(owner: str, repo: str, pr: int) -> list[dict]:
 
 
 def find_unhandled_bot_mentions(
-    owner: str, repo: str, pr: int
+    owner: str, repo: str, pr: int, threads: list[dict] | None = None
 ) -> list[BotMention]:
     """
     Scan for unhandled @bot mentions in:
-      1. Inline review threads (GraphQL)
+      1. Inline review threads (from pre-fetched threads)
       2. Issue/PR-level comments (REST API)
 
-    Dedup: a @bot mention is handled if a subsequent note/comment starts with '[from bot]'.
+    Dedup:
+      - Inline threads: handled if a subsequent note starts with '[from bot]'
+      - Issue comments: handled if the comment has a ✅ (+1) reaction
     """
     mentions: list[BotMention] = []
 
     # --- 1. Inline review threads ---
-    query = (
-        f'query {{ repository(owner: "{owner}", name: "{repo}") {{ '
-        f'pullRequest(number: {pr}) {{ '
-        f'reviewThreads(first: 100) {{ nodes {{ '
-        f'id isResolved path line '
-        f'comments(first: 50) {{ nodes {{ '
-        f'databaseId body createdAt author {{ login __typename }} '
-        f'}} }} }} }} }} }} }}'
-    )
-    data = gh_graphql(query)
-    if data:
-        threads = (
-            data.get("data", {})
-            .get("repository", {})
-            .get("pullRequest", {})
-            .get("reviewThreads", {})
-            .get("nodes", [])
-        )
+    if threads is None:
+        threads = fetch_review_threads_raw(owner, repo, pr)
+    if threads:
         for thread in threads:
             if thread.get("isResolved"):
                 continue
@@ -328,11 +318,12 @@ def poll_once(
     # 3. Target branch
     rebase_needed = check_target_branch_updated(target)
 
-    # 4. Bot review threads
-    bot_review_threads = fetch_bot_review_threads(owner, repo, pr)
+    # 4. Fetch review threads once (shared by bot review + @bot mention detection)
+    raw_threads = fetch_review_threads_raw(owner, repo, pr)
+    bot_review_threads = extract_bot_review_threads(raw_threads)
 
     # 5. @bot mentions
-    mentions = find_unhandled_bot_mentions(owner, repo, pr)
+    mentions = find_unhandled_bot_mentions(owner, repo, pr, threads=raw_threads)
 
     # Write status file every cycle
     write_pr_status(
@@ -369,7 +360,7 @@ def poll_once(
         for m in mentions:
             # Add 👀 reaction (visual: "I see this")
             if m.source == "issue_comment":
-                run(f"gh api repos/{owner}/{repo}/issues/comments/{m.comment_id}/reactions -f content='eyes'")
+                run(["gh", "api", f"repos/{owner}/{repo}/issues/comments/{m.comment_id}/reactions", "-f", "content=eyes"])
             print(f"\n[poll] Unhandled @bot mention:", flush=True)
             print(f"  source: {m.source}", flush=True)
             print(f"  author: {m.author}", flush=True)
