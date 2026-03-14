@@ -288,7 +288,7 @@ The `check` state must parse severity from bot review comments and only act on b
 ### AC4: `@bot` Dedup (Issue Comment)
 - **Given** mr-lifecycle has replied (with `[from bot]` prefix) to an issue comment containing `@bot`
 - **When** the poll state scans issue comments again
-- **Then** the comment is skipped (`[from bot]` reply found)
+- **Then** the comment is skipped (a ✅ reaction from the bot exists on the `@bot` comment)
 
 ### AC5: Bot Review Blocker Auto-Fix
 - **Given** a bot review has posted an unresolved blocker comment

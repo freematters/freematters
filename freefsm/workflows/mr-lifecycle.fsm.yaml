@@ -148,9 +148,10 @@ states:
 
       ## Auto-fix round tracking
 
-      Track `auto_fix_rounds` as an in-conversation counter across check/fix/push/poll cycles.
-      - On first entry to check (no prior value mentioned in conversation), initialize `auto_fix_rounds = 0`.
-      - Read the current value from your conversation history each time you enter check.
+      Track `auto_fix_rounds` via a durable temp file `/tmp/mr_lifecycle_state.json`.
+      - On first entry to check, read the file: `cat /tmp/mr_lifecycle_state.json 2>/dev/null`.
+        If the file doesn't exist, initialize `auto_fix_rounds = 0` and write it:
+        `echo '{"auto_fix_rounds": 0}' > /tmp/mr_lifecycle_state.json`
       - The max is 3. If `auto_fix_rounds >= 3`, skip bot review blockers entirely (see below).
 
       ## Check items
@@ -211,7 +212,7 @@ states:
          close events but will not auto-fix bot review issues.
     todos:
       - Check pipeline for failed jobs
-      - Read current auto_fix_rounds counter from conversation history
+      - Read current auto_fix_rounds counter from /tmp/mr_lifecycle_state.json
       - Check for unresolved bot inline review comments — parse severity (blocker vs major)
       - Only include blocker-severity comments if auto_fix_rounds < 3
       - Skip major-severity comments entirely (never auto-fix)
@@ -227,8 +228,8 @@ states:
 
       ## Auto-fix round counter
 
-      Track `auto_fix_rounds` as an in-conversation counter. Read the current value from
-      your conversation history (it was set or last updated in the check state).
+      Track `auto_fix_rounds` via a durable temp file `/tmp/mr_lifecycle_state.json`.
+      Read the current value: `cat /tmp/mr_lifecycle_state.json 2>/dev/null | jq '.auto_fix_rounds // 0'`
 
       **Increment rule**: Increment `auto_fix_rounds` by 1 in this state ONLY when you
       actually fix at least one of the following:
@@ -237,8 +238,8 @@ states:
       Do NOT increment the counter when fixing `@bot` code change requests — those are
       user-initiated and do not count toward the auto-fix limit.
 
-      After incrementing, state the new value explicitly (e.g., "auto_fix_rounds is now 2")
-      so the next check state can read it from conversation history.
+      After incrementing, write the new value to the temp file:
+      `echo '{"auto_fix_rounds": N}' > /tmp/mr_lifecycle_state.json`
 
       ## Fix sources in priority order (highest first)
 
@@ -266,7 +267,7 @@ states:
       - Fix CI failures (if any)
       - Fix unresolved bot inline review comments with blocker severity (if any)
       - Handle @bot code change requests (if any)
-      - Increment auto_fix_rounds counter if CI or blocker fixes were applied (not for @bot requests)
+      - Increment auto_fix_rounds in /tmp/mr_lifecycle_state.json if CI or blocker fixes were applied (not for @bot requests)
       - Rebase (if needed)
       - Run lint/format/unit tests to verify
     transitions:
@@ -295,9 +296,7 @@ states:
          thread (inline) or as a new comment (issue-level) with body starting with `[from bot]`,
          explaining what was changed. Then add a ✅ reaction to the original `@bot` comment
          as the dedup signal.
-      4. **React to processed `@bot` comments** with ✅ as a visual indicator that the
-         request was handled.
-      5. **Update the MR/PR description** if the implementation approach changed while
+      4. **Update the MR/PR description** if the implementation approach changed while
          addressing review feedback or `@bot` requests.
     todos:
       - Commit all changes
