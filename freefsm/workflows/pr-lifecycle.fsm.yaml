@@ -98,7 +98,7 @@ states:
       ## `@bot` dedup rules (implemented in the script)
 
       - **Inline threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
-      - **Issue comments**: a `@bot` mention is handled if it has a 👍 (+1) reaction
+      - **Issue comments**: a `@bot` mention is handled if it has a 🚀 (rocket) reaction
 
       ## Exit RESULT lines
 
@@ -252,14 +252,14 @@ states:
       6. **For `@bot` questions**: Reply with body starting with `[from bot]` answering
          the question. Do NOT resolve the thread — the user may want to follow up.
 
-      7. **React to processed `@bot` comments**: Add ✅ (`+1`) reaction as a visual
-         indicator that the request has been handled.
+      7. **React to processed `@bot` comments**: Add 🚀 (rocket) reaction as the
+         dedup signal that the request has been handled.
     todos:
       - Commit all changes (skip if no local changes)
       - Push to remote (force push if rebased)
       - Reply on addressed bot review threads with [from bot] prefix + resolve thread
       - Reply on addressed @bot threads with [from bot] prefix + resolve (code changes only)
-      - React to processed @bot comments with 👍
+      - React to processed @bot comments with 🚀
       - Update PR description if implementation approach changed
     transitions:
       pushed: poll

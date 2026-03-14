@@ -197,7 +197,7 @@ def find_unhandled_bot_mentions(
 
     Dedup:
       - Inline threads: handled if a subsequent note starts with '[from bot]'
-      - Issue comments: handled if the comment has a 👍 (+1) reaction
+      - Issue comments: handled if the comment has a 🚀 (rocket) reaction
     """
     mentions: list[BotMention] = []
 
@@ -259,9 +259,9 @@ def find_unhandled_bot_mentions(
             continue
         if "@bot" not in body.lower():
             continue
-        # Check for 👍 (+1) reaction as dedup signal
+        # Check for 🚀 (rocket) reaction as dedup signal (added by push state)
         reactions = comment.get("reactions", {})
-        if reactions.get("+1", 0) > 0:
+        if reactions.get("rocket", 0) > 0:
             continue
         mentions.append(BotMention(
             source="issue_comment",
@@ -358,7 +358,7 @@ def poll_once(
     has_blocker = any(t.get("severity") == "blocker" for t in bot_review_threads)
     if has_blocker or mentions:
         for m in mentions:
-            # Add 👀 reaction (visual: "I see this")
+            # Add 👀 (eyes) reaction on detection
             if m.source == "issue_comment":
                 run(["gh", "api", f"repos/{owner}/{repo}/issues/comments/{m.comment_id}/reactions", "-f", "content=eyes"])
             print(f"\n[poll] Unhandled @bot mention:", flush=True)
