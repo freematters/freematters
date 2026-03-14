@@ -109,8 +109,21 @@ states:
            note itself serves as the dedup signal.
         3. Continue polling — conversational replies do NOT cause a state transition.
 
-        **Handling code-change `@bot` mentions**: exit with "RESULT: fix requested"
-        (this is handled in a later step; for now, treat all `@bot` mentions as conversational).
+        **Handling code-change `@bot` mentions** (fix a bug, apply a suggestion, add/remove code):
+        When an unhandled `@bot` mention requires a code change (as determined by intent analysis
+        of the comment body — look for action verbs like "fix", "add", "remove", "change",
+        "update", "refactor", "rename", etc., or explicit requests to modify files/code):
+        1. Print the `@bot` context to stdout so the fix state can act on it:
+           - The comment body (full text of the `@bot` mention)
+           - If it's an inline thread: the file path and line range from the review thread
+           - Whether it's an inline thread or issue-level comment
+        2. Exit with "RESULT: fix requested"
+        3. Do NOT reply to the comment yet — the push state will comment after the fix is applied.
+
+        **Intent analysis priority**: If ambiguous whether a mention is conversational or
+        code-change, prefer code-change when the comment references specific code, files,
+        or lines. Prefer conversational when the comment asks "why" or "how" questions
+        without requesting modification.
 
       On first entry, run a single poll inline to verify the script works
       (API token/auth valid, correct IDs, etc.) before starting the background job.
@@ -161,15 +174,25 @@ states:
 
   fix:
     prompt: |
-      Fix issues found during check or requested via `@bot`:
-      - CI failure: Fetch failed job logs (GitLab API / `gh run view --log-failed`), analyze root cause, and fix the code.
-      - Bot inline review comments: Read each unresolved bot-authored review thread with blocker
-        severity. Understand the issue described, read the relevant code, and fix it.
-        Skip major severity comments.
-      - `@bot` code change requests: If this state was entered via a `@bot` mention requesting
-        code changes, apply the requested modification. User instructions via `@bot` take
-        priority over bot review findings when they conflict.
-      - Rebase needed: Fetch the latest target branch, git rebase. Resolve conflicts autonomously.
+      Fix issues found during check or requested via `@bot`.
+
+      **Fix sources in priority order** (highest first):
+      1. **CI failures**: Fetch failed job logs (GitLab API / `gh run view --log-failed`),
+         analyze root cause, and fix the code. Pipeline won't pass without these.
+      2. **`@bot` code change requests**: If this state was entered via a `@bot` mention
+         requesting code changes (the poll state printed the `@bot` context before exiting),
+         apply the requested modification. Read the comment body and, for inline threads,
+         the file path and line range to understand exactly what the user wants changed.
+      3. **Bot review blockers**: Read each unresolved bot-authored review thread with blocker
+         severity. Understand the issue described, read the relevant code, and fix it.
+         Skip major severity comments — leave for the user to address.
+
+      **User priority rule**: If a `@bot` instruction contradicts a bot review blocker
+      (e.g., user says "don't add error handling here" but a bot blocker says "add error
+      handling"), follow the user's `@bot` instruction and skip that blocker. The code-review
+      pipeline will re-evaluate in its next run.
+
+      **Rebase**: If the target branch is ahead, fetch and rebase. Resolve conflicts autonomously.
 
       After fixing, run lint/format/unit tests to confirm the fix doesn't introduce new issues.
 
@@ -188,8 +211,15 @@ states:
     prompt: |
       Commit and push the fixes:
       - Commit and push to the remote branch (force push if rebased).
-      - Comment on addressed review threads explaining what was fixed, prefixed with `[from bot]`.
-        Do NOT resolve review threads — that is the code-review pipeline's responsibility.
+      - **Comment on addressed review threads**: For each bot review thread that was fixed,
+        reply explaining what was fixed, prefixed with `[from bot]`.
+      - **Comment on addressed `@bot` code change threads**: For each `@bot` mention that
+        requested a code change and was addressed in this fix cycle, reply in the same
+        thread (inline) or as a new comment (issue-level) with body starting with `[from bot]`,
+        explaining what was changed. Then add a ✅ reaction to the original `@bot` comment
+        as the dedup signal.
+      - **Do NOT resolve threads** — neither review threads nor `@bot` threads. Thread
+        resolution is the code-review pipeline's responsibility, not mr-lifecycle's.
       - React to processed `@bot` comments as a visual indicator.
       - Update the MR/PR description if needed, especially when addressing review feedback
         changed the implementation approach.
