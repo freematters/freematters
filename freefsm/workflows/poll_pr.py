@@ -1,3 +1,4 @@
+# PR polling script for pr-lifecycle workflow
 #!/usr/bin/env python3
 """
 Poll script for pr-lifecycle.
