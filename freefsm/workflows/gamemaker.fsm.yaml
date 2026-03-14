@@ -185,8 +185,8 @@ states:
       Reference `spec.md` for detailed content the GM needs to consult.
 
       Save files should be stored in `saves/` relative to the FSM file's directory
-      (i.e. `games/<game-name>/saves/`). Add a `.gitignore` in the saves directory
-      to exclude save files from version control.
+      (i.e. `games/<game-name>/saves/`). Add a `.gitignore` in `games/<game-name>/`
+      with the line `saves/` to exclude save files from version control.
 
       Test the FSM with `freefsm start <path>` to verify it loads correctly.
     todos:
