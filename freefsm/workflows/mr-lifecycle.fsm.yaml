@@ -1,24 +1,35 @@
 # Flow:
 #
-#   create-mr → wait-for-pipeline ←--+
-#                |            \       |
-#              check          done    |
-#              /   \                  |
-#           fix ← wait-for-input     |
-#             |        \              |
-#           push       done          |
-#             |                      |
-#             +----------------------+
+#   create-mr → poll ←-----------+
+#                |    \     \     |
+#              check  fix   done  |
+#              /   \    |         |
+#           fix    poll push      |
+#             |          |        |
+#           push         +-------+
+#             |
+#             +-------------------+
 #
 
 version: 1
 guide: |
   Monitor a MR/PR until it is merged or closed.
-  Automatically fix CI failures, bot review findings, and author-marked `!fix` comments.
+  Automatically fix CI failures and bot review blockers. Respond to `@bot` mentions
+  for conversational replies or code changes.
 
   Supports GitLab (MR) and GitHub (PR). Platform is auto-detected from git remote URL:
   - GitLab: Uses GitLab REST API (requires PRIVATE-TOKEN)
   - GitHub: Prefers `gh` CLI, falls back to GitHub REST API
+
+  ## Interaction model
+
+  All user-initiated interaction goes through `@bot` mentions in inline review threads
+  or issue-level (PR-level) comments. The `@bot` mention can trigger either:
+  - A conversational reply (answer questions, explain code) — handled in-place during poll
+  - A code modification (fix a bug, apply a suggestion) — exits poll to fix state
+
+  All mr-lifecycle replies MUST be prefixed with `[from bot]` to distinguish agent-generated
+  comments from human-authored ones.
 
   ## GitHub CLI tips (avoid common pitfalls)
 
@@ -26,10 +37,8 @@ guide: |
   - **GraphQL queries**: Always inline owner/repo/PR values directly into the query string.
     Do NOT use `-f owner=... -f repo=...` variable binding — shell escaping breaks it.
     Example: `query { repository(owner: "myorg", name: "myrepo") { ... } }`
-  - **jq and `!fix`**: The `!` character triggers bash history expansion in double-quoted strings.
-    Always use single quotes for jq expressions, or pipe through `grep` instead.
-    Good: `gh api ... -q '.[] | .body'` then pipe to `grep '!fix'`
-    Bad: `gh api ... --jq '.[] | select(.body | contains("!fix"))'`
+  - **jq and `@bot`**: When searching for `@bot` in API output, pipe through `grep '@bot'`
+    rather than embedding in jq expressions to avoid shell escaping issues.
   - **Check runs**: Use `gh pr checks <N>` instead of raw `/commits/{sha}/check-runs` API.
 
 initial: create-mr
@@ -59,13 +68,13 @@ states:
 
       Record the MR/PR URL and ID — subsequent states will need them.
     transitions:
-      MR ready: wait-for-pipeline
+      MR ready: poll
 
-  wait-for-pipeline:
+  poll:
     prompt: |
       Run the polling script as a **background bash job** so the conversation is not blocked.
 
-      Write a Python polling script to `/tmp/poll_pipeline.py` and run it in the background.
+      Write a Python polling script to `/tmp/poll_mr.py` and run it in the background.
       The script should check every 20 seconds and print status lines. When an exit condition
       is met, it should print a clear result line (e.g., "RESULT: pipelines finished") and exit.
 
@@ -78,14 +87,16 @@ states:
           Do NOT use the legacy commit status API (`/commits/{sha}/status`) — it returns
           "pending" when no commit statuses exist (common with GitHub Actions).
       - Whether the target branch has new commits since the current branch was last rebased/merged
-        - GitLab: Compare target branch HEAD via API
-        - GitHub: Compare via `git fetch` + `git rev-list --count HEAD..origin/<target>`
-
-      If the target branch has been updated:
-      - Fetch latest target branch
-      - Rebase onto it and resolve any conflicts
-      - Force push to the remote branch
-      - Continue polling (the push will trigger a new pipeline)
+        - Use `git fetch` + `git rev-list --count HEAD..origin/<target>` to detect.
+        - If new commits detected, exit with "RESULT: pipelines finished" so the check state
+          can handle rebase detection.
+      - Whether new `@bot` mentions appear that request code changes
+        - Scan inline review threads and issue-level comments for unhandled `@bot` mentions.
+        - Dedup logic: a `@bot` mention is "handled" if a subsequent note/comment with
+          `[from bot]` prefix exists (timestamp-based ordering).
+        - For conversational `@bot` mentions (questions, explanations): reply in-place with
+          `[from bot]` prefix, add a reaction to the comment, and continue polling.
+        - For `@bot` mentions requesting code changes: exit with "RESULT: fix requested".
 
       On first entry, run a single poll inline to verify the script works
       (API token/auth valid, correct IDs, etc.) before starting the background job.
@@ -93,18 +104,20 @@ states:
       Exit conditions (print as RESULT line):
       - MR/PR merged or closed → "RESULT: MR merged" or "RESULT: MR closed"
       - All CI completed (regardless of pass/fail) → "RESULT: pipelines finished"
+      - `@bot` code change request detected → "RESULT: fix requested"
 
       When running the script in the background, do NOT redirect stdout/stderr to a file —
       let output go to the terminal so the user can observe progress in real time.
       When the job completes, read its output from the task output and transition based on the RESULT line.
     transitions:
       pipelines finished: check
+      fix requested: fix
       MR merged: done
       MR closed: done
 
   check:
     prompt: |
-      All CI has completed. Check for issues that need attention:
+      All CI has completed or the target branch has been updated. Check for issues that need attention:
 
       Check items:
       - CI results: Are there any failed jobs (GitLab pipeline / GitHub Actions checks)?
@@ -116,65 +129,32 @@ states:
           gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: N) { reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login __typename } body } } } } } } }'
           ```
         - GitLab: Use MR discussions API, filter for `user.type == "Bot"`.
-        All unresolved bot inline comments (blocker/major) should be fixed.
-      - `!fix`-marked comments: Two scenarios:
-        1. A reviewer left a review comment on the diff, and the author replied with `!fix [optional description]`
-        2. The author posted a `!fix [optional description]` comment directly on the MR/PR
-        Do NOT handle reviewer comments without `!fix` markers.
-        API endpoints to check (must check ALL of these):
-        - GitLab: MR discussions API (includes inline and general comments)
-        - GitHub: Both `pulls/{N}/comments` (inline review comments) AND `issues/{N}/comments` (PR-level comments)
-        To search for `!fix`, pipe the API output through `grep '!fix'` instead of using jq `contains` —
-        the `!` in `"!fix"` triggers bash history expansion inside double-quoted strings.
-      - Rebase: Is the current branch behind the target branch?
+        Only unresolved bot inline comments with blocker severity should be auto-fixed.
+        Skip major severity comments — leave for the user to address.
+      - Rebase needed: Is the current branch behind the target branch?
+        Use `git rev-list --count HEAD..origin/<target>` to detect.
 
       Decision logic:
-      - Any issues found → fix
-      - No issues → wait-for-input
+      - Any issues found (CI failures, bot review blockers, rebase needed) → fix
+      - No issues → poll
     todos:
       - Check pipeline for failed jobs
-      - Check for unresolved bot inline review comments (blocker/major)
-      - Check for !fix-marked comments
-      - Check if rebase is needed
+      - Check for unresolved bot inline review comments (blocker severity only)
+      - Check if rebase is needed (target branch ahead)
     transitions:
       issues found: fix
-      all clear: wait-for-input
-
-  wait-for-input:
-    prompt: |
-      CI has passed with no pending issues.
-
-      Run the polling script as a **background bash job** so the conversation is not blocked.
-
-      Write a Python polling script to `/tmp/poll_input.py` and run it in the background.
-      The script should check every 20 seconds and print status lines. When an exit condition
-      is met, it should print a clear result line and exit.
-
-      The script monitors:
-      - Whether the MR/PR has been merged or closed
-      - Whether new `!fix` markers appear (author replies or comments containing `!fix`)
-
-      Exit conditions (print as RESULT line):
-      - MR/PR merged or closed → "RESULT: MR merged" or "RESULT: MR closed"
-      - `!fix` found → "RESULT: fix requested"
-
-      When running the script in the background, do NOT redirect stdout/stderr to a file —
-      let output go to the terminal so the user can observe progress in real time.
-      When the job completes, read its output from the task output and transition based on the RESULT line.
-    transitions:
-      fix requested: fix
-      MR merged: done
-      MR closed: done
+      all clear: poll
 
   fix:
     prompt: |
-      Fix issues found during check or wait-for-input:
+      Fix issues found during check or requested via `@bot`:
       - CI failure: Fetch failed job logs (GitLab API / `gh run view --log-failed`), analyze root cause, and fix the code.
-      - Bot inline review comments: Read each unresolved bot-authored review thread. Understand
-        the issue described, read the relevant code, and fix it. These are blocker/major issues
-        posted by automated code review — treat them as actionable items that must be addressed.
-      - `!fix`-marked comments: Find author-marked `!fix` comments, read the corresponding
-        reviewer comment or author's description, understand the intent, and modify the code.
+      - Bot inline review comments: Read each unresolved bot-authored review thread with blocker
+        severity. Understand the issue described, read the relevant code, and fix it.
+        Skip major severity comments.
+      - `@bot` code change requests: If this state was entered via a `@bot` mention requesting
+        code changes, apply the requested modification. User instructions via `@bot` take
+        priority over bot review findings when they conflict.
       - Rebase needed: Fetch the latest target branch, git rebase. Resolve conflicts autonomously.
 
       After fixing, run lint/format/unit tests to confirm the fix doesn't introduce new issues.
@@ -182,36 +162,37 @@ states:
       If upon inspection there is nothing to fix, transition back to polling.
     todos:
       - Fix CI failures (if any)
-      - Fix unresolved bot inline review comments (if any)
-      - Handle !fix-marked comments (if any)
+      - Fix unresolved bot inline review comments with blocker severity (if any)
+      - Handle @bot code change requests (if any)
       - Rebase (if needed)
       - Run lint/format/unit tests to verify
     transitions:
       fixed: push
-      nothing to fix: wait-for-pipeline
+      nothing to fix: poll
 
   push:
     prompt: |
       Commit and push the fixes:
       - Commit and push to the remote branch (force push if rebased).
-      - Only resolve review threads that were actually fixed in this round (bot review findings or `!fix`-marked comments).
-        Do NOT resolve unfixed threads.
-        - GitLab: Resolve discussions via API
-        - GitHub: Reply to review comments explaining the fix
-      - Update the MR/PR description if needed, especially when addressing review feedback changed the implementation approach.
+      - Comment on addressed review threads explaining what was fixed, prefixed with `[from bot]`.
+        Do NOT resolve review threads — that is the code-review pipeline's responsibility.
+      - React to processed `@bot` comments as a visual indicator.
+      - Update the MR/PR description if needed, especially when addressing review feedback
+        changed the implementation approach.
     todos:
-      - Reply to and resolve addressed !fix comments (explain what was fixed)
-      - Reply to and resolve bot review discussions where critical issues were fixed (explain the fix)
-      - Reply to and resolve bot review discussions that had no critical issues (acknowledge review)
-      - Update MR/PR description — append a summary of what was fixed in this round
+      - Comment on addressed review threads with [from bot] prefix (explain what was fixed)
+      - Comment on addressed @bot code change threads with [from bot] prefix
+      - React to processed @bot comments
+      - Update MR/PR description if implementation approach changed
       - Push to remote (force push if rebased)
     transitions:
-      pushed: wait-for-pipeline
+      pushed: poll
 
   done:
     prompt: |
       The MR/PR has been merged or closed. Output a summary:
       - MR/PR URL
       - Total number of fix rounds
+      - Total `@bot` interactions handled
       - Brief overview of main fixes applied
     transitions: {}

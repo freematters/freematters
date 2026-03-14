@@ -13,8 +13,8 @@ The `!fix` mechanism is removed entirely. All user-initiated interaction goes th
 - **Dual mode**: `@bot` can trigger either a conversational reply (answer questions, explain code) or a code modification (fix a bug, apply a suggestion), determined by Claude's intent analysis.
 - **Reply format**: All mr-lifecycle replies MUST be prefixed with `[from bot]` to distinguish agent-generated comments from human-authored ones.
 - **Deduplication**:
-  - Inline threads: Check whether every user note in the thread is eventually followed by a `[from-bot]` note (timestamp-based). If a user note has no subsequent `[from-bot]` note, it needs a response.
-  - Issue comments: The same, should check for `[from-bot]` replies.
+  - Inline threads: Check whether every user note in the thread is eventually followed by a `[from bot]` note (timestamp-based). If a user note has no subsequent `[from bot]` note, it needs a response.
+  - Issue comments: The same, should check for `[from bot]` replies.
   - Should react to @bot with reaction.
 - **User priority**: When a `@bot` instruction conflicts with a bot review finding, the user's instruction takes precedence. The code-review pipeline will re-evaluate in its next run.
 
@@ -52,7 +52,7 @@ The `!fix` mechanism is removed entirely. All user-initiated interaction goes th
 
 - **mr-lifecycle** operates under the **user's identity** (user's API token). Its comments appear as authored by the user.
 - **code-review pipeline** operates under a **bot identity** (CI bot token). Its comments appear as bot-authored.
-- Consequence: code-review treats mr-lifecycle's comments as "user messages" (since author is not a bot). The `[from bot]` prefix is for human readers only.
+- Consequence: code-review treats mr-lifecycle's comments as "user messages" (since author is not a bot). The `[from bot]` prefix serves dual purposes: it is visible to human readers for transparency, and it is parsed programmatically by the polling script for dedup purposes (see §5.3).
 
 ## 3. Architecture Overview
 
@@ -118,8 +118,9 @@ No changes from v1 except: remove any `!fix`-related mentions from the descripti
 | MR merged | API check | Exit → `done` |
 | MR closed | API check | Exit → `done` |
 
-**`@bot` dedup logic**:
-- see design
+**`@bot` dedup logic** (see §5.3 `@bot` Mention Detection):
+- Inline threads: iterate notes in timestamp order. For each user note containing `@bot`, check if a subsequent note with `[from bot]` prefix exists. If not → needs reply.
+- Issue comments: check if a ✅ reaction from the bot exists on each `@bot` comment. If not → needs reply.
 
 **`@bot` reply format**: All replies prefixed with `[from bot]`.
 
@@ -247,7 +248,7 @@ Comment {
 }
 ```
 
-Logic: Filter comments containing `@bot` where no subsequent `[from bot]`-prefixed reply exists → needs reply. Additionally, react to processed `@bot` comments as a visual indicator.
+Logic: Filter comments containing `@bot` where no ✅ reaction from the bot user exists on the original comment → needs reply. After replying (with `[from bot]` prefix), add a ✅ reaction to the original `@bot` comment as the primary dedup signal.
 
 ### 5.4 Bot Review Severity
 
