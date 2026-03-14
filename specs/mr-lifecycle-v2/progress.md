@@ -18,3 +18,17 @@
   - Dedup logic matches design.md §5.3: inline threads use timestamp-ordered `[from bot]` note check, issue comments use ✅ reaction check
   - `freefsm finish --run-id test-step2` — clean up succeeded
 - **Notes**: Code-change `@bot` mentions are noted in the prompt but deferred to Step 3 for full implementation. All `@bot` mentions are treated as conversational for now.
+
+## Step 3: Implement @bot code change flow (poll -> fix -> push -> poll)
+- **Files changed**: `freefsm/workflows/mr-lifecycle.fsm.yaml`, `specs/mr-lifecycle-v2/progress.md`
+- **What was built**: Enabled `@bot` mentions that request code changes to exit poll and flow through fix -> push -> poll. Three state prompts were updated:
+  - **poll**: Replaced placeholder code-change handling with full intent analysis — action verb detection (fix, add, remove, change, etc.), context printing (comment body, file path, line range for inline threads), exit with `RESULT: fix requested`, and intent ambiguity resolution rules (code-change when referencing specific code/files, conversational for why/how questions).
+  - **fix**: Restructured as explicit priority-ordered fix sources (CI failures > `@bot` requests > bot review blockers) per design.md §4.4. Added user priority rule: `@bot` instructions override conflicting bot review blockers (design.md §2.1).
+  - **push**: Added separate instructions for commenting on addressed `@bot` code change threads with `[from bot]` prefix + ✅ reaction dedup. Added explicit "Do NOT resolve threads" rule for both review threads and `@bot` threads.
+- **Tests**: All validation passed:
+  - `freefsm start freefsm/workflows/mr-lifecycle.fsm.yaml --run-id test-step3` — YAML parses correctly
+  - Full cycle walk-through: `create-mr -> poll -> fix -> push -> poll -> done` — all transitions valid via `freefsm goto`
+  - Poll prompt contains: intent analysis with action verb detection, context printing instructions, `RESULT: fix requested` exit, intent ambiguity resolution
+  - Fix prompt contains: priority-ordered fix sources (CI > @bot > bot review blockers), user priority rule for @bot vs bot review conflicts
+  - Push prompt contains: `[from bot]` comment instruction for addressed @bot threads, explicit "Do NOT resolve threads" rule
+  - `freefsm finish --run-id test-step3` — run reached terminal `done` state (already completed)
