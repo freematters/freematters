@@ -78,7 +78,7 @@ states:
       The script should check every 20 seconds and print status lines. When an exit condition
       is met, it should print a clear result line (e.g., "RESULT: pipelines finished") and exit.
 
-      The script monitors:
+      The script monitors (checked on **every poll cycle**, not just at exit):
       - Whether the MR/PR has been merged or closed
       - Whether all CI has completed (keep waiting if pending/running):
         - GitLab: Check pipeline status via API
@@ -90,13 +90,27 @@ states:
         - Use `git fetch` + `git rev-list --count HEAD..origin/<target>` to detect.
         - If new commits detected, exit with "RESULT: pipelines finished" so the check state
           can handle rebase detection.
-      - Whether new `@bot` mentions appear that request code changes
-        - Scan inline review threads and issue-level comments for unhandled `@bot` mentions.
-        - Dedup logic: a `@bot` mention is "handled" if a subsequent note/comment with
-          `[from bot]` prefix exists (timestamp-based ordering).
-        - For conversational `@bot` mentions (questions, explanations): reply in-place with
-          `[from bot]` prefix, add a reaction to the comment, and continue polling.
-        - For `@bot` mentions requesting code changes: exit with "RESULT: fix requested".
+      - **`@bot` mention detection** — scan for unhandled `@bot` mentions on every poll cycle:
+
+        **Inline thread dedup** (GitHub GraphQL reviewThreads / GitLab discussions API):
+        Iterate notes in each thread in timestamp order. For each user note whose body
+        contains `@bot`, check if any subsequent note (later timestamp) has a body starting
+        with `[from bot]`. If no such note exists → this mention needs a reply.
+
+        **Issue/PR-level comment dedup** (GitHub issues comments / GitLab MR notes):
+        For each comment whose body contains `@bot`, check if a ✅ reaction from the
+        current user exists on that comment. If no ✅ reaction → this mention needs a reply.
+
+        **Handling conversational `@bot` mentions** (questions, explanations — no code change):
+        1. Reply in the same thread / as a new comment with body starting with `[from bot]`
+           followed by the conversational response.
+        2. After replying, add a ✅ reaction to the original `@bot` comment as the primary
+           dedup signal for issue-level comments. For inline threads, the `[from bot]` reply
+           note itself serves as the dedup signal.
+        3. Continue polling — conversational replies do NOT cause a state transition.
+
+        **Handling code-change `@bot` mentions**: exit with "RESULT: fix requested"
+        (this is handled in a later step; for now, treat all `@bot` mentions as conversational).
 
       On first entry, run a single poll inline to verify the script works
       (API token/auth valid, correct IDs, etc.) before starting the background job.
