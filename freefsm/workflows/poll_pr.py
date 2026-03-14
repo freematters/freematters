@@ -197,7 +197,7 @@ def find_unhandled_bot_mentions(
 
     Dedup:
       - Inline threads: handled if a subsequent note starts with '[from bot]'
-      - Issue comments: handled if a subsequent [from bot] reply exists (nearest match)
+      - Issue comments: handled if the comment has a 👍 (+1) reaction
     """
     mentions: list[BotMention] = []
 
@@ -247,42 +247,28 @@ def find_unhandled_bot_mentions(
             break
         page += 1
 
-    # For issue comments, dedup via [from bot] reply.
-    # Each [from bot] reply consumes the most recent preceding @bot mention.
-    # Walk backwards from each [from bot] to find its target @bot.
-    bot_indices: list[int] = []
-    for i, comment in enumerate(all_issue_comments):
+    # For issue comments, dedup via 👍 (+1) reaction on the comment.
+    # Unlike review threads, issue comments are flat — [from bot] reply pairing
+    # doesn't work because replies aren't linked to specific mentions.
+    for comment in all_issue_comments:
         body = comment.get("body", "")
         if body.startswith("[from bot]"):
             continue
+        # Skip bot-authored comments (e.g., code-review summary containing @bot)
         if comment.get("user", {}).get("type") == "Bot":
             continue
         if "@bot" not in body.lower():
             continue
-        bot_indices.append(i)
-
-    # Mark handled: for each [from bot] reply, find the closest preceding @bot
-    handled_set: set[int] = set()
-    for i, comment in enumerate(all_issue_comments):
-        if not comment.get("body", "").startswith("[from bot]"):
+        # Check for 👍 (+1) reaction as dedup signal
+        reactions = comment.get("reactions", {})
+        if reactions.get("+1", 0) > 0:
             continue
-        # Walk backwards to find the nearest unhandled @bot mention
-        for bot_i in reversed(bot_indices):
-            if bot_i >= i:
-                continue
-            if bot_i not in handled_set:
-                handled_set.add(bot_i)
-                break
-
-    for bot_i in bot_indices:
-        if bot_i not in handled_set:
-            comment = all_issue_comments[bot_i]
-            mentions.append(BotMention(
-                source="issue_comment",
-                comment_body=comment.get("body", ""),
-                comment_id=comment.get("id"),
-                author=comment.get("user", {}).get("login", "unknown"),
-            ))
+        mentions.append(BotMention(
+            source="issue_comment",
+            comment_body=body,
+            comment_id=comment.get("id"),
+            author=comment.get("user", {}).get("login", "unknown"),
+        ))
 
     return mentions
 
@@ -372,6 +358,9 @@ def poll_once(
     has_blocker = any(t.get("severity") == "blocker" for t in bot_review_threads)
     if has_blocker or mentions:
         for m in mentions:
+            # Add 👀 reaction (visual: "I see this")
+            if m.source == "issue_comment":
+                run(["gh", "api", f"repos/{owner}/{repo}/issues/comments/{m.comment_id}/reactions", "-f", "content=eyes"])
             print(f"\n[poll] Unhandled @bot mention:", flush=True)
             print(f"  source: {m.source}", flush=True)
             print(f"  author: {m.author}", flush=True)
