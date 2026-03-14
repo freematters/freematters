@@ -164,6 +164,13 @@ def fetch_bot_review_threads(owner: str, repo: str, pr: int) -> list[dict]:
             continue
         first = comments[0]
         if first.get("author", {}).get("__typename") == "Bot":
+            # Skip if already addressed — a [from bot] reply means pr-lifecycle handled it
+            has_bot_reply = any(
+                c.get("body", "").startswith("[from bot]")
+                for c in comments[1:]
+            )
+            if has_bot_reply:
+                continue
             first_body = first.get("body", "")
             result.append({
                 "thread_id": thread.get("id"),
