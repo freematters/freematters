@@ -98,7 +98,7 @@ states:
       ## `@bot` dedup rules (implemented in the script)
 
       - **Inline threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
-      - **Issue comments**: a `@bot` mention is handled if it has a ✅ (+1) reaction
+      - **Issue comments**: a `@bot` mention is handled if it has a 👍 (+1) reaction
 
       ## Exit RESULT lines
 
@@ -259,7 +259,7 @@ states:
       - Push to remote (force push if rebased)
       - Reply on addressed bot review threads with [from bot] prefix + resolve thread
       - Reply on addressed @bot threads with [from bot] prefix + resolve (code changes only)
-      - React to processed @bot comments with ✅
+      - React to processed @bot comments with 👍
       - Update PR description if implementation approach changed
     transitions:
       pushed: poll

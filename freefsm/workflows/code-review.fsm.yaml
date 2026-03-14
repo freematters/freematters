@@ -12,17 +12,6 @@ guide: |
   - Respond to user rebuttals on bot-authored threads
   - Detect and reply to pending user notes on bot threads
 
-  ## `[from bot]` Awareness
-
-  Some comments appear user-authored but are prefixed with `[from bot]`, indicating they
-  are agent-generated.
-
-  When detecting user replies for respond-and-resolve logic:
-  - Treat `[from bot]` comments the same as user messages for reply detection purposes:
-    if a `[from bot]` comment is the last reply in a thread, it still counts as a reply
-    that needs evaluation (the user/agent may be providing a rebuttal or explaining a fix)
-  - A `[from bot]` reply explaining a fix is strong signal that the issue may be resolved —
-    verify by checking the current code before auto-resolving
 
 initial: init
 states:

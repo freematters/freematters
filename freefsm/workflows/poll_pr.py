@@ -197,7 +197,7 @@ def find_unhandled_bot_mentions(
 
     Dedup:
       - Inline threads: handled if a subsequent note starts with '[from bot]'
-      - Issue comments: handled if the comment has a ✅ (+1) reaction
+      - Issue comments: handled if the comment has a 👍 (+1) reaction
     """
     mentions: list[BotMention] = []
 
@@ -247,7 +247,7 @@ def find_unhandled_bot_mentions(
             break
         page += 1
 
-    # For issue comments, dedup via ✅ (+1) reaction on the comment.
+    # For issue comments, dedup via 👍 (+1) reaction on the comment.
     # Unlike review threads, issue comments are flat — [from bot] reply pairing
     # doesn't work because replies aren't linked to specific mentions.
     for comment in all_issue_comments:
@@ -259,7 +259,7 @@ def find_unhandled_bot_mentions(
             continue
         if "@bot" not in body.lower():
             continue
-        # Check for ✅ (+1) reaction as dedup signal
+        # Check for 👍 (+1) reaction as dedup signal
         reactions = comment.get("reactions", {})
         if reactions.get("+1", 0) > 0:
             continue
