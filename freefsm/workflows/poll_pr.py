@@ -394,9 +394,16 @@ def main() -> None:
     parser.add_argument("--target", default="main", help="Target branch (default: main)")
     parser.add_argument("--interval", type=int, default=20, help="Poll interval in seconds (default: 20)")
     parser.add_argument("--wf-dir", required=True, help="Workflow directory (WF_DIR) for pr_status.json")
+    parser.add_argument("--once", action="store_true", help="Run a single poll cycle and exit (writes pr_status.json, prints RESULT if any)")
     args = parser.parse_args()
 
     wf_dir = Path(os.path.expanduser(args.wf_dir))
+
+    if args.once:
+        result = poll_once(args.owner, args.repo, args.pr, args.target, wf_dir)
+        if result:
+            print(result, flush=True)
+        sys.exit(0)
 
     print(f"[poll] Starting poll for {args.owner}/{args.repo}#{args.pr} "
           f"(target={args.target}, interval={args.interval}s, wf_dir={wf_dir})", flush=True)

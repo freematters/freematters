@@ -198,9 +198,13 @@ states:
 
       ## Before transitioning to push
 
-      Re-check for new `@bot` mentions by calling the poll script's mention detection
-      or reading the latest state. If new `@bot` mentions arrived while you were working,
-      loop back and address them before proceeding to push.
+      Run the poll script with `--once` to re-check for new `@bot` mentions:
+      ```bash
+      python3 "$SCRIPT_DIR/poll_pr.py" <owner> <repo> <pr_number> \
+        --target <target_branch> --wf-dir "$WF_DIR" --once
+      ```
+      Read the updated `WF_DIR/pr_status.json` — if new mentions appeared, loop back
+      and address them before proceeding to push.
 
       If upon inspection there is nothing to address, transition back to polling.
     todos:
