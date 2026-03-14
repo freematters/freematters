@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-Poll script for mr-lifecycle v2.
+Poll script for pr-lifecycle.
 
 Monitors a GitHub PR for events and prints RESULT lines for the FSM agent to act on.
 The agent cannot generate replies — this script only detects events and exits.
 
 Usage:
-    python3 poll_mr.py <owner> <repo> <pr_number> [--target <branch>] [--interval <seconds>]
+    python3 poll_pr.py <owner> <repo> <pr_number> [--target <branch>] [--interval <seconds>]
 
 Exit RESULT lines:
-    RESULT: MR merged
-    RESULT: MR closed
+    RESULT: PR merged
+    RESULT: PR closed
     RESULT: pipelines finished
     RESULT: bot mention <type>    (type: conversational | code-change)
 """
@@ -177,6 +177,9 @@ def find_unhandled_bot_mentions(
                     ))
 
     # --- 2. Issue/PR-level comments ---
+    # Fetch all issue comments and check for unhandled @bot mentions.
+    # Dedup: a @bot comment is handled if a subsequent comment starts with [from bot].
+    all_issue_comments: list[dict] = []
     page = 1
     while True:
         comments_data, rc = gh_api(
@@ -184,30 +187,28 @@ def find_unhandled_bot_mentions(
         )
         if rc != 0 or not comments_data or not isinstance(comments_data, list):
             break
-        for comment in comments_data:
-            body = comment.get("body", "")
-            if "@bot" not in body.lower():
-                continue
-            # Check for ✅ reaction (dedup signal for issue comments)
-            comment_id = comment.get("id")
-            reactions_data, rrc = gh_api(
-                f"repos/{owner}/{repo}/issues/comments/{comment_id}/reactions"
-            )
-            # GitHub reactions: +1, -1, laugh, confused, heart, hooray, rocket, eyes.
-            # We use +1 as the dedup signal (closest to ✅).
-            has_checkmark = False
-            if rrc == 0 and isinstance(reactions_data, list):
-                has_checkmark = any(r.get("content") == "+1" for r in reactions_data)
-            if not has_checkmark:
-                mentions.append(BotMention(
-                    source="issue_comment",
-                    comment_body=body,
-                    comment_id=comment_id,
-                    author=comment.get("user", {}).get("login", "unknown"),
-                ))
+        all_issue_comments.extend(comments_data)
         if len(comments_data) < 100:
             break
         page += 1
+
+    for i, comment in enumerate(all_issue_comments):
+        body = comment.get("body", "")
+        if "@bot" not in body.lower():
+            continue
+        # Check if any subsequent comment starts with [from bot]
+        handled = False
+        for later in all_issue_comments[i + 1 :]:
+            if later.get("body", "").startswith("[from bot]"):
+                handled = True
+                break
+        if not handled:
+            mentions.append(BotMention(
+                source="issue_comment",
+                comment_body=body,
+                comment_id=comment.get("id"),
+                author=comment.get("user", {}).get("login", "unknown"),
+            ))
 
     return mentions
 
@@ -263,9 +264,9 @@ def poll_once(owner: str, repo: str, pr: int, target: str) -> str | None:
     # 1. PR state
     state = check_pr_state(owner, repo, pr)
     if state == "MERGED":
-        return "RESULT: MR merged"
+        return "RESULT: PR merged"
     if state == "CLOSED":
-        return "RESULT: MR closed"
+        return "RESULT: PR closed"
 
     # 2. CI status
     ci = check_ci(pr, owner, repo)
@@ -282,6 +283,9 @@ def poll_once(owner: str, repo: str, pr: int, target: str) -> str | None:
     if mentions:
         for m in mentions:
             intent = classify_mention(m)
+            # Add 👀 reaction (visual: "I see this")
+            if m.source == "issue_comment":
+                run(f"gh api repos/{owner}/{repo}/issues/comments/{m.comment_id}/reactions -f content='eyes'")
             print(f"\n[poll] Unhandled @bot mention ({intent}):", flush=True)
             print(f"  source: {m.source}", flush=True)
             print(f"  author: {m.author}", flush=True)

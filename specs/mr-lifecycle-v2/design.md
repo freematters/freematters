@@ -120,7 +120,7 @@ No changes from v1 except: remove any `!fix`-related mentions from the descripti
 
 **`@bot` dedup logic** (see §5.3 `@bot` Mention Detection):
 - Inline threads: iterate notes in timestamp order. For each user note containing `@bot`, check if a subsequent note with `[from bot]` prefix exists. If not → needs reply.
-- Issue comments: check if a ✅ reaction from the bot exists on each `@bot` comment. If not → needs reply.
+- Issue comments: check if a subsequent comment starts with `[from bot]`. If not → needs reply. (👀/✅ reactions are visual indicators only, not dedup signals.)
 
 **`@bot` reply format**: All replies prefixed with `[from bot]`.
 
@@ -248,7 +248,7 @@ Comment {
 }
 ```
 
-Logic: Filter comments containing `@bot` where no ✅ reaction from the bot user exists on the original comment → needs reply. After replying (with `[from bot]` prefix), add a ✅ reaction to the original `@bot` comment as the primary dedup signal.
+Logic: Filter comments containing `@bot` where no subsequent comment starts with `[from bot]` → needs reply. After replying (with `[from bot]` prefix), add 👀 reaction on detection and ✅ reaction after handling as visual indicators (NOT dedup signals — `[from bot]` reply is the dedup signal).
 
 ### 5.4 Bot Review Severity
 
@@ -288,7 +288,7 @@ The `check` state must parse severity from bot review comments and only act on b
 ### AC4: `@bot` Dedup (Issue Comment)
 - **Given** mr-lifecycle has replied (with `[from bot]` prefix) to an issue comment containing `@bot`
 - **When** the poll state scans issue comments again
-- **Then** the comment is skipped (a ✅ reaction from the bot exists on the `@bot` comment)
+- **Then** the comment is skipped (a subsequent `[from bot]` reply exists after the `@bot` comment)
 
 ### AC5: Bot Review Blocker Auto-Fix
 - **Given** a bot review has posted an unresolved blocker comment

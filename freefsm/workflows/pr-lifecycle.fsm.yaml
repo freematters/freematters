@@ -1,6 +1,6 @@
 # Flow:
 #
-#   create-mr → poll ←-----------+
+#   create-pr → poll ←-----------+
 #                |    \     \     |
 #              check  fix   done  |
 #              /   \    |         |
@@ -13,22 +13,18 @@
 
 version: 1
 guide: |
-  Monitor a MR/PR until it is merged or closed.
+  Monitor a GitHub PR until it is merged or closed.
   Automatically fix CI failures and bot review blockers. Respond to `@bot` mentions
   for conversational replies or code changes.
-
-  Supports GitLab (MR) and GitHub (PR). Platform is auto-detected from git remote URL:
-  - GitLab: Uses GitLab REST API (requires PRIVATE-TOKEN)
-  - GitHub: Prefers `gh` CLI, falls back to GitHub REST API
 
   ## Interaction model
 
   All user-initiated interaction goes through `@bot` mentions in inline review threads
-  or issue-level (PR-level) comments. The `@bot` mention can trigger either:
+  or PR-level comments. The `@bot` mention can trigger either:
   - A conversational reply (answer questions, explain code) — handled in-place during poll
   - A code modification (fix a bug, apply a suggestion) — exits poll to fix state
 
-  All mr-lifecycle replies MUST be prefixed with `[from bot]` to distinguish agent-generated
+  All pr-lifecycle replies MUST be prefixed with `[from bot]` to distinguish agent-generated
   comments from human-authored ones.
 
   ## GitHub CLI tips (avoid common pitfalls)
@@ -41,49 +37,42 @@ guide: |
     rather than embedding in jq expressions to avoid shell escaping issues.
   - **Check runs**: Use `gh pr checks <N>` instead of raw `/commits/{sha}/check-runs` API.
 
-initial: create-mr
+initial: create-pr
 
 states:
-  create-mr:
+  create-pr:
     prompt: |
-      First, detect the platform from git remote URL (gitlab.* → GitLab, github.com → GitHub).
-
-      Verify authentication:
-      - GitLab: Check for PRIVATE-TOKEN (environment variable or config file). If not found, prompt user to configure it.
-      - GitHub: Check `gh auth status`. If not logged in, prompt user to run `gh auth login`.
+      Verify authentication: run `gh auth status`. If not logged in, prompt user to run `gh auth login`.
 
       Once authenticated:
       - Run lint/format checks (refer to project CLAUDE.md for check commands). Fix any failures first.
       - Commit all local changes.
-      - Check if the current branch already has an open MR/PR:
-        - GitLab: Query via GitLab API
-        - GitHub: Query via `gh pr list` or GitHub API
-        If one exists, push the branch, record the URL and ID, and check if the description needs updating.
-      - If none exists, create a new MR/PR:
+      - Check if the current branch already has an open PR:
+        `gh pr list --head <branch> --json number,url`
+        If one exists, push the branch, record the URL and number, and check if the description needs updating.
+      - If none exists, create a new PR:
         - Target branch: Use user-specified branch if provided, otherwise use the repo's default branch.
         - Compare against target branch and summarize changes as the description.
         - Use conventional commit format for the title.
-        - GitLab: Create via GitLab API
-        - GitHub: Create via `gh pr create` or GitHub API
+        - Create via `gh pr create`
 
-      Record the MR/PR URL and ID — subsequent states will need them.
+      Record the PR URL and number — subsequent states will need them.
     transitions:
-      MR ready: poll
+      PR ready: poll
 
   poll:
     prompt: |
       Run the bundled polling script as a **background bash job** so the conversation is not blocked.
 
-      The script is at `poll_mr.py` in the same directory as this workflow YAML. Find it via:
+      The script is at `poll_pr.py` in the same directory as this workflow YAML. Find it via:
       ```bash
       SCRIPT_DIR="$(dirname "$(readlink -f "$(freefsm current --run-id <run_id> -j | jq -r '.data.fsm_path')")")"
       ```
-      Or locate it relative to this workflow file: `freefsm/workflows/poll_mr.py`
 
       ## Running the script
 
       ```bash
-      python3 "$SCRIPT_DIR/poll_mr.py" <owner> <repo> <pr_number> --target <target_branch> --interval 20
+      python3 "$SCRIPT_DIR/poll_pr.py" <owner> <repo> <pr_number> --target <target_branch> --interval 20
       ```
 
       Run a single inline poll first to verify the script works (API auth, correct IDs),
@@ -99,12 +88,17 @@ states:
       ## `@bot` dedup rules (implemented in the script)
 
       - **Inline threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
-      - **Issue comments**: a `@bot` mention is handled if a `+1` reaction exists on the comment
+      - **Issue comments**: a `@bot` mention is handled if a subsequent comment starts with `[from bot]`
+
+      ## `@bot` reaction signals (visual indicators, NOT dedup)
+
+      - 👀 — added when the poll script detects and starts processing a `@bot` mention
+      - ✅ — added when the `@bot` mention has been fully handled (reply posted or fix pushed)
 
       ## Exit RESULT lines
 
       The script prints one of these and exits:
-      - `RESULT: MR merged` / `RESULT: MR closed` → transition to done
+      - `RESULT: PR merged` / `RESULT: PR closed` → transition to done
       - `RESULT: pipelines finished` → transition to check
       - `RESULT: bot mention code-change` → transition to fix (script prints @bot context)
       - `RESULT: bot mention conversational` → handle in-place, then restart the script
@@ -114,10 +108,12 @@ states:
       When the script exits with `RESULT: bot mention conversational`, the script has printed
       the mention details (source, author, comment_id, body). You must:
       1. Read the printed context to understand what was asked
-      2. Reply in the same thread / as a new comment with body starting with `[from bot]`
-      3. For issue comments: add a `+1` reaction to the original comment as the dedup signal:
+      2. Add a 👀 reaction to the original `@bot` comment (visual: "I see this"):
+         `gh api repos/<owner>/<repo>/issues/comments/<id>/reactions -f content='eyes'`
+      3. Reply in the same thread / as a new comment with body starting with `[from bot]`
+         — the `[from bot]` reply is the dedup signal for both inline threads and issue comments
+      4. Add a ✅ reaction to the original `@bot` comment (visual: "done"):
          `gh api repos/<owner>/<repo>/issues/comments/<id>/reactions -f content='+1'`
-      4. For inline threads: the `[from bot]` reply note itself serves as the dedup signal
       5. Restart the polling script — conversational replies do NOT cause a state transition
 
       ## Handling code-change `@bot` mentions
@@ -132,8 +128,8 @@ states:
     transitions:
       pipelines finished: check
       fix requested: fix
-      MR merged: done
-      MR closed: done
+      PR merged: done
+      PR closed: done
 
   check:
     prompt: |
@@ -141,30 +137,30 @@ states:
 
       ## Auto-fix round tracking
 
-      Track `auto_fix_rounds` via a durable temp file `/tmp/mr_lifecycle_state.json`.
-      - On first entry to check, read the file: `cat /tmp/mr_lifecycle_state.json 2>/dev/null`.
+      Track `auto_fix_rounds` via `~/.freefsm/runs/<run_id>/pr_lifecycle_state.json`.
+      - On first entry to check, read the file: `cat ~/.freefsm/runs/<run_id>/pr_lifecycle_state.json 2>/dev/null`.
         If the file doesn't exist, initialize `auto_fix_rounds = 0` and write it:
-        `echo '{"auto_fix_rounds": 0}' > /tmp/mr_lifecycle_state.json`
+        `echo '{"auto_fix_rounds": 0}' > ~/.freefsm/runs/<run_id>/pr_lifecycle_state.json`
       - The max is 3. If `auto_fix_rounds >= 3`, skip bot review blockers entirely (see below).
 
       ## Check items
 
-      **1. CI results**: Are there any failed jobs (GitLab pipeline / GitHub Actions checks)?
+      **1. CI results**: Are there any failed GitHub Actions checks?
+      Use `gh pr checks <N> --json name,state,bucket` to check.
       CI failures are always actionable regardless of round count.
 
-      **2. Bot inline review comments**: Fetch all unresolved review threads.
-        - GitHub: Use a single-line GraphQL query with owner/repo/PR inlined directly (no `-f` variables).
-          Filter for bot-authored threads: `comments.nodes[0].author.__typename == "Bot"`.
-          Example:
-          ```bash
-          gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: N) { reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login __typename } body } } } } } } }'
-          ```
-        - GitLab: Use MR discussions API, filter for `user.type == "Bot"`.
+      **2. Bot inline review comments**: Fetch all unresolved review threads via GraphQL.
+        Use owner/repo/PR inlined directly (no `-f` variables).
+        Filter for bot-authored threads: `comments.nodes[0].author.__typename == "Bot"`.
+        Example:
+        ```bash
+        gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: N) { reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login __typename } body } } } } } } }'
+        ```
 
         **Severity parsing**: Bot review comments indicate severity via markers in the comment
-        body. Look for patterns like `[BLOCKER]`, `[MAJOR]`, or HTML comments like
-        `<!-- severity: blocker -->`, `<!-- severity: major -->`. Parse each unresolved
-        bot-authored comment to determine its severity.
+        body. Look for patterns like `**blocker**`, `**major**`, `[BLOCKER]`, `[MAJOR]`, or
+        HTML comments like `<!-- severity: blocker -->`. Parse each unresolved bot-authored
+        comment to determine its severity.
 
         **Severity filtering**:
         - **Blocker**: Include in fix list ONLY if `auto_fix_rounds < 3`.
@@ -172,7 +168,6 @@ states:
           address manually or via `@bot`. Never auto-fix major severity comments.
 
         If `auto_fix_rounds >= 3`, skip ALL bot review comments (both blocker and major).
-        Bot review blockers are no longer actionable after 3 rounds.
 
       **3. Rebase needed**: Is the current branch behind the target branch?
         Use `git rev-list --count HEAD..origin/<target>` to detect.
@@ -192,7 +187,7 @@ states:
       ## Round limit reached (`auto_fix_rounds >= 3`)
 
       When the round limit is reached and there are still unresolved bot review blockers:
-      1. Post a comment on the MR/PR summarizing the remaining unresolved bot review issues
+      1. Post a comment on the PR summarizing the remaining unresolved bot review issues
          (both blocker and major), prefixed with `[from bot]`. Example:
          ```
          [from bot] Auto-fix round limit (3/3) reached. Remaining unresolved review issues:
@@ -204,12 +199,12 @@ states:
          (idle mode). The workflow continues monitoring for `@bot` mentions, merge, and
          close events but will not auto-fix bot review issues.
     todos:
-      - Check pipeline for failed jobs
-      - Read current auto_fix_rounds counter from /tmp/mr_lifecycle_state.json
+      - Check GitHub Actions for failed jobs
+      - Read current auto_fix_rounds counter from ~/.freefsm/runs/<run_id>/pr_lifecycle_state.json
       - Check for unresolved bot inline review comments — parse severity (blocker vs major)
       - Only include blocker-severity comments if auto_fix_rounds < 3
       - Skip major-severity comments entirely (never auto-fix)
-      - If round limit reached with remaining blockers, post summary comment on MR
+      - If round limit reached with remaining blockers, post summary comment on PR
       - Check if rebase is needed (target branch ahead)
     transitions:
       issues found: fix
@@ -221,8 +216,8 @@ states:
 
       ## Auto-fix round counter
 
-      Track `auto_fix_rounds` via a durable temp file `/tmp/mr_lifecycle_state.json`.
-      Read the current value: `cat /tmp/mr_lifecycle_state.json 2>/dev/null | jq '.auto_fix_rounds // 0'`
+      Track `auto_fix_rounds` via `~/.freefsm/runs/<run_id>/pr_lifecycle_state.json`.
+      Read the current value: `cat ~/.freefsm/runs/<run_id>/pr_lifecycle_state.json 2>/dev/null | jq '.auto_fix_rounds // 0'`
 
       **Increment rule**: Increment `auto_fix_rounds` by 1 in this state ONLY when you
       actually fix at least one of the following:
@@ -231,12 +226,12 @@ states:
       Do NOT increment the counter when fixing `@bot` code change requests — those are
       user-initiated and do not count toward the auto-fix limit.
 
-      After incrementing, write the new value to the temp file:
-      `echo '{"auto_fix_rounds": N}' > /tmp/mr_lifecycle_state.json`
+      After incrementing, write the new value to the file:
+      `echo '{"auto_fix_rounds": N}' > ~/.freefsm/runs/<run_id>/pr_lifecycle_state.json`
 
       ## Fix sources in priority order (highest first)
 
-      1. **CI failures**: Fetch failed job logs (GitLab API / `gh run view --log-failed`),
+      1. **CI failures**: Fetch failed job logs via `gh run view --log-failed`,
          analyze root cause, and fix the code. Pipeline won't pass without these.
       2. **`@bot` code change requests**: If this state was entered via a `@bot` mention
          requesting code changes (the poll state printed the `@bot` context before exiting),
@@ -260,7 +255,7 @@ states:
       - Fix CI failures (if any)
       - Fix unresolved bot inline review comments with blocker severity (if any)
       - Handle @bot code change requests (if any)
-      - Increment auto_fix_rounds in /tmp/mr_lifecycle_state.json if CI or blocker fixes were applied (not for @bot requests)
+      - Increment auto_fix_rounds in ~/.freefsm/runs/<run_id>/pr_lifecycle_state.json if CI or blocker fixes were applied (not for @bot requests)
       - Rebase (if needed)
       - Run lint/format/unit tests to verify
     transitions:
@@ -272,12 +267,9 @@ states:
       Commit and push the fixes.
 
       ## CRITICAL RULE: NEVER resolve threads
-      mr-lifecycle MUST NEVER resolve review threads. Do NOT use any thread resolution
-      mechanism — no GitLab resolve API (`PUT /discussions/:id` with `resolved: true`),
-      no GitHub GraphQL `resolveReviewThread` mutation, no `gh api` calls that resolve
-      threads. Thread resolution is exclusively the code-review pipeline's responsibility.
-      This applies to ALL threads: bot review threads, `@bot` threads, and any other
-      discussion threads.
+      pr-lifecycle MUST NEVER resolve review threads. Do NOT use the GitHub GraphQL
+      `resolveReviewThread` mutation or any API call that resolves threads.
+      Thread resolution is exclusively the code-review pipeline's responsibility.
 
       ## Actions
       1. **Commit and push** to the remote branch (force push if rebased).
@@ -287,25 +279,26 @@ states:
       3. **Comment on addressed `@bot` code change threads**: For each `@bot` mention that
          requested a code change and was addressed in this fix cycle, reply in the same
          thread (inline) or as a new comment (issue-level) with body starting with `[from bot]`,
-         explaining what was changed. Then add a ✅ reaction to the original `@bot` comment
-         as the dedup signal.
-      4. **Update the MR/PR description** if the implementation approach changed while
+         explaining what was changed. The `[from bot]` reply is the dedup signal.
+      4. **React to processed `@bot` comments**: Add ✅ (`+1`) reaction as a visual indicator
+         that the request has been handled. (The 👀 reaction was already added by the poll state.)
+      5. **Update the PR description** if the implementation approach changed while
          addressing review feedback or `@bot` requests.
     todos:
       - Commit all changes
       - Push to remote (force push if rebased)
       - Comment on addressed review threads with [from bot] prefix (explain what was fixed)
-      - Comment on addressed @bot code change threads with [from bot] prefix
-      - React to processed @bot comments with ✅
-      - Update MR/PR description if implementation approach changed
-      - "NEVER resolve threads — no resolve API calls, no resolveReviewThread mutations"
+      - Comment on addressed @bot code change threads with [from bot] prefix (dedup signal)
+      - React to processed @bot comments with ✅ (visual indicator)
+      - Update PR description if implementation approach changed
+      - "NEVER resolve threads — no resolveReviewThread mutations"
     transitions:
       pushed: poll
 
   done:
     prompt: |
-      The MR/PR has been merged or closed. Output a summary:
-      - MR/PR URL
+      The PR has been merged or closed. Output a summary:
+      - PR URL
       - Total auto-fix rounds used (out of 3 max)
       - Total `@bot` interactions handled
       - Brief overview of main fixes applied
