@@ -5,6 +5,14 @@ guide: |
   - major: Strongly recommend (performance issues, bad practices, architectural flaws)
   - minor: Optional improvement (naming, minor readability)
 
+  ## Thread handling
+
+  - Skip already-resolved threads gracefully (other workflows may resolve them)
+  - Auto-resolve threads where the flagged issue is verified as fixed in the code
+  - Respond to user rebuttals on bot-authored threads
+  - Detect and reply to pending user notes on bot threads
+
+
 initial: init
 states:
   init:
@@ -161,10 +169,13 @@ states:
 
       For each unresolved bot-authored review thread from init (`author.__typename == "Bot"`):
       1. **Check for user replies**: In the thread's comments, look for human replies
-         (entries after the first where `author.login` is not a bot)
-      2. **Skip if already responded**: If the last comment is from the bot and its
-         `createdAt` is after the last human reply, skip
-      3. **Analyze intent and respond**:
+         (entries after the first where `author.login` is not a bot).
+      2. **Skip if already responded**: If the last comment is from the bot (this code-review
+         bot, `__typename == "Bot"`) and its `createdAt` is after the last human reply, skip.
+      3. **Pending reply detection**: Every user note in an unresolved bot-authored thread
+         should eventually have a bot note after it. If the last note in the thread is a
+         user note, the thread needs a response.
+      4. **Analyze intent and respond**:
          - **User disagrees** (e.g., "this is intentional"):
            Re-examine the code. If user is right → reply acknowledging, then resolve the thread.
            If still a problem → reply explaining why.
@@ -185,7 +196,12 @@ states:
       2. Read the current version of the relevant file
       3. Determine if the flagged issue has been fixed (not just "file changed" —
          verify the specific problem is resolved)
-      4. If confirmed fixed, resolve via GraphQL:
+      4. If confirmed fixed, reply then resolve via GraphQL:
+
+      ```bash
+      gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
+        -f body="Verified fixed and resolved - [short description of what was fixed]"
+      ```
 
       ```bash
       gh api graphql -f query='
@@ -299,7 +315,8 @@ states:
       **Once all steps are complete**, transition to the next state.
     todos:
       - Respond to user replies on bot threads
-      - Auto-resolve threads where issues are confirmed fixed
+      - Detect pending replies — ensure every user note has a subsequent bot response
+      - Auto-resolve threads where issues are confirmed fixed (verify current code)
       - Post new inline comments (deduplicated against existing threads)
       - Update or create summary issue comment
     transitions:
