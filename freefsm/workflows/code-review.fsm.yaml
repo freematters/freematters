@@ -170,27 +170,17 @@ states:
       For each unresolved bot-authored review thread from init (`author.__typename == "Bot"`):
       1. **Check for user replies**: In the thread's comments, look for human replies
          (entries after the first where `author.login` is not a bot).
-         **`[from bot]` awareness**: Comments starting with `[from bot]` are agent-generated
-         (posted by mr-lifecycle under the user's identity). Treat them as user messages
-         for reply detection — they still need evaluation. A `[from bot]` comment explaining
-         a fix (e.g., "[from bot] Fixed by adding null check in foo.ts:42") is a strong signal
-         that the issue may be resolved; verify by checking the current code.
       2. **Skip if already responded**: If the last comment is from the bot (this code-review
-         bot, `__typename == "Bot"`) and its `createdAt` is after the last human/`[from bot]`
-         reply, skip
-      3. **Pending reply detection**: Every user note (including `[from bot]` notes) in an
-         unresolved bot-authored thread should eventually have a bot note after it. If the
-         last note in the thread is a user or `[from bot]` note, the thread needs a response.
+         bot, `__typename == "Bot"`) and its `createdAt` is after the last human reply, skip.
+      3. **Pending reply detection**: Every user note in an unresolved bot-authored thread
+         should eventually have a bot note after it. If the last note in the thread is a
+         user note, the thread needs a response.
       4. **Analyze intent and respond**:
          - **User disagrees** (e.g., "this is intentional"):
            Re-examine the code. If user is right → reply acknowledging, then resolve the thread.
            If still a problem → reply explaining why.
          - **User asks for clarification**: Reply with reasoning and impact.
          - **User asks for suggestion**: Reply with concrete fix and code example.
-         - **`[from bot]` fix explanation** (e.g., "[from bot] Fixed by ..."):
-           Verify the fix by reading the current code. If the issue is indeed fixed,
-           reply confirming and resolve the thread. If not fully fixed, reply explaining
-           what is still missing.
 
       ```bash
       gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
@@ -324,8 +314,8 @@ states:
 
       **Once all steps are complete**, transition to the next state.
     todos:
-      - Respond to user replies on bot threads (including [from bot] replies from mr-lifecycle)
-      - Detect pending replies — ensure every user/[from bot] note has a subsequent bot response
+      - Respond to user replies on bot threads
+      - Detect pending replies — ensure every user note has a subsequent bot response
       - Auto-resolve threads where issues are confirmed fixed (verify current code)
       - Post new inline comments (deduplicated against existing threads)
       - Update or create summary issue comment
