@@ -14,8 +14,8 @@ export class CliError extends Error {
     opts?: { data?: Record<string, unknown>; context?: CliErrorContext },
   ) {
     super(message);
-    this.name = "CliError";
-    this.code = code;
+    this.name = "CliError"
+    this.code = code
     this.data = opts?.data;
     this.context = opts?.context ?? {};
   }
