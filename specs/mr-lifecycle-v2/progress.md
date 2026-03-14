@@ -60,3 +60,15 @@
   - Push state prompt does NOT contain any resolve instructions (no resolve API calls, no resolveReviewThread mutations)
   - Grep confirmed: all "resolve" mentions in push state are part of the prohibition rule
   - `test-step5` run completed to terminal `done` state
+
+## Step 6: Update code-review pipeline (respond-and-resolve + /bot-review trigger)
+- **Files changed**: `.github/workflows/code-review.yml`, `freefsm/workflows/code-review.fsm.yaml`, `specs/mr-lifecycle-v2/progress.md`
+- **What was built**: Two-part update bridging mr-lifecycle and code-review responsibilities.
+  - **6a — `/bot-review` GitHub Actions trigger**: Updated `.github/workflows/code-review.yml` to support two triggers: `pull_request: types: [opened]` (automatic on PR creation only, removed `synchronize` and `reopened`) and `issue_comment: types: [created]` (manual via `/bot-review` comment). Added compound job condition checking event type, `github.event.issue.pull_request` presence, and comment body containing `/bot-review`. Added a step to resolve the PR head SHA for `issue_comment` events (since `github.event.pull_request` is not available). Updated concurrency group to handle both event types.
+  - **6b — Code-review respond-and-resolve alignment**: Updated `code-review.fsm.yaml` guide section with: division of labor between code-review and mr-lifecycle (who posts, who resolves, who fixes), `[from bot]` awareness section explaining how mr-lifecycle comments appear under user identity with `[from bot]` prefix and how code-review should treat them. Updated `post-and-resolve` state: added `[from bot]`-awareness to user reply detection (step 1), added pending reply detection logic (step 3 — every user/`[from bot]` note must eventually have a bot note after it), added `[from bot]` fix explanation handling (verify current code before auto-resolving). Updated todos to include `[from bot]` reply handling and pending reply detection.
+- **Tests**: All validation passed:
+  - `freefsm start freefsm/workflows/code-review.fsm.yaml --run-id test-step6` — YAML parses correctly, guide section shows division of labor and `[from bot]` awareness
+  - `post-and-resolve` state includes: `[from bot]`-awareness in user reply detection, pending reply detection (every user/`[from bot]` note needs a subsequent bot note), `[from bot]` fix explanation handling with code verification
+  - Guide section describes division of labor: code-review posts reviews + resolves threads, mr-lifecycle fixes issues + comments (never resolves)
+  - GitHub Actions workflow has both triggers: `pull_request: [opened]` and `issue_comment: [created]` with `/bot-review` check
+  - `freefsm finish --run-id test-step6` — clean up succeeded
