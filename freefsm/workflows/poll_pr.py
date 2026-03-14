@@ -387,7 +387,7 @@ def poll_once(
     # All clear — continue polling
     print(
         f"[poll] PR #{pr} state={pr_state} CI={ci['status']} "
-        f"reviews={len(bot_review_threads)} mentions=0",
+        f"reviews={len(bot_review_threads)} mentions={len(mentions)}",
         flush=True,
     )
     return None
