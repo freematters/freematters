@@ -213,6 +213,8 @@ def find_unhandled_bot_mentions(
             comments = thread.get("comments", {}).get("nodes", [])
             for i, comment in enumerate(comments):
                 body = comment.get("body", "")
+                if body.startswith("[from bot]"):
+                    continue
                 author_type = comment.get("author", {}).get("__typename", "")
                 if author_type == "Bot":
                     continue
@@ -249,6 +251,8 @@ def find_unhandled_bot_mentions(
 
     for i, comment in enumerate(all_issue_comments):
         body = comment.get("body", "")
+        if body.startswith("[from bot]"):
+            continue
         if "@bot" not in body.lower():
             continue
         handled = any(
