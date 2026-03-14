@@ -17,6 +17,13 @@ guide: |
   Automatically fix CI failures and bot review blockers. Respond to `@bot` mentions
   for conversational replies or code changes.
 
+  ## Workflow directory
+
+  `WF_DIR = ~/.freefsm/runs/<run_id>/`
+
+  This is the workflow's working directory. The poll script writes `pr_status.json` here,
+  and other states read it for PR status, CI results, bot reviews, and `@bot` mentions.
+
   ## Interaction model
 
   All user-initiated interaction goes through `@bot` mentions in inline review threads
@@ -72,11 +79,12 @@ states:
       ## Running the script
 
       ```bash
-      python3 "$SCRIPT_DIR/poll_pr.py" <owner> <repo> <pr_number> --target <target_branch> --interval 20
+      python3 "$SCRIPT_DIR/poll_pr.py" <owner> <repo> <pr_number> \
+        --target <target_branch> --interval 20 --wf-dir "$WF_DIR"
       ```
 
-      Run a single inline poll first to verify the script works (API auth, correct IDs),
-      then start it as a background job.
+      The script writes `pr_status.json` to `WF_DIR` on every cycle with the latest PR state,
+      CI results, bot review threads, and `@bot` mentions. Other states read this file directly.
 
       ## What the script monitors (every cycle)
 
@@ -90,10 +98,9 @@ states:
       - **Inline threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
       - **Issue comments**: a `@bot` mention is handled if a subsequent comment starts with `[from bot]`
 
-      ## `@bot` reaction signals (visual indicators, NOT dedup)
+      ## `@bot` reaction signal
 
-      - 👀 — added when the poll script detects and starts processing a `@bot` mention
-      - ✅ — added when the `@bot` mention has been fully handled (reply posted or fix pushed)
+      - 👀 — added when the poll script detects an unhandled `@bot` mention
 
       ## Exit RESULT lines
 
@@ -108,13 +115,9 @@ states:
       When the script exits with `RESULT: bot mention conversational`, the script has printed
       the mention details (source, author, comment_id, body). You must:
       1. Read the printed context to understand what was asked
-      2. Add a 👀 reaction to the original `@bot` comment (visual: "I see this"):
-         `gh api repos/<owner>/<repo>/issues/comments/<id>/reactions -f content='eyes'`
-      3. Reply in the same thread / as a new comment with body starting with `[from bot]`
+      2. Reply in the same thread / as a new comment with body starting with `[from bot]`
          — the `[from bot]` reply is the dedup signal for both inline threads and issue comments
-      4. Add a ✅ reaction to the original `@bot` comment (visual: "done"):
-         `gh api repos/<owner>/<repo>/issues/comments/<id>/reactions -f content='+1'`
-      5. Restart the polling script — conversational replies do NOT cause a state transition
+      3. Restart the polling script — conversational replies do NOT cause a state transition
 
       ## Handling code-change `@bot` mentions
 
@@ -136,28 +139,24 @@ states:
 
   check:
     prompt: |
-      All CI has completed or the target branch has been updated. Check for issues that need attention.
+      Read `WF_DIR/pr_status.json` written by the poll script. This file contains the latest
+      PR state, CI results, bot review threads, and `@bot` mentions.
 
       ## Check items
 
-      **1. CI results**: Are there any failed GitHub Actions checks?
-      Use `gh pr checks <N> --json name,state,bucket` to check.
+      **1. CI results**: Check `pr_status.ci` for any failed checks.
 
-      **2. Bot inline review comments**: Fetch all unresolved review threads via GraphQL.
-        Use owner/repo/PR inlined directly (no `-f` variables).
-        Filter for bot-authored threads: `comments.nodes[0].author.__typename == "Bot"`.
-        Example:
-        ```bash
-        gh api graphql -f query='query { repository(owner: "OWNER", name: "REPO") { pullRequest(number: N) { reviewThreads(first: 100) { nodes { isResolved comments(first: 1) { nodes { author { login __typename } body } } } } } } }'
-        ```
+      **2. Bot inline review comments**: Check `pr_status.bot_review_threads` for unresolved
+      bot-authored threads. Parse severity from the comment body yourself — look for patterns
+      like `**blocker**`, `**major**`, `[BLOCKER]`, `[MAJOR]`, or HTML comments like
+      `<!-- severity: blocker -->`.
 
         **Severity filtering**:
         - **Blocker**: Include in fix list — auto-fix these.
         - **Major**: Do NOT include in fix list. Skip entirely — leave for the user to
           address manually or via `@bot`.
 
-      **3. Rebase needed**: Is the current branch behind the target branch?
-        Use `git rev-list --count HEAD..origin/<target>` to detect.
+      **3. Rebase needed**: Check `pr_status.rebase_needed`.
 
       ## Decision logic
 
@@ -170,9 +169,10 @@ states:
       If any actionable items exist → transition to `fix` with the list of issues.
       If no actionable items → transition to `poll`.
     todos:
-      - Check GitHub Actions for failed jobs
-      - Check for unresolved bot inline review comments (blocker severity only, skip major)
-      - Check if rebase is needed (target branch ahead)
+      - Read WF_DIR/pr_status.json
+      - Check CI for failed jobs
+      - Parse bot review comments for severity (blocker vs major)
+      - Check if rebase is needed
     transitions:
       issues found: fix
       all clear: poll
@@ -183,11 +183,9 @@ states:
 
       ## Fix sources in priority order (highest first)
 
-      1. **CI failures**: Fetch failed job logs via `gh run view --log-failed`,
-         analyze root cause, and fix the code.
+      1. **CI failures**: Read the failed job logs and fix the code.
       2. **`@bot` code change requests**: If this state was entered via a `@bot` mention
-         requesting code changes (the poll state printed the `@bot` context before exiting),
-         apply the requested modification.
+         requesting code changes, apply the requested modification.
       3. **Bot review blockers**: Read each unresolved bot-authored review thread with blocker
          severity. Understand the issue described, read the relevant code, and fix it.
          Skip major severity comments — leave for the user to address.
@@ -230,7 +228,7 @@ states:
          thread (inline) or as a new comment (issue-level) with body starting with `[from bot]`,
          explaining what was changed. The `[from bot]` reply is the dedup signal.
       4. **React to processed `@bot` comments**: Add ✅ (`+1`) reaction as a visual indicator
-         that the request has been handled. (The 👀 reaction was already added by the poll state.)
+         that the request has been handled.
       5. **Update the PR description** if the implementation approach changed while
          addressing review feedback or `@bot` requests.
     todos:

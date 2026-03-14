@@ -3,10 +3,10 @@
 Poll script for pr-lifecycle.
 
 Monitors a GitHub PR for events and prints RESULT lines for the FSM agent to act on.
-The agent cannot generate replies — this script only detects events and exits.
+Writes pr_status.json to WF_DIR on every cycle for other states to consume.
 
 Usage:
-    python3 poll_pr.py <owner> <repo> <pr_number> [--target <branch>] [--interval <seconds>]
+    python3 poll_pr.py <owner> <repo> <pr_number> --wf-dir <path> [--target <branch>] [--interval <seconds>]
 
 Exit RESULT lines:
     RESULT: PR merged
@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass
+from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
@@ -46,7 +48,6 @@ def gh_api(endpoint: str) -> tuple[dict | list | None, int]:
 
 
 def gh_graphql(query: str) -> dict | None:
-    # Use -f query= so we don't need to escape
     out, rc = run(f"gh api graphql -f query='{query}'")
     if rc != 0 or not out:
         return None
@@ -82,25 +83,23 @@ def check_pr_state(owner: str, repo: str, pr: int) -> str | None:
     return out if rc == 0 else None
 
 
-def check_ci(pr: int, owner: str, repo: str) -> str:
+def check_ci(pr: int, owner: str, repo: str) -> dict:
     """
-    Return CI status:
-      'pending'  — at least one check still running
-      'finished' — all checks done (pass or fail)
-      'none'     — no checks found
+    Return CI status dict:
+      { "status": "pending"|"finished"|"none", "checks": [...] }
     """
     out, rc = run(f"gh pr checks {pr} -R {owner}/{repo} --json name,state,bucket 2>/dev/null")
     if rc != 0 or not out:
-        return "none"
+        return {"status": "none", "checks": []}
     try:
         checks = json.loads(out)
     except json.JSONDecodeError:
-        return "none"
+        return {"status": "none", "checks": []}
     if not checks:
-        return "none"
+        return {"status": "none", "checks": []}
     if any(c.get("state") == "PENDING" for c in checks):
-        return "pending"
-    return "finished"
+        return {"status": "pending", "checks": checks}
+    return {"status": "finished", "checks": checks}
 
 
 def check_target_branch_updated(target: str) -> bool:
@@ -113,6 +112,48 @@ def check_target_branch_updated(target: str) -> bool:
         return False
 
 
+def fetch_bot_review_threads(owner: str, repo: str, pr: int) -> list[dict]:
+    """Fetch all unresolved bot-authored review threads with full comments."""
+    query = (
+        f'query {{ repository(owner: "{owner}", name: "{repo}") {{ '
+        f'pullRequest(number: {pr}) {{ '
+        f'reviewThreads(first: 100) {{ nodes {{ '
+        f'id isResolved path line '
+        f'comments(first: 50) {{ nodes {{ '
+        f'databaseId body createdAt author {{ login __typename }} '
+        f'}} }} }} }} }} }} }}'
+    )
+    data = gh_graphql(query)
+    if not data:
+        return []
+    threads = (
+        data.get("data", {})
+        .get("repository", {})
+        .get("pullRequest", {})
+        .get("reviewThreads", {})
+        .get("nodes", [])
+    )
+    # Return unresolved bot-authored threads
+    result = []
+    for thread in threads:
+        if thread.get("isResolved"):
+            continue
+        comments = thread.get("comments", {}).get("nodes", [])
+        if not comments:
+            continue
+        first = comments[0]
+        if first.get("author", {}).get("__typename") == "Bot":
+            result.append({
+                "thread_id": thread.get("id"),
+                "path": thread.get("path"),
+                "line": thread.get("line"),
+                "first_comment_body": first.get("body", ""),
+                "first_comment_author": first.get("author", {}).get("login", ""),
+                "comment_count": len(comments),
+            })
+    return result
+
+
 def find_unhandled_bot_mentions(
     owner: str, repo: str, pr: int
 ) -> list[BotMention]:
@@ -121,9 +162,7 @@ def find_unhandled_bot_mentions(
       1. Inline review threads (GraphQL)
       2. Issue/PR-level comments (REST API)
 
-    Dedup rules:
-      - Inline threads: a mention is handled if a subsequent note starts with '[from bot]'
-      - Issue comments: a mention is handled if a ✅ reaction from any user exists
+    Dedup: a @bot mention is handled if a subsequent note/comment starts with '[from bot]'.
     """
     mentions: list[BotMention] = []
 
@@ -150,21 +189,17 @@ def find_unhandled_bot_mentions(
             if thread.get("isResolved"):
                 continue
             comments = thread.get("comments", {}).get("nodes", [])
-            # Walk comments in order looking for unhandled @bot mentions
             for i, comment in enumerate(comments):
                 body = comment.get("body", "")
                 author_type = comment.get("author", {}).get("__typename", "")
-                # Skip bot-authored comments
                 if author_type == "Bot":
                     continue
                 if "@bot" not in body.lower():
                     continue
-                # Check if any subsequent comment starts with [from bot]
-                handled = False
-                for later in comments[i + 1 :]:
-                    if later.get("body", "").startswith("[from bot]"):
-                        handled = True
-                        break
+                handled = any(
+                    later.get("body", "").startswith("[from bot]")
+                    for later in comments[i + 1 :]
+                )
                 if not handled:
                     mentions.append(BotMention(
                         source="inline_thread",
@@ -177,8 +212,6 @@ def find_unhandled_bot_mentions(
                     ))
 
     # --- 2. Issue/PR-level comments ---
-    # Fetch all issue comments and check for unhandled @bot mentions.
-    # Dedup: a @bot comment is handled if a subsequent comment starts with [from bot].
     all_issue_comments: list[dict] = []
     page = 1
     while True:
@@ -196,12 +229,10 @@ def find_unhandled_bot_mentions(
         body = comment.get("body", "")
         if "@bot" not in body.lower():
             continue
-        # Check if any subsequent comment starts with [from bot]
-        handled = False
-        for later in all_issue_comments[i + 1 :]:
-            if later.get("body", "").startswith("[from bot]"):
-                handled = True
-                break
+        handled = any(
+            later.get("body", "").startswith("[from bot]")
+            for later in all_issue_comments[i + 1 :]
+        )
         if not handled:
             mentions.append(BotMention(
                 source="issue_comment",
@@ -229,33 +260,80 @@ def classify_mention(mention: BotMention) -> str:
 
 
 # ---------------------------------------------------------------------------
+# pr_status.json
+# ---------------------------------------------------------------------------
+
+def write_pr_status(
+    wf_dir: Path,
+    *,
+    pr_state: str | None,
+    ci: dict,
+    rebase_needed: bool,
+    bot_review_threads: list[dict],
+    mentions: list[BotMention],
+) -> None:
+    """Write pr_status.json to WF_DIR."""
+    status = {
+        "pr_state": pr_state,
+        "ci": ci,
+        "rebase_needed": rebase_needed,
+        "bot_review_threads": bot_review_threads,
+        "mentions": [asdict(m) for m in mentions],
+    }
+    wf_dir.mkdir(parents=True, exist_ok=True)
+    (wf_dir / "pr_status.json").write_text(json.dumps(status, indent=2) + "\n")
+
+
+# ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
 
-def poll_once(owner: str, repo: str, pr: int, target: str) -> str | None:
+def poll_once(
+    owner: str, repo: str, pr: int, target: str, wf_dir: Path
+) -> str | None:
     """
-    Run a single poll cycle. Returns a RESULT string if an exit condition is met,
-    or None to continue polling.
+    Run a single poll cycle. Writes pr_status.json every cycle.
+    Returns a RESULT string if an exit condition is met, or None to continue.
     """
     # 1. PR state
-    state = check_pr_state(owner, repo, pr)
-    if state == "MERGED":
-        return "RESULT: PR merged"
-    if state == "CLOSED":
-        return "RESULT: PR closed"
+    pr_state = check_pr_state(owner, repo, pr)
 
     # 2. CI status
     ci = check_ci(pr, owner, repo)
-    if ci == "finished":
+
+    # 3. Target branch
+    rebase_needed = check_target_branch_updated(target)
+
+    # 4. Bot review threads
+    bot_review_threads = fetch_bot_review_threads(owner, repo, pr)
+
+    # 5. @bot mentions
+    mentions = find_unhandled_bot_mentions(owner, repo, pr)
+
+    # Write status file every cycle
+    write_pr_status(
+        wf_dir,
+        pr_state=pr_state,
+        ci=ci,
+        rebase_needed=rebase_needed,
+        bot_review_threads=bot_review_threads,
+        mentions=mentions,
+    )
+
+    # --- Evaluate exit conditions ---
+
+    if pr_state == "MERGED":
+        return "RESULT: PR merged"
+    if pr_state == "CLOSED":
+        return "RESULT: PR closed"
+
+    if ci["status"] == "finished":
         return "RESULT: pipelines finished"
 
-    # 3. Target branch updated
-    if check_target_branch_updated(target):
+    if rebase_needed:
         print(f"[poll] target branch '{target}' has new commits", flush=True)
         return "RESULT: pipelines finished"
 
-    # 4. @bot mentions
-    mentions = find_unhandled_bot_mentions(owner, repo, pr)
     if mentions:
         for m in mentions:
             intent = classify_mention(m)
@@ -270,13 +348,11 @@ def poll_once(owner: str, repo: str, pr: int, target: str) -> str | None:
                 print(f"  file: {m.file_path}:{m.line}", flush=True)
             if m.thread_id:
                 print(f"  thread_id: {m.thread_id}", flush=True)
-            # Truncate very long bodies for readability
             body_preview = m.comment_body[:500]
             if len(m.comment_body) > 500:
                 body_preview += "..."
             print(f"  body: {body_preview}", flush=True)
 
-        # Check if any are code-change
         has_code_change = any(classify_mention(m) == "code-change" for m in mentions)
         if has_code_change:
             return "RESULT: bot mention code-change"
@@ -284,34 +360,36 @@ def poll_once(owner: str, repo: str, pr: int, target: str) -> str | None:
 
     # Nothing to report
     print(
-        f"[poll] PR #{pr} state={state} CI={ci} mentions=0",
+        f"[poll] PR #{pr} state={pr_state} CI={ci['status']} "
+        f"reviews={len(bot_review_threads)} mentions=0",
         flush=True,
     )
     return None
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Poll a GitHub PR for mr-lifecycle events")
+    parser = argparse.ArgumentParser(description="Poll a GitHub PR for pr-lifecycle events")
     parser.add_argument("owner", help="Repository owner")
     parser.add_argument("repo", help="Repository name")
     parser.add_argument("pr", type=int, help="PR number")
     parser.add_argument("--target", default="main", help="Target branch (default: main)")
     parser.add_argument("--interval", type=int, default=20, help="Poll interval in seconds (default: 20)")
+    parser.add_argument("--wf-dir", required=True, help="Workflow directory (WF_DIR) for pr_status.json")
     args = parser.parse_args()
 
-    # Initial inline poll to verify connectivity
-    print(f"[poll] Starting poll for {args.owner}/{args.repo}#{args.pr} "
-          f"(target={args.target}, interval={args.interval}s)", flush=True)
+    wf_dir = Path(os.path.expanduser(args.wf_dir))
 
-    result = poll_once(args.owner, args.repo, args.pr, args.target)
+    print(f"[poll] Starting poll for {args.owner}/{args.repo}#{args.pr} "
+          f"(target={args.target}, interval={args.interval}s, wf_dir={wf_dir})", flush=True)
+
+    result = poll_once(args.owner, args.repo, args.pr, args.target, wf_dir)
     if result:
         print(result, flush=True)
         sys.exit(0)
 
-    # Background loop
     while True:
         time.sleep(args.interval)
-        result = poll_once(args.owner, args.repo, args.pr, args.target)
+        result = poll_once(args.owner, args.repo, args.pr, args.target, wf_dir)
         if result:
             print(result, flush=True)
             sys.exit(0)
