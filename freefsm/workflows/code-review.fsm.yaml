@@ -5,30 +5,19 @@ guide: |
   - major: Strongly recommend (performance issues, bad practices, architectural flaws)
   - minor: Optional improvement (naming, minor readability)
 
-  ## Division of Labor with mr-lifecycle
+  ## Thread handling
 
-  The code-review pipeline and mr-lifecycle have distinct, non-overlapping responsibilities:
-
-  - **code-review** (this workflow, runs as bot identity in CI):
-    - Posts new review comments (inline + summary)
-    - Auto-resolves threads where the flagged issue is verified as fixed in the code
-    - Responds to user rebuttals on its own threads
-    - Detects and replies to pending user notes on bot threads
-    - Is the ONLY entity that resolves review threads
-
-  - **mr-lifecycle** (runs as user identity, separate workflow):
-    - Monitors CI, @bot mentions, merge/close events
-    - Auto-fixes CI failures and blocker-severity bot review comments
-    - Comments on threads explaining what was fixed (prefixed with `[from bot]`)
-    - NEVER resolves threads — that is code-review's job
+  - Skip already-resolved threads gracefully (other workflows may resolve them)
+  - Auto-resolve threads where the flagged issue is verified as fixed in the code
+  - Respond to user rebuttals on bot-authored threads
+  - Detect and reply to pending user notes on bot threads
 
   ## `[from bot]` Awareness
 
-  mr-lifecycle operates under the user's identity, so its comments appear as user-authored.
-  However, they are prefixed with `[from bot]` to indicate they are agent-generated.
+  Some comments appear user-authored but are prefixed with `[from bot]`, indicating they
+  are agent-generated.
 
   When detecting user replies for respond-and-resolve logic:
-  - Comments starting with `[from bot]` are agent-generated (from mr-lifecycle)
   - Treat `[from bot]` comments the same as user messages for reply detection purposes:
     if a `[from bot]` comment is the last reply in a thread, it still counts as a reply
     that needs evaluation (the user/agent may be providing a rebuttal or explaining a fix)
@@ -228,7 +217,12 @@ states:
       2. Read the current version of the relevant file
       3. Determine if the flagged issue has been fixed (not just "file changed" —
          verify the specific problem is resolved)
-      4. If confirmed fixed, resolve via GraphQL:
+      4. If confirmed fixed, reply then resolve via GraphQL:
+
+      ```bash
+      gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
+        -f body="Verified fixed and resolved - [short description of what was fixed]"
+      ```
 
       ```bash
       gh api graphql -f query='

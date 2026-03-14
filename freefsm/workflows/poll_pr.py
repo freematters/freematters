@@ -11,8 +11,9 @@ Usage:
 Exit RESULT lines:
     RESULT: PR merged
     RESULT: PR closed
-    RESULT: pipelines finished
-    RESULT: bot mention <type>    (type: conversational | code-change)
+    RESULT: needs rebase
+    RESULT: needs fix
+    RESULT: needs address
 """
 
 from __future__ import annotations
@@ -20,7 +21,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import subprocess
 import sys
 import time
@@ -112,8 +112,28 @@ def check_target_branch_updated(target: str) -> bool:
         return False
 
 
+def parse_severity(body: str) -> str:
+    """
+    Parse severity from a bot review comment body.
+
+    Matches patterns: **blocker**, **major**, **minor**, [BLOCKER], [MAJOR], [MINOR],
+    <!-- severity: blocker -->, leading **blocker**: ...
+
+    Returns "blocker", "major", "minor", or "unknown".
+    """
+    lower = body.lower()
+    for level in ("blocker", "major", "minor"):
+        if f"**{level}**" in lower:
+            return level
+        if f"[{level.upper()}]" in body:
+            return level
+        if f"<!-- severity: {level}" in lower:
+            return level
+    return "unknown"
+
+
 def fetch_bot_review_threads(owner: str, repo: str, pr: int) -> list[dict]:
-    """Fetch all unresolved bot-authored review threads with full comments."""
+    """Fetch all unresolved bot-authored review threads with full comments and severity."""
     query = (
         f'query {{ repository(owner: "{owner}", name: "{repo}") {{ '
         f'pullRequest(number: {pr}) {{ '
@@ -143,13 +163,15 @@ def fetch_bot_review_threads(owner: str, repo: str, pr: int) -> list[dict]:
             continue
         first = comments[0]
         if first.get("author", {}).get("__typename") == "Bot":
+            first_body = first.get("body", "")
             result.append({
                 "thread_id": thread.get("id"),
                 "path": thread.get("path"),
                 "line": thread.get("line"),
-                "first_comment_body": first.get("body", ""),
+                "first_comment_body": first_body,
                 "first_comment_author": first.get("author", {}).get("login", ""),
                 "comment_count": len(comments),
+                "severity": parse_severity(first_body),
             })
     return result
 
@@ -244,21 +266,6 @@ def find_unhandled_bot_mentions(
     return mentions
 
 
-_FIX_PATTERN = re.compile(r"\bFIX\b")
-
-
-def classify_mention(mention: BotMention) -> str:
-    """
-    Classify a @bot mention as 'conversational' or 'code-change'.
-
-    Code-change is ONLY triggered by issue-level comments containing 'FIX' (case-sensitive).
-    Everything else (inline threads, issue comments without FIX) is conversational.
-    """
-    if mention.source == "issue_comment" and _FIX_PATTERN.search(mention.comment_body):
-        return "code-change"
-    return "conversational"
-
-
 # ---------------------------------------------------------------------------
 # pr_status.json
 # ---------------------------------------------------------------------------
@@ -320,27 +327,33 @@ def poll_once(
         mentions=mentions,
     )
 
-    # --- Evaluate exit conditions ---
+    # --- Evaluate exit conditions (priority order) ---
 
+    # 1. Terminal states
     if pr_state == "MERGED":
         return "RESULT: PR merged"
     if pr_state == "CLOSED":
         return "RESULT: PR closed"
 
-    if ci["status"] == "finished":
-        return "RESULT: pipelines finished"
-
+    # 2. Rebase (highest operational priority)
     if rebase_needed:
         print(f"[poll] target branch '{target}' has new commits", flush=True)
-        return "RESULT: pipelines finished"
+        return "RESULT: needs rebase"
 
-    if mentions:
+    # 3. CI failures (only when ALL checks finished AND has failures)
+    if ci["status"] == "finished":
+        has_failure = any(c.get("bucket") == "fail" for c in ci.get("checks", []))
+        if has_failure:
+            return "RESULT: needs fix"
+
+    # 4. Address (blocker bot reviews or @bot mentions)
+    has_blocker = any(t.get("severity") == "blocker" for t in bot_review_threads)
+    if has_blocker or mentions:
         for m in mentions:
-            intent = classify_mention(m)
             # Add 👀 reaction (visual: "I see this")
             if m.source == "issue_comment":
                 run(f"gh api repos/{owner}/{repo}/issues/comments/{m.comment_id}/reactions -f content='eyes'")
-            print(f"\n[poll] Unhandled @bot mention ({intent}):", flush=True)
+            print(f"\n[poll] Unhandled @bot mention:", flush=True)
             print(f"  source: {m.source}", flush=True)
             print(f"  author: {m.author}", flush=True)
             print(f"  comment_id: {m.comment_id}", flush=True)
@@ -352,13 +365,9 @@ def poll_once(
             if len(m.comment_body) > 500:
                 body_preview += "..."
             print(f"  body: {body_preview}", flush=True)
+        return "RESULT: needs address"
 
-        has_code_change = any(classify_mention(m) == "code-change" for m in mentions)
-        if has_code_change:
-            return "RESULT: bot mention code-change"
-        return "RESULT: bot mention conversational"
-
-    # Nothing to report
+    # All clear — continue polling
     print(
         f"[poll] PR #{pr} state={pr_state} CI={ci['status']} "
         f"reviews={len(bot_review_threads)} mentions=0",
