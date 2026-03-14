@@ -6,7 +6,7 @@
 - [x] Step 3: Implement `@bot` code change flow (poll → fix → push → poll)
 - [x] Step 4: Bot review severity filtering and auto-fix round limit
 - [x] Step 5: Remove resolve from push, add comment-only behavior
-- [ ] Step 6: Update code-review pipeline (respond-and-resolve + `/bot-review` trigger)
+- [x] Step 6: Update code-review pipeline (respond-and-resolve + `/bot-review` trigger)
 - [ ] Step 7: Manual E2E testing (see manual-e2e.md)
 
 ---
