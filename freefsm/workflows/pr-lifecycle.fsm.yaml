@@ -32,9 +32,10 @@ guide: |
 
   ## Thread resolution
 
-  After fixing issues, the `push` state resolves threads via `resolveReviewThread` for
-  bot review blockers and @bot code changes that were fixed. Questions answered via
-  `[from bot]` replies are NOT resolved.
+  pr-lifecycle MUST NOT resolve review threads. Resolution is the code-review pipeline's
+  responsibility. After fixing issues, the `push` state replies with `[from bot]` to
+  explain what was fixed — this reply is the signal for the code-review pipeline to
+  verify and resolve the thread in its next run.
 
   ## GitHub CLI tips (avoid common pitfalls)
 
@@ -236,18 +237,11 @@ states:
       4. **For bot review blockers that were fixed**: Reply in the thread explaining what
          was fixed. The reply body MUST start with `[from bot]` (e.g.,
          `[from bot] Fixed by adding null check in foo.ts:42`).
-         Then resolve the thread:
-         ```bash
-         gh api graphql -f query='
-           mutation { resolveReviewThread(input: {threadId: "<thread_id>"}) {
-             thread { isResolved }
-           } }
-         '
-         ```
+         Do NOT resolve the thread — resolution is the code-review pipeline's responsibility.
 
       5. **For `@bot` code change requests that were fixed**: Reply in the same thread
          (inline) or as a new comment (issue-level) with body starting with `[from bot]`,
-         explaining what was changed. Then resolve the thread (for inline threads).
+         explaining what was changed. Do NOT resolve threads — leave that to the code-review pipeline.
 
       6. **For `@bot` questions**: Reply with body starting with `[from bot]` answering
          the question. Do NOT resolve the thread — the user may want to follow up.
@@ -257,8 +251,8 @@ states:
     todos:
       - Commit all changes (skip if no local changes)
       - Push to remote (force push if rebased)
-      - Reply on addressed bot review threads with [from bot] prefix + resolve thread
-      - Reply on addressed @bot threads with [from bot] prefix + resolve (code changes) or leave open (questions)
+      - Reply on addressed bot review threads with [from bot] prefix (do NOT resolve)
+      - Reply on addressed @bot threads with [from bot] prefix (do NOT resolve)
       - React to processed @bot comments with ✅
       - Update PR description if implementation approach changed
     transitions:
