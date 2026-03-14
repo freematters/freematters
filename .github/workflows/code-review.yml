@@ -2,24 +2,41 @@ name: Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened]
+  issue_comment:
+    types: [created]
 
 jobs:
   review:
     if: >-
-      github.event.pull_request.head.repo.full_name == github.repository
+      (github.event_name == 'pull_request' && github.event.action == 'opened'
+       && github.event.pull_request.head.repo.full_name == github.repository)
+      || (github.event_name == 'issue_comment' && github.event.action == 'created'
+          && github.event.issue.pull_request
+          && contains(github.event.comment.body, '/bot-review')
+          && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: ubuntu-latest
     concurrency:
-      group: code-review-${{ github.event.pull_request.number }}
+      group: code-review-${{ github.event.pull_request.number || github.event.issue.number }}
       cancel-in-progress: true
     permissions:
       contents: write
       pull-requests: write
       id-token: write
     steps:
+      - name: Get PR head ref (issue_comment trigger)
+        if: github.event_name == 'issue_comment'
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_JSON=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }})
+          echo "head_sha=$(echo "$PR_JSON" | jq -r .head.sha)" >> "$GITHUB_OUTPUT"
+          echo "head_ref=$(echo "$PR_JSON" | jq -r .head.ref)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || steps.pr.outputs.head_sha }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v4
