@@ -142,6 +142,7 @@ def fetch_review_threads_raw(owner: str, repo: str, pr: int) -> list[dict]:
         f'id isResolved path line '
         f'comments(first: 50) {{ nodes {{ '
         f'databaseId body createdAt author {{ login __typename }} '
+        f'pullRequestReview {{ state }} '
         f'}} }} }} }} }} }} }}'
     )
     data = gh_graphql(query)
@@ -215,6 +216,10 @@ def find_unhandled_bot_mentions(
                     continue
                 author_type = comment.get("author", {}).get("__typename", "")
                 if author_type == "Bot":
+                    continue
+                # Skip comments from pending (un-submitted) reviews
+                review = comment.get("pullRequestReview") or {}
+                if review.get("state") == "PENDING":
                     continue
                 if "@bot" not in body.lower():
                     continue
