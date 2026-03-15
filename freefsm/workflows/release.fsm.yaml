@@ -1,7 +1,21 @@
 version: 1
 guide: |
-  Release workflow for freefsm.
+  General release workflow for GitHub projects.
   Opens a release PR, merges after CI, tags and publishes.
+
+  ## Configuration (set these before starting)
+
+  The workflow prompts reference these variables. Before entering the `bump` state,
+  determine them from the project context:
+
+  - **PKG_DIR**: package directory relative to repo root (e.g. `freefsm`, `.` for root)
+  - **TAG_PREFIX**: tag prefix for releases (e.g. `freefsm-v`, `v`)
+  - **VERSION_CMD**: command to bump version (e.g. `npm version <bump> --no-git-tag-version`)
+  - **VERSION_READ_CMD**: command to read current version (e.g. `node -p "require('./package.json').version"`)
+  - **FORMAT_CMD**: optional post-bump formatting command (e.g. `npx biome check --write .`)
+  - **RELEASE_NOTES_TEMPLATE**: path to release notes template (optional)
+  - **RELEASE_WORKFLOW**: GitHub Actions workflow filename for publish (e.g. `release.yml`, optional)
+  - **COMMIT_SCOPE**: path filter for `git log` (e.g. `freefsm/`, `.`)
 
 initial: bump
 states:
@@ -17,19 +31,19 @@ states:
       ```
 
       - Working tree must be clean. If dirty, stop and ask the user to commit or stash.
-      - Must be on `main`. If not, stop and warn.
+      - Must be on `main` (or the project's default branch). If not, stop and warn.
       - Pull latest: `git pull --ff-only`
 
       ## 2. Determine bump type
 
       Find the last release tag:
       ```bash
-      git tag --list 'freefsm-v*' --sort=-version:refname | head -1
+      git tag --list '${TAG_PREFIX}*' --sort=-version:refname | head -1
       ```
 
       If no tag exists, use the full commit history. Otherwise, get commits since that tag:
       ```bash
-      git log <last_tag>..HEAD -- freefsm/
+      git log <last_tag>..HEAD -- ${COMMIT_SCOPE}
       ```
 
       Analyze the commit messages and determine the bump type:
@@ -44,33 +58,35 @@ states:
 
       ## 3. Generate release notes
 
-      Read the template at `freefsm/workflows/release-notes.md` (same directory as this workflow).
-      Fill in the placeholders using the commit analysis from step 2:
+      If a RELEASE_NOTES_TEMPLATE is configured, read the template and fill in placeholders:
 
       - `{{VERSION}}`: the new version (from step 4 below)
       - `{{ONE_LINE_SUMMARY}}`: a single-sentence summary of the release theme
-      - `{{NARRATIVE}}`: 2-3 sentences on what changed and why it matters — concise and professional
+      - `{{NARRATIVE}}`: 2-3 sentences on what changed and why it matters
       - `{{Breaking Changes}}`: list or omit section entirely if none
       - `{{Features/Fixes/Other}}`: categorize commits by conventional commit prefix
-      - `{{OWNER}}/{{REPO}}`: GitHub owner/repo
+      - `{{OWNER}}/{{REPO}}`: GitHub owner/repo (from `gh repo view --json owner,name`)
       - `{{PREV_TAG}}`: the previous release tag
 
       Write the filled-in notes to `WF_DIR/RELEASE_NOTES.md` (the workflow run directory,
       NOT the repo). Do not commit this file. Show the draft to the user and ask if they
       want to adjust anything before proceeding.
 
+      If no template is configured, generate release notes in a standard format with
+      the same sections.
+
       ## 4. Create release branch and bump
 
       ```bash
-      cd freefsm
-      npm version <patch|minor|major> --no-git-tag-version
-      npx biome check --write .
-      VERSION=$(node -p "require('./package.json').version")
-      cd ..
-      git checkout -b release/freefsm-v${VERSION}
-      git add freefsm/package.json freefsm/package-lock.json
-      git commit -m "release: freefsm v${VERSION}"
-      git push -u origin release/freefsm-v${VERSION}
+      cd ${PKG_DIR}
+      ${VERSION_CMD}
+      ${FORMAT_CMD}  # skip if not configured
+      VERSION=$(${VERSION_READ_CMD})
+      cd <repo_root>
+      git checkout -b release/${TAG_PREFIX}${VERSION}
+      git add -u
+      git commit -m "release: ${TAG_PREFIX}${VERSION}"
+      git push -u origin release/${TAG_PREFIX}${VERSION}
       ```
 
       ## 5. Open PR
@@ -78,7 +94,7 @@ states:
       Use the release notes as the PR body:
 
       ```bash
-      gh pr create --title "release: freefsm v${VERSION}" \
+      gh pr create --title "release: ${TAG_PREFIX}${VERSION}" \
         --body-file "$WF_DIR/RELEASE_NOTES.md"
       ```
 
@@ -97,11 +113,11 @@ states:
       ```
 
       - If all checks pass, merge the PR.
-      - If a **lint** or **format** check fails, auto-fix locally and push:
+      - If a **lint** or **format** check fails and FORMAT_CMD is configured, auto-fix locally and push:
         ```bash
-        cd freefsm
-        npx biome check --write .
-        cd ..
+        cd ${PKG_DIR}
+        ${FORMAT_CMD}
+        cd <repo_root>
         git add -u && git commit -m "fix: auto-fix lint" && git push
         ```
         Then re-poll.
@@ -123,15 +139,15 @@ states:
     prompt: |
       # Phase: Tag and Push
 
-      Read the version from package.json (source of truth):
+      Read the version (source of truth):
 
       ```bash
-      VERSION=$(node -p "require('./freefsm/package.json').version")
-      git tag "freefsm-v${VERSION}"
-      git push origin "freefsm-v${VERSION}"
+      cd ${PKG_DIR}
+      VERSION=$(${VERSION_READ_CMD})
+      cd <repo_root>
+      git tag "${TAG_PREFIX}${VERSION}"
+      git push origin "${TAG_PREFIX}${VERSION}"
       ```
-
-      The tag format `freefsm-v<version>` triggers the release workflow (npm publish + GitHub Release).
 
     transitions:
       tag pushed: monitor
@@ -142,9 +158,12 @@ states:
 
       ## 1. Find the release workflow run
 
+      If RELEASE_WORKFLOW is configured:
       ```bash
-      gh run list --workflow=release.yml --limit=1 --json databaseId,status,conclusion
+      gh run list --workflow=${RELEASE_WORKFLOW} --limit=1 --json databaseId,status,conclusion
       ```
+
+      If no release workflow is configured, skip to step 3 (verify).
 
       ## 2. Watch until completion
 
@@ -154,12 +173,14 @@ states:
 
       ## 3. Verify
 
-      Once the run completes:
+      Once the run completes (or if no workflow):
 
-      - If **success**: update the release with generated notes and show the URL.
+      - If **success** (or no workflow): create/update the release with generated notes and show the URL.
         ```bash
-        gh release edit "freefsm-v${VERSION}" --notes-file "$WF_DIR/RELEASE_NOTES.md"
-        gh release view "freefsm-v${VERSION}" --json url -q '.url'
+        gh release create "${TAG_PREFIX}${VERSION}" --title "${TAG_PREFIX}${VERSION}" \
+          --notes-file "$WF_DIR/RELEASE_NOTES.md" || \
+        gh release edit "${TAG_PREFIX}${VERSION}" --notes-file "$WF_DIR/RELEASE_NOTES.md"
+        gh release view "${TAG_PREFIX}${VERSION}" --json url -q '.url'
         ```
       - If **failure**: show the error.
         ```bash
