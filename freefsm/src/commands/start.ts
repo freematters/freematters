@@ -3,6 +3,7 @@ import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import {
   formatStateCard,
+  fsmToMermaid,
   handleError,
   jsonSuccess,
   printJson,
@@ -55,6 +56,8 @@ export function start(args: StartArgs): void {
 
     const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
 
+    const mermaid = fsmToMermaid(fsm.states, fsm.initial);
+
     if (args.json) {
       printJson(
         jsonSuccess("Run started", {
@@ -64,6 +67,8 @@ export function start(args: StartArgs): void {
           todos: card.todos,
           transitions: card.transitions,
           run_status: "active",
+          total_states: Object.keys(fsm.states).length,
+          mermaid,
         }),
       );
     } else {

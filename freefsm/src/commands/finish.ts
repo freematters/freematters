@@ -2,18 +2,52 @@ import { CliError } from "../errors.js";
 import { handleError, jsonSuccess, printJson } from "../output.js";
 import { Store, type StoreEvent } from "../store.js";
 
-function formatTransitionChain(events: StoreEvent[]): string {
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 3_600_000) return `${(ms / 60_000).toFixed(1)}m`;
+  return `${(ms / 3_600_000).toFixed(1)}h`;
+}
+
+interface RunStats {
+  totalTransitions: number;
+  totalDuration: string;
+  statesVisited: string[];
+  chain: string;
+}
+
+function computeRunStats(events: StoreEvent[]): RunStats {
   const parts: string[] = [];
+  const statesVisited: string[] = [];
+
   for (const e of events) {
     if (e.event === "start") {
-      parts.push(e.to_state ?? "unknown");
+      const state = e.to_state ?? "unknown";
+      parts.push(state);
+      if (!statesVisited.includes(state)) statesVisited.push(state);
     } else if (e.event === "goto") {
       parts.push(`-[${e.on_label}]-> ${e.to_state}`);
+      if (e.to_state && !statesVisited.includes(e.to_state)) {
+        statesVisited.push(e.to_state);
+      }
     } else if (e.event === "finish") {
       parts.push("-[aborted]");
     }
   }
-  return `  ${parts.join(" ")}`;
+
+  let totalDuration = "0ms";
+  if (events.length >= 2) {
+    const startTs = new Date(events[0].ts).getTime();
+    const endTs = new Date(events[events.length - 1].ts).getTime();
+    totalDuration = formatDuration(endTs - startTs);
+  }
+
+  return {
+    totalTransitions: events.filter((e) => e.event === "goto").length,
+    totalDuration,
+    statesVisited,
+    chain: `  ${parts.join(" ")}`,
+  };
 }
 
 export interface FinishArgs {
@@ -65,7 +99,7 @@ export function finish(args: FinishArgs): void {
     });
 
     const events = store.readEvents(args.runId);
-    const chain = formatTransitionChain(events);
+    const stats = computeRunStats(events);
 
     if (args.json) {
       printJson(
@@ -74,6 +108,9 @@ export function finish(args: FinishArgs): void {
           run_status: "aborted",
           state: abortedState,
           completion_reason: "manual_abort",
+          total_transitions: stats.totalTransitions,
+          total_duration: stats.totalDuration,
+          states_visited: stats.statesVisited,
         }),
       );
     } else {
@@ -81,7 +118,12 @@ export function finish(args: FinishArgs): void {
         `Run aborted at **${abortedState}** state.
 
 Transition history:
-${chain}
+${stats.chain}
+
+Summary:
+  Transitions: ${stats.totalTransitions}
+  Duration: ${stats.totalDuration}
+  States visited: ${stats.statesVisited.join(", ")}
 `,
       );
     }

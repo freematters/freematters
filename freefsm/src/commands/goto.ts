@@ -95,13 +95,31 @@ ${labels}`,
 
     const card = stateCardFromFsm(args.target, fsm.states[args.target]);
 
+    // Compute time spent in previous state
+    const events = store.readEvents(args.runId);
+    let timeInPrevState: string | null = null;
+    if (events.length >= 2) {
+      const prevEvent = events[events.length - 2];
+      const curEvent = events[events.length - 1];
+      const elapsed =
+        new Date(curEvent.ts).getTime() - new Date(prevEvent.ts).getTime();
+      if (elapsed < 1000) timeInPrevState = `${elapsed}ms`;
+      else if (elapsed < 60_000) timeInPrevState = `${(elapsed / 1000).toFixed(1)}s`;
+      else if (elapsed < 3_600_000)
+        timeInPrevState = `${(elapsed / 60_000).toFixed(1)}m`;
+      else timeInPrevState = `${(elapsed / 3_600_000).toFixed(1)}h`;
+    }
+
     if (args.json) {
       const data: Record<string, unknown> = {
         state: card.state,
+        from_state: result.fromState,
         prompt: card.prompt,
         todos: card.todos,
         transitions: card.transitions,
         run_status: result.newStatus,
+        transition_label: args.on,
+        time_in_previous_state: timeInPrevState,
       };
       if (result.isDone) {
         data.completion_reason = "done_auto";
