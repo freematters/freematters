@@ -269,7 +269,8 @@ states:
       - Commit all changes (skip if no local changes)
       - Push to remote (force push if rebased)
       - Reply on addressed bot review threads with [from bot] prefix + resolve thread
-      - Reply on addressed @bot threads with [from bot] prefix + resolve (code changes only)
+      - Reply on addressed @bot inline review threads with [from bot] prefix + resolve (code changes only)
+      - Reply on addressed @bot issue comments with [from bot] prefix (code changes only)
       - React to processed @bot comments with 🚀
       - Update PR description summary if implementation approach changed
       - Append push summary to PR description
