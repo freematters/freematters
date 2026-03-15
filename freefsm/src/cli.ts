@@ -6,8 +6,11 @@ import { Command } from "commander";
 import { current } from "./commands/current.js";
 import { finish } from "./commands/finish.js";
 import { goto } from "./commands/goto.js";
+import { history } from "./commands/history.js";
 import { install } from "./commands/install.js";
+import { list } from "./commands/list.js";
 import { start } from "./commands/start.js";
+import { validate } from "./commands/validate.js";
 import { main as postToolUseMain } from "./hooks/post-tool-use.js";
 
 function resolveRoot(flagRoot?: string): string {
@@ -97,6 +100,48 @@ program
     finish({
       runId: opts.runId as string,
       root: resolveRoot(root),
+      json: json ?? false,
+    });
+  });
+
+program
+  .command("history")
+  .description("show transition history for a run")
+  .requiredOption("--run-id <id>", "run identifier")
+  .option("--limit <n>", "show last N transitions", Number.parseInt)
+  .option("--since <iso>", "show transitions since ISO timestamp")
+  .action((opts: Record<string, unknown>, cmd: Command) => {
+    const { root, json } = getGlobalOpts(cmd);
+    history({
+      runId: opts.runId as string,
+      limit: opts.limit as number | undefined,
+      since: opts.since as string | undefined,
+      root: resolveRoot(root),
+      json: json ?? false,
+    });
+  });
+
+program
+  .command("list")
+  .description("list all runs")
+  .option("--status <status>", "filter by status (active, completed, aborted)")
+  .action((opts: Record<string, unknown>, cmd: Command) => {
+    const { root, json } = getGlobalOpts(cmd);
+    list({
+      status: opts.status as string | undefined,
+      root: resolveRoot(root),
+      json: json ?? false,
+    });
+  });
+
+program
+  .command("validate")
+  .description("validate an FSM YAML file and report stats")
+  .argument("<fsm_path>", "path to FSM YAML file")
+  .action((_fsmPath: string, _opts: Record<string, unknown>, cmd: Command) => {
+    const { json } = getGlobalOpts(cmd);
+    validate({
+      fsmPath: resolve(_fsmPath),
       json: json ?? false,
     });
   });

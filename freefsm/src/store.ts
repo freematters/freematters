@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmdirSync,
   unlinkSync,
   writeFileSync,
@@ -297,5 +298,49 @@ export class Store {
     const dir = this.sessionsDir();
     mkdirSync(dir, { recursive: true });
     writeFileSync(this.counterPath(sessionId), String(value), "utf-8");
+  }
+
+  // --- Run Listing ---
+
+  listRuns(): string[] {
+    const runsDir = join(this.root, "runs");
+    if (!existsSync(runsDir)) return [];
+    return readdirSync(runsDir).filter((name) =>
+      existsSync(join(runsDir, name, "fsm.meta.json")),
+    );
+  }
+
+  listRunsWithStatus(): Array<{
+    runId: string;
+    status: RunStatus;
+    state: string;
+    createdAt: string;
+  }> {
+    const runIds = this.listRuns();
+    const results: Array<{
+      runId: string;
+      status: RunStatus;
+      state: string;
+      createdAt: string;
+    }> = [];
+
+    for (const runId of runIds) {
+      try {
+        const meta = this.readMeta(runId);
+        const snapshot = this.readSnapshot(runId);
+        results.push({
+          runId,
+          status: snapshot?.run_status ?? "active",
+          state: snapshot?.state ?? "unknown",
+          createdAt: meta.created_at,
+        });
+      } catch {
+        // Skip runs with corrupted data
+      }
+    }
+
+    return results.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   }
 }

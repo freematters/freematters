@@ -96,6 +96,37 @@ export function formatReminder(card: StateCard): string {
   return lines.join("\n");
 }
 
+// --- Duration Formatting ---
+
+export function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 3_600_000) return `${(ms / 60_000).toFixed(1)}m`;
+  return `${(ms / 3_600_000).toFixed(1)}h`;
+}
+
+// --- Graph Visualization (Mermaid) ---
+
+export function fsmToMermaid(
+  states: Record<string, { transitions: Record<string, string> }>,
+  initial: string,
+): string {
+  const lines: string[] = [];
+  lines.push("stateDiagram-v2");
+  lines.push(`  [*] --> ${initial}`);
+
+  for (const [name, state] of Object.entries(states)) {
+    for (const [label, target] of Object.entries(state.transitions)) {
+      lines.push(`  ${name} --> ${target}: ${label}`);
+    }
+    if (Object.keys(state.transitions).length === 0) {
+      lines.push(`  ${name} --> [*]`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
 // --- JSON Envelope ---
 
 export interface JsonEnvelope {
