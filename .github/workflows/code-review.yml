@@ -15,7 +15,7 @@ jobs:
           && github.event.issue.pull_request
           && contains(github.event.comment.body, '/bot-review')
           && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
-    runs-on: warp-ubuntu-latest-x64-2x
+    runs-on: warp-ubuntu-2404-x64-2x
     concurrency:
       group: code-review-${{ github.event.pull_request.number || github.event.issue.number }}
       cancel-in-progress: true

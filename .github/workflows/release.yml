@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   publish:
-    runs-on: warp-ubuntu-latest-x64-2x
+    runs-on: warp-ubuntu-2404-x64-2x
     defaults:
       run:
         working-directory: freefsm
