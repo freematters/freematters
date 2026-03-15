@@ -278,20 +278,7 @@ states:
 
   done:
     prompt: |
-      The PR has been merged or closed.
-
-      ## Final PR description update
-
-      If the PR was merged and the implementation drifted from the original description,
-      update the summary section at the top of the PR description to reflect what was
-      actually implemented. Keep all `## Push round N` sections intact — they serve as
-      an audit trail.
-
-      If there are no changes needed, skip the update.
-
-      ## Output summary
-
-      Output a final summary:
+      The PR has been merged or closed. Output a final summary:
       - PR URL
       - Final status (merged or closed)
       - Total `@bot` interactions handled
