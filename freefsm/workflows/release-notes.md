@@ -4,11 +4,6 @@
 
 {{NARRATIVE — 2-3 sentences. What changed in this release and why it matters.}}
 
-## Highlights
-
-{{TOP 1-3 changes worth calling out. One bullet each, concise.
-  Format: **Short title** — one-sentence description.}}
-
 ## Breaking Changes
 
 {{List any breaking changes. Omit this section entirely if none.}}
