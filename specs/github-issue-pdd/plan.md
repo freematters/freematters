@@ -8,7 +8,7 @@
 - [x] Step 5: Implement `design`, `plan`, and `e2e-test-design` state prompts
 - [x] Step 6: Implement `done` state prompt (label, summary, status update)
 - [x] Step 7: Add guide rules (polling, comment format, minimize API, creator-only filtering)
-- [ ] Step 8: Integration test against testbed
+- [x] Step 8: Integration test against testbed
 
 ---
 
