@@ -1,0 +1,731 @@
+# Issue Bot — GitHub Issue-driven PDD workflow
+#
+# Flow:
+#
+#   create-issue
+#       |           \
+#   requirements ← → research
+#       |               |
+#       +-------+-------+
+#               |
+#          checkpoint
+#         /    |     \
+#   requirements  research  design
+#                           |     \
+#                          plan    requirements (gaps)
+#                         /    \
+#               e2e-test-design  design (revision)
+#                  /      |       \
+#               done    skip→done  revision→e2e-test-design
+
+version: 1
+guide: |
+  Issue Bot — Plan-Driven Development (PDD) via GitHub Issues.
+
+  This workflow drives a complete PDD process through GitHub issue comments. The bot creates
+  a GitHub issue, then interacts with the user entirely via issue comments — gathering
+  requirements, conducting research, producing a design, and outputting an implementation plan.
+  All artifacts are posted as issue comments (not local files). The final output is a GitHub
+  issue labeled `spec-ready` with a plan checklist in the body and all PDD artifacts as comments.
+
+  Rules that apply across ALL states:
+
+  ### ETag-Based Comment Polling
+
+  Whenever you need to wait for a user reply on the issue, use this exact polling pattern:
+
+  ```bash
+  # Get latest comments with ETag
+  RESPONSE=$(gh api repos/{owner}/{repo}/issues/{n}/comments --include)
+  ETAG=$(echo "$RESPONSE" | grep -i etag | awk '{print $2}' | tr -d '\r')
+
+  # Poll loop
+  while true; do
+    RESPONSE=$(gh api repos/{owner}/{repo}/issues/{n}/comments \
+      -H "If-None-Match: $ETAG" --include 2>&1)
+    if echo "$RESPONSE" | grep -q "304"; then
+      sleep 1
+    else
+      ETAG=$(echo "$RESPONSE" | grep -i etag | awk '{print $2}' | tr -d '\r')
+      # Extract new comment, filter by issue creator
+      break
+    fi
+  done
+  ```
+
+  Poll at 1-second intervals. 304 responses do not count against GitHub rate limits.
+  You MUST keep polling until a new comment arrives — there is no timeout.
+
+  ### Creator-Only Filtering
+
+  Only process comments where `author.login` matches the issue creator (the user who started
+  the workflow). Ignore all other comments silently and continue polling.
+  When extracting comments from the API response, check the `user.login` field of each comment
+  and discard any that do not match the issue creator's username.
+
+  ### Artifact Comment Format
+
+  Every artifact MUST be posted as an issue comment with the title `## <filename>`:
+  - `## requirements.md`
+  - `## research/<topic-name>.md`
+  - `## design.md`
+  - `## plan.md`
+  - `## e2e.md`
+
+  The comment body is the full markdown content of the artifact, preceded by the `## <filename>` title.
+
+  ### Minimize-and-Repost for Artifact Updates
+
+  When an artifact comment needs updating (e.g., design revision), you MUST:
+  1. Minimize the old comment using the GitHub GraphQL API with classifier OUTDATED:
+     ```
+     gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "{node_id}", classifier: OUTDATED}) { minimizedComment { isMinimized } } }'
+     ```
+     Replace `{node_id}` with the comment's GraphQL node ID.
+  2. Post a new comment with the updated content.
+  3. Track the new comment's node_id for future updates.
+
+  If minimizing fails, log a warning and continue — it is non-critical.
+
+  ### Status Checklist Updates
+
+  The issue body contains a status checklist. When completing a phase, update the issue body
+  to check off that phase. Use `gh issue edit {n} --repo {repo} --body {updated_body}` to
+  update the body. You MUST re-read the current issue body before editing to avoid overwriting
+  concurrent changes.
+
+  The status checklist items are:
+  - [ ] gathering requirements
+  - [ ] research
+  - [ ] design
+  - [ ] plan
+  - [ ] e2e-test-design
+  - [ ] spec-ready
+
+  ### User-Driven Flow
+
+  You MUST NOT proceed to the next state without explicit user confirmation via an issue comment.
+  At each transition point, present numbered options as a comment and poll for the user's choice.
+  The user replies with their choice as a comment.
+
+  ### Agent Memory
+
+  You MUST remember these values across states (keep them in your conversation memory):
+  - `repo` — the owner/repo string (e.g., `freematters/testbed`)
+  - `issue_number` — the issue number returned by `gh issue create`
+  - `issue_creator` — the username of the person who created the issue
+  - `artifact_comment_ids` — a map of artifact filename to comment node_id
+  - `current_etag` — the latest ETag for polling
+
+  ### Error Handling
+
+  - **Rate limit exceeded (429)**: If `gh api` returns HTTP 429, read the `X-RateLimit-Reset`
+    header, wait until that time, then retry.
+  - **Network errors**: If a `gh api` call fails with a connection error, retry after 5 seconds.
+    If it fails 3 times in a row, report the error to the user.
+  - **Issue body update conflict**: If `gh issue edit` fails, re-read the current issue body,
+    re-apply your changes, and retry.
+
+  ### Planning Only
+
+  This workflow produces planning artifacts. You MUST NOT implement code, run containers,
+  execute scripts, or begin any implementation work.
+
+initial: create-issue
+
+states:
+  create-issue:
+    prompt: |
+      ## Create Issue
+
+      Before anything else, verify GitHub CLI authentication:
+      ```bash
+      gh auth status
+      ```
+      If this fails, tell the user to run `gh auth login` and stop.
+
+      Parse the user's prompt to extract:
+      1. **Repository**: The `owner/repo` string (e.g., `freematters/testbed`). The user provides this in their prompt — there is no `--repo` flag.
+      2. **Idea**: The description of what they want to build.
+      3. **Title**: Generate a concise issue title from the idea.
+
+      Then create a GitHub issue (if this fails with 404/403, report the error and ask the user to check the repo name and permissions):
+
+      ```bash
+      gh issue create --repo {repo} --title "{title}" --body "{body}"
+      ```
+
+      The issue body MUST follow this exact structure:
+
+      ```markdown
+      ## {title}
+
+      {rough idea from user prompt}
+
+      ## Status
+
+      - [ ] gathering requirements
+      - [ ] research
+      - [ ] design
+      - [ ] plan
+      - [ ] e2e-test-design
+      - [ ] spec-ready
+      ```
+
+      From the `gh issue create` output, extract and remember:
+      - The **issue number** (from the URL in the output, e.g., `https://github.com/owner/repo/issues/42` → issue number is `42`)
+      - The **issue creator** username (run `gh api user --jq .login` to get the authenticated user's login, since the bot is creating the issue on behalf of the user)
+
+      Report the issue URL to the user.
+
+      Then post an initial welcome comment on the issue:
+
+      ```bash
+      gh issue comment {n} --repo {repo} --body "👋 Welcome! I'll guide you through a Plan-Driven Development process on this issue.
+
+      Where would you like to start?
+
+      1. **Requirements clarification** (recommended) — refine the idea through Q&A
+      2. **Research first** — investigate specific technical topics before refining requirements
+
+      Reply with your choice (1 or 2)."
+      ```
+
+      Now poll for the user's reply using the ETag polling pattern from the guide.
+      When you receive a reply from the issue creator:
+      - If they choose requirements (1), transition to `start with requirements`
+      - If they choose research (2), transition to `start with research`
+
+      You MUST NOT proceed without the user's explicit choice via an issue comment.
+    transitions:
+      start with requirements: requirements
+      start with research: research
+
+  requirements:
+    prompt: |
+      ## Requirements Clarification
+
+      Guide the user through questions to refine the rough idea into concrete requirements.
+      All interaction happens via issue comments.
+
+      First, read the issue body to understand the rough idea.
+
+      You MUST follow this cycle for each question:
+      1. Formulate a question based on what is unclear, ambiguous, or underspecified in the idea.
+      2. Post the question as an issue comment via:
+         ```bash
+         gh issue comment {n} --repo {repo} --body "{question}"
+         ```
+      3. Poll for the user's reply using the ETag polling pattern from the guide.
+         Filter: only process comments where `user.login` matches the issue creator.
+         Ignore all other comments and continue polling.
+      4. Read the user's answer from the new comment.
+      5. Track the Q&A pair in your memory (question and answer).
+      6. Proceed to the next question.
+
+      Constraints:
+      - You MUST ask ONE question at a time. Do NOT list multiple questions in a single comment.
+      - You MUST NOT pre-populate or assume answers.
+      - Focus on: ambiguities, trade-offs, edge cases, non-functional constraints
+        (performance, security, compatibility), success criteria, and verification methods.
+      - Do NOT ask obvious questions — the user's rough idea already conveys basic intent.
+        Read the issue body first to understand what has already been stated.
+      - When the user seems unsure, suggest concrete options rather than leaving it open-ended.
+
+      Troubleshooting:
+      - If requirements stall, suggest switching to a different aspect of the project,
+        provide example answers, or pivot to research to unblock decisions.
+
+      When you believe you have enough clarity on goals, constraints, and verification criteria:
+      1. Compile all Q&A pairs into a structured requirements summary.
+      2. Post it as a `## requirements.md` comment:
+         ```bash
+         gh issue comment {n} --repo {repo} --body "## requirements.md
+
+         {structured summary of all requirements from Q&A}"
+         ```
+      3. Track this comment's node_id in `artifact_comment_ids` under `requirements.md`.
+      4. Update the issue body status checklist: check off "gathering requirements".
+         Re-read the current issue body first, then update it:
+         ```bash
+         gh issue edit {n} --repo {repo} --body "{updated body with [x] gathering requirements}"
+         ```
+      5. Post a transition options comment:
+         ```
+         Requirements captured! What would you like to do next?
+
+         1. Review progress (checkpoint) — recommended if you've also done some research
+         2. Research first — investigate technical topics before moving on
+
+         Reply with your choice.
+         ```
+      6. Poll for the user's choice.
+
+      Transition based on the user's reply:
+      - Checkpoint / review → `requirements complete`
+      - Research → `need research`
+
+      You MUST NOT move on until the user explicitly confirms via an issue comment.
+    transitions:
+      requirements complete: checkpoint
+      need research: research
+
+  research:
+    prompt: |
+      ## Research
+
+      Investigate specific technical topics relevant to the project.
+      All interaction and output happens via issue comments.
+
+      Process:
+      1. Propose a research plan (2–4 topics) as an issue comment:
+         ```bash
+         gh issue comment {n} --repo {repo} --body "Here are the topics I'd like to research:
+
+         1. {topic 1} — {brief description}
+         2. {topic 2} — {brief description}
+         3. {topic 3} — {brief description}
+
+         Would you like to add, remove, or modify any topics? Reply with your thoughts."
+         ```
+      2. Poll for the user's reply using the ETag polling pattern. Incorporate their suggestions.
+      3. For each topic, investigate using available tools (web search, codebase exploration, etc.).
+      4. Post each finding as a separate `## research/<topic-name>.md` comment:
+         ```bash
+         gh issue comment {n} --repo {repo} --body "## research/{topic-name}.md
+
+         **Summary**
+         {one-paragraph overview}
+
+         **Key Findings**
+         1. {finding 1}
+         2. {finding 2}
+         ...
+
+         **Trade-offs**
+         - {pros/cons of approaches}
+
+         **Recommendations**
+         - {what you suggest and why}
+
+         **References**
+         - {links, docs, sources consulted}"
+         ```
+      5. Track each research comment's node_id in `artifact_comment_ids` under `research/{topic-name}.md`.
+      6. Include Mermaid diagrams when documenting architectures or data flows.
+
+      After completing research:
+      1. Update the issue body status checklist: check off "research".
+         Re-read the current issue body, then:
+         ```bash
+         gh issue edit {n} --repo {repo} --body "{updated body with [x] research}"
+         ```
+      2. Post a transition options comment:
+         ```
+         Research complete! What would you like to do next?
+
+         1. Review progress (checkpoint) — summarize all findings and decide next steps
+         2. Clarify requirements — new questions came up during research
+
+         Reply with your choice.
+         ```
+      3. Poll for the user's choice.
+
+      Troubleshooting:
+      - If research hits dead ends, document what is missing, suggest alternatives, and
+        ask the user for additional context. Do not block progress.
+
+      Transition based on the user's reply:
+      - Checkpoint / review → `research sufficient`
+      - Requirements → `new questions arose`
+
+      You MUST NOT proceed until the user confirms via an issue comment.
+    transitions:
+      research sufficient: checkpoint
+      new questions arose: requirements
+
+  checkpoint:
+    prompt: |
+      ## Iteration Checkpoint
+
+      Read all artifact comments on the issue to build a comprehensive summary of progress so far.
+
+      Process:
+      1. Fetch all comments on the issue:
+         ```bash
+         gh api repos/{owner}/{repo}/issues/{n}/comments
+         ```
+      2. Identify artifact comments (those starting with `## requirements.md`, `## research/...`, etc.).
+      3. Read through all artifacts and produce a structured summary covering:
+         - **Requirements**: Key decisions made and any open questions remaining
+         - **Research Findings**: Summary of each research topic investigated
+         - **Gaps & Contradictions**: Areas where requirements and research do not align, or
+           where more information is needed
+         - **Readiness Assessment**: Your assessment of whether there is enough information
+           to proceed to design
+
+      4. Post the summary as an issue comment:
+         ```bash
+         gh issue comment {n} --repo {repo} --body "## Checkpoint Summary
+
+         {structured summary}
+
+         ---
+
+         What would you like to do next?
+
+         1. **Proceed to design** — requirements and research are sufficient
+         2. **Back to requirements** — need to clarify more
+         3. **More research** — need to investigate additional topics
+
+         Reply with your choice (1, 2, or 3)."
+         ```
+
+      5. Poll for the user's choice using the ETag polling pattern from the guide.
+         Filter: only process comments from the issue creator.
+
+      Transition based on the user's reply:
+      - Proceed to design → `proceed to design`
+      - Back to requirements → `back to requirements`
+      - More research → `more research`
+
+      You MUST NOT proceed to design without explicit user approval via an issue comment.
+      You MUST support iterating between requirements and research as many times as needed.
+    transitions:
+      proceed to design: design
+      back to requirements: requirements
+      more research: research
+
+  design:
+    prompt: |
+      ## Detailed Design
+
+      Produce a comprehensive design document based on all gathered requirements and research.
+      The design is posted as an issue comment — it MUST be standalone and fully understandable
+      without reading any other comments.
+
+      Process:
+      1. Fetch all comments on the issue to read requirements and research artifacts:
+         ```bash
+         gh api repos/{owner}/{repo}/issues/{n}/comments
+         ```
+      2. Synthesize all requirements and research findings into a design document.
+      3. Post the design as a `## design.md` comment:
+         ```bash
+         gh issue comment {n} --repo {repo} --body "## design.md
+
+         ## 1. Overview
+         {one-paragraph summary of what we are building and why}
+
+         ## 2. Detailed Requirements
+         {consolidated and synthesized from requirements — not a copy, restructured into coherent categories}
+
+         ## 3. Architecture Overview
+         {high-level structure with a Mermaid diagram}
+
+         ## 4. Components & Interfaces
+         {each component's responsibility, API surface, and how components interact}
+
+         ## 5. Data Models
+         {key data structures, schemas, state, and their relationships}
+
+         ## 6. Error Handling
+         {failure modes, recovery strategies, and degradation behavior}
+
+         ## 7. Acceptance Criteria
+         {Given/When/Then format, specific enough for machine verification}
+
+         ## 8. Testing Strategy
+         {what to test, how to test, and coverage expectations}
+
+         ## 9. Appendices
+         {technology choices with rationale, research findings summary,
+         alternative approaches considered and why they were rejected}"
+         ```
+      4. Track the comment's node_id in `artifact_comment_ids` under `design.md`.
+      5. Post a follow-up comment asking for feedback:
+         ```
+         Please review the design above. You can:
+
+         1. **Approve** — design looks good, proceed to implementation planning
+         2. **Request changes** — describe what needs to be modified
+         3. **Requirements gaps** — we need to go back and clarify requirements
+
+         Reply with your choice or feedback.
+         ```
+      6. Poll for the user's reply using the ETag polling pattern.
+
+      If the user requests changes:
+      - Minimize the old `## design.md` comment using the GraphQL minimize mutation from the guide.
+      - Post a new `## design.md` comment with the revisions applied.
+      - Update `artifact_comment_ids` with the new comment's node_id.
+      - Ask for feedback again. Repeat until approved.
+
+      When the user approves:
+      1. Update the issue body status checklist: check off "design".
+         Re-read the current issue body, then:
+         ```bash
+         gh issue edit {n} --repo {repo} --body "{updated body with [x] design}"
+         ```
+      2. Transition to `design approved`.
+
+      If the user identifies requirements gaps, transition to `gaps found`.
+
+      Constraints:
+      - Include Mermaid diagrams for architecture and data flow.
+      - The design MUST consolidate all requirements from the Q&A into section 2.
+      - Include an appendix summarizing research findings, technology choices, and alternatives.
+      - Iterate on feedback until the user explicitly approves.
+
+      You MUST NOT proceed to planning until the user explicitly approves the design via an issue comment.
+    transitions:
+      design approved: plan
+      gaps found: requirements
+
+  plan:
+    prompt: |
+      ## Implementation Plan
+
+      Produce a numbered, incremental implementation plan based on the approved design.
+      The plan is posted as an issue comment.
+
+      Process:
+      1. Fetch all comments to read the latest `## design.md` artifact:
+         ```bash
+         gh api repos/{owner}/{repo}/issues/{n}/comments
+         ```
+      2. Produce an implementation plan following this structure:
+         - Each step builds on previous steps
+         - Each step results in working, demoable functionality
+         - Each step follows TDD practices (tests before implementation)
+         - No orphaned code — every step ends with integration
+         - Core end-to-end functionality MUST be available by step 2 or 3
+         - Steps MUST be small enough to complete in one focused session
+      3. Post the plan as a `## plan.md` comment:
+         ```bash
+         gh issue comment {n} --repo {repo} --body "## plan.md
+
+         # Implementation Plan: {Feature Name}
+
+         ## Checklist
+         - [ ] Step 1: {title}
+         - [ ] Step 2: {title}
+         ...
+
+         ---
+
+         ## Step 1: {Title}
+
+         **Objective**: {what and why}
+
+         **Test Requirements**: {tests to write BEFORE implementation}
+
+         **Implementation Guidance**: {specific technical instructions, referencing design sections}
+
+         **Integration Notes**: {how this connects to previous steps}
+
+         **Demo**: {concrete verifiable demonstration}
+
+         ---
+
+         ## Step 2: {Title}
+         ...
+         "
+         ```
+      4. Track the comment's node_id in `artifact_comment_ids` under `plan.md`.
+      5. Update the issue body to add the plan steps as a task checklist.
+         Re-read the current issue body, then add a `## Plan` section:
+         ```bash
+         gh issue edit {n} --repo {repo} --body "{updated body with Plan section:
+         ## Plan
+
+         - [ ] Step 1: {title}
+         - [ ] Step 2: {title}
+         ...}"
+         ```
+      6. Update the issue body status checklist: check off "plan".
+      7. Post a follow-up comment asking for approval:
+         ```
+         Please review the implementation plan above. You can:
+
+         1. **Approve** — plan looks good, proceed to E2E test design
+         2. **Request changes** — describe what needs to be modified
+         3. **Design revision needed** — we need to go back and revise the design
+
+         Reply with your choice or feedback.
+         ```
+      8. Poll for the user's reply using the ETag polling pattern.
+
+      If the user requests changes:
+      - Minimize the old `## plan.md` comment using the GraphQL minimize mutation from the guide.
+      - Post a new `## plan.md` comment with the revisions applied.
+      - Update `artifact_comment_ids` with the new comment's node_id.
+      - Also update the plan checklist in the issue body with the revised steps.
+      - Ask for feedback again. Repeat until approved.
+
+      When the user approves, transition to `plan approved`.
+      If the user wants design revision, transition to `needs design revision`.
+
+      Constraints:
+      - Do NOT duplicate design details — reference design sections instead.
+      - Each step MUST result in working, demoable functionality.
+      - Include test requirements BEFORE implementation guidance (TDD).
+      - Include at least one step for integration testing and cleanup.
+
+      You MUST NOT proceed until the user explicitly approves the plan via an issue comment.
+    transitions:
+      plan approved: e2e-test-design
+      needs design revision: design
+
+  e2e-test-design:
+    prompt: |
+      ## E2E Test Design (Optional)
+
+      The implementation plan is complete. Ask the user whether they want E2E test design.
+
+      Post a comment on the issue:
+      ```bash
+      gh issue comment {n} --repo {repo} --body "The implementation plan is approved! 🎉
+
+      Would you like to add an E2E test design? This creates a detailed end-to-end test plan
+      that can be executed after implementation.
+
+      1. **Yes** — design E2E tests
+      2. **Skip** — proceed without E2E test design
+
+      Reply with your choice (1 or 2)."
+      ```
+
+      Poll for the user's reply using the ETag polling pattern from the guide.
+      Filter: only process comments from the issue creator.
+
+      If the user chooses to **skip** (2):
+      - Transition to `skip` immediately.
+
+      If the user chooses **yes** (1):
+      1. Read the design and plan artifacts from issue comments for context.
+      2. Produce an E2E test design and post it as a `## e2e.md` comment:
+         ```bash
+         gh issue comment {n} --repo {repo} --body "## e2e.md
+
+         ## 1. E2E Infrastructure
+
+         **Existing infra**: {what was found and how to integrate}
+         **Proposed setup**: {minimal E2E setup appropriate for the project type}
+
+         ## 2. E2E Test Scenario
+
+         {step-by-step actions with expected outputs}
+
+         ## 3. How to Run
+
+         {exact commands to execute the E2E tests}
+         {required environment setup — env vars, services, test data}
+
+         ## 4. Debugging Guide
+
+         {how to read test output and identify which action failed}
+         {how to run individual actions in isolation}
+         {how to inspect intermediate state during a failed run}"
+         ```
+      3. Track the comment's node_id in `artifact_comment_ids` under `e2e.md`.
+      4. Update the issue body status checklist: check off "e2e-test-design".
+         Re-read the current issue body, then:
+         ```bash
+         gh issue edit {n} --repo {repo} --body "{updated body with [x] e2e-test-design}"
+         ```
+      5. Post a follow-up comment asking for approval:
+         ```
+         Please review the E2E test design above. You can:
+
+         1. **Approve** — E2E test design looks good, finalize the spec
+         2. **Request changes** — describe what needs to be modified
+
+         Reply with your choice or feedback.
+         ```
+      6. Poll for the user's reply.
+
+      If the user requests changes:
+      - Minimize the old `## e2e.md` comment using the GraphQL minimize mutation from the guide.
+      - Post a new `## e2e.md` comment with the revisions applied.
+      - Update `artifact_comment_ids` with the new comment's node_id.
+      - Ask for feedback again. Repeat until approved.
+
+      When the user approves, transition to `e2e design approved`.
+      If the user wants more revisions, transition to `needs revision`.
+
+      You MUST NOT proceed until the user explicitly confirms via an issue comment.
+    transitions:
+      e2e design approved: done
+      skip: done
+      needs revision: e2e-test-design
+
+  done:
+    prompt: |
+      ## Done — Finalize Spec Issue
+
+      Finalize the issue by adding the label, completing the status checklist, and posting a summary.
+
+      Steps:
+      1. Add the `spec-ready` label to the issue:
+         ```bash
+         gh issue edit {n} --repo {repo} --add-label spec-ready
+         ```
+         If the label does not exist on the repo yet, create it first:
+         ```bash
+         gh label create spec-ready --repo {repo} --description "Spec is complete and ready for implementation" --color 0E8A16
+         ```
+         If creation fails because it already exists, that is fine — proceed.
+
+      2. Update the issue body status checklist: check off ALL remaining items including "spec-ready".
+         Re-read the current issue body, then update it so every status item is checked:
+         ```bash
+         gh issue edit {n} --repo {repo} --body "{updated body with all [x] items}"
+         ```
+         The final status section should look like:
+         ```
+         ## Status
+
+         - [x] gathering requirements
+         - [x] research
+         - [x] design
+         - [x] plan
+         - [x] e2e-test-design
+         - [x] spec-ready
+         ```
+         Note: if e2e-test-design was skipped, still check it off (it was addressed by choosing to skip).
+
+      3. Compile a list of all artifact comments posted during the workflow. For each artifact,
+         include its filename and a link to the comment (using the issue comment URL format:
+         `https://github.com/{owner}/{repo}/issues/{n}#issuecomment-{comment_id}`).
+
+      4. Post a summary comment on the issue:
+         ```bash
+         gh issue comment {n} --repo {repo} --body "## Spec Complete! 🎉
+
+         All PDD phases are done. This issue now contains a complete specification.
+
+         ### Artifacts
+
+         | Artifact | Link |
+         |----------|------|
+         | requirements.md | {link} |
+         | research/{topic}.md | {link} |
+         | design.md | {link} |
+         | plan.md | {link} |
+         | e2e.md | {link or 'skipped'} |
+
+         ### Status
+
+         All phases complete. The issue is labeled \`spec-ready\` and ready for implementation.
+
+         ### Next Steps
+
+         Use the plan checklist in the issue body to track implementation progress."
+         ```
+
+      5. Report completion to the user: display the issue URL and confirm the spec is ready.
+
+      The issue is left **open** — it serves as the living spec for implementation.
+      This is the terminal state. The workflow ends here.
+    transitions: {}
