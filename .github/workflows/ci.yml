@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint:
-    runs-on: warp-ubuntu-2404-x64-2x
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: freefsm
@@ -23,7 +23,7 @@ jobs:
       - run: npx biome check .
 
   test:
-    runs-on: warp-ubuntu-2404-x64-2x
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: freefsm
@@ -39,7 +39,7 @@ jobs:
       - run: npm test
 
   integration:
-    runs-on: warp-ubuntu-2404-x64-2x
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: freefsm

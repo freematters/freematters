@@ -111,7 +111,7 @@ function findTerminalStates(fsm: Fsm): string[] {
     .map(([name]) => name);
 }
 
-function analyzeWarnings(fsm: Fsm): string[] {
+function analyzeAndCollect(fsm: Fsm): { warnings: string[]; stats: FsmStats } {
   const warnings: string[] = [];
 
   const unreachable = findUnreachableStates(fsm);
@@ -142,23 +142,21 @@ function analyzeWarnings(fsm: Fsm): string[] {
     }
   }
 
-  return warnings;
-}
-
-function collectStats(fsm: Fsm): FsmStats {
   let totalTransitions = 0;
   for (const state of Object.values(fsm.states)) {
     totalTransitions += Object.keys(state.transitions).length;
   }
 
-  return {
+  const stats: FsmStats = {
     total_states: Object.keys(fsm.states).length,
     total_transitions: totalTransitions,
-    terminal_states: findTerminalStates(fsm),
-    unreachable_states: findUnreachableStates(fsm),
+    terminal_states: terminals,
+    unreachable_states: unreachable,
     max_depth: computeMaxDepth(fsm),
-    has_cycles: detectCycles(fsm),
+    has_cycles: hasCycles,
   };
+
+  return { warnings, stats };
 }
 
 function formatReport(result: ValidationResult): string {
@@ -239,8 +237,7 @@ export function validate(args: ValidateArgs): void {
       throw err;
     }
 
-    const warnings = analyzeWarnings(fsm);
-    const stats = collectStats(fsm);
+    const { warnings, stats } = analyzeAndCollect(fsm);
 
     const result: ValidationResult = {
       valid: true,

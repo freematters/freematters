@@ -1,13 +1,6 @@
 import { CliError } from "../errors.js";
-import { handleError, jsonSuccess, printJson } from "../output.js";
+import { formatDuration, handleError, jsonSuccess, printJson } from "../output.js";
 import { Store, type StoreEvent } from "../store.js";
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  if (ms < 3_600_000) return `${(ms / 60_000).toFixed(1)}m`;
-  return `${(ms / 3_600_000).toFixed(1)}h`;
-}
 
 interface RunStats {
   totalTransitions: number;
