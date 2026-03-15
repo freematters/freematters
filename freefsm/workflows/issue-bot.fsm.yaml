@@ -1,0 +1,74 @@
+# Issue Bot — GitHub Issue-driven PDD workflow
+#
+# Flow:
+#
+#   create-issue
+#       |           \
+#   requirements ← → research
+#       |               |
+#       +-------+-------+
+#               |
+#          checkpoint
+#         /    |     \
+#   requirements  research  design
+#                           |     \
+#                          plan    requirements (gaps)
+#                         /    \
+#               e2e-test-design  design (revision)
+#                  /      |       \
+#               done    skip→done  revision→e2e-test-design
+
+version: 1
+guide: |
+  TODO
+
+initial: create-issue
+
+states:
+  create-issue:
+    prompt: "TODO"
+    transitions:
+      start with requirements: requirements
+      start with research: research
+
+  requirements:
+    prompt: "TODO"
+    transitions:
+      requirements complete: checkpoint
+      need research: research
+
+  research:
+    prompt: "TODO"
+    transitions:
+      research sufficient: checkpoint
+      new questions arose: requirements
+
+  checkpoint:
+    prompt: "TODO"
+    transitions:
+      proceed to design: design
+      back to requirements: requirements
+      more research: research
+
+  design:
+    prompt: "TODO"
+    transitions:
+      design approved: plan
+      gaps found: requirements
+
+  plan:
+    prompt: "TODO"
+    transitions:
+      plan approved: e2e-test-design
+      needs design revision: design
+
+  e2e-test-design:
+    prompt: "TODO"
+    transitions:
+      e2e design approved: done
+      skip: done
+      needs revision: e2e-test-design
+
+  done:
+    prompt: "TODO"
+    transitions: {}
