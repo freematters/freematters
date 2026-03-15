@@ -55,16 +55,52 @@ function formatTimeline(summaries: TransitionSummary[]): string {
   const lines: string[] = [];
   lines.push("## Transition History\n");
 
+  // Pre-compute columns for alignment
+  const rows: Array<{
+    prefix: string;
+    transition: string;
+    target: string;
+    duration: string;
+  }> = [];
   for (const s of summaries) {
-    const duration =
-      s.duration_ms !== null ? ` (${formatDuration(s.duration_ms)})` : "";
-    const arrow = s.from && s.to ? `${s.from} → ${s.to}` : (s.to ?? s.from ?? "?");
-    const label = s.label ? ` [${s.label}]` : "";
-
-    lines.push(`  ${s.seq}. ${s.event}${label}: ${arrow}${duration}`);
-    if (s.reason) {
-      lines.push(`     reason: ${s.reason}`);
+    const prefix = `  ${s.seq}. ${s.event}`;
+    if (s.event === "start") {
+      rows.push({ prefix, transition: "", target: s.to ?? "?", duration: "" });
+    } else if (s.event === "goto") {
+      const label = s.label ?? "?";
+      const duration =
+        s.duration_ms !== null ? `(${formatDuration(s.duration_ms)})` : "";
+      rows.push({
+        prefix,
+        transition: `-- (${label}) -->`,
+        target: s.to ?? "?",
+        duration,
+      });
+    } else if (s.event === "finish") {
+      const duration =
+        s.duration_ms !== null ? `(${formatDuration(s.duration_ms)})` : "";
+      rows.push({ prefix, transition: "-- (aborted)", target: "", duration });
     }
+  }
+
+  // Find max widths for alignment
+  const maxPrefix = Math.max(...rows.map((r) => r.prefix.length));
+  const maxTransition = Math.max(...rows.map((r) => r.transition.length));
+  const maxTarget = Math.max(...rows.map((r) => r.target.length));
+
+  for (const r of rows) {
+    const parts = [r.prefix.padEnd(maxPrefix)];
+    if (r.transition) {
+      parts.push(
+        ` ${r.transition.padEnd(maxTransition)} ${r.target.padEnd(maxTarget)}`,
+      );
+    } else {
+      parts.push(`: ${r.target}`);
+    }
+    if (r.duration) {
+      parts.push(` ${r.duration}`);
+    }
+    lines.push(parts.join("").trimEnd());
   }
 
   if (summaries.length > 0) {
