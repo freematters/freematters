@@ -187,6 +187,11 @@ states:
          - Fix threads with `severity: "blocker"` only
          - Skip major/minor severity — leave for the user to address
 
+      **Scope rule**: Only act on items that match the criteria above. Do NOT fix
+      bot review threads that are major/minor severity without an `@bot` mention,
+      even if the suggestion looks reasonable. If a bot review thread also has an
+      `@bot` mention, address the `@bot` request — not the bot review suggestion.
+
       **User priority rule**: If a `@bot` instruction contradicts a bot review blocker,
       follow the user's `@bot` instruction and skip that blocker. The code-review
       pipeline will re-evaluate in its next run.
