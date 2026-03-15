@@ -45,6 +45,8 @@ The state card consists of instructions, todos and valid state transitions, foll
 
 **Execution model**: After every state transition, immediately execute the new state's instructions. You may summarize progress or report status, but do NOT stop between states. Keep driving the workflow forward until you reach a terminal state (a state with no transitions). Only a terminal state ends the workflow.
 
+**Before ending a turn**: You MUST run `freefsm current --run-id <run_id>` before ending your turn to check if there is remaining work in the current state. Only end your turn if the current state has no actionable work left or requires user input. This prevents accidentally dropping tasks mid-state.
+
 If the exit code of any CLI is not 0, the cli will output the error message, follow the error message on right actions to take.
 
 ## Error Handling

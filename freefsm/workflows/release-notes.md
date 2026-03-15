@@ -1,4 +1,4 @@
-# freefsm v{{VERSION}}
+# {{TAG_PREFIX}}{{VERSION}}
 
 > {{ONE_LINE_SUMMARY}}
 
@@ -23,4 +23,4 @@
 
 ---
 
-**Full Changelog**: https://github.com/{{OWNER}}/{{REPO}}/compare/{{PREV_TAG}}...freefsm-v{{VERSION}}
+**Full Changelog**: https://github.com/{{OWNER}}/{{REPO}}/compare/{{PREV_TAG}}...{{TAG_PREFIX}}{{VERSION}}
