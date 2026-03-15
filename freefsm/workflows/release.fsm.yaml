@@ -55,8 +55,9 @@ states:
       - `{{OWNER}}/{{REPO}}`: GitHub owner/repo
       - `{{PREV_TAG}}`: the previous release tag
 
-      Write the filled-in notes to `freefsm/RELEASE_NOTES.md`. Show the draft to the user
-      and ask if they want to adjust anything before proceeding.
+      Write the filled-in notes to `WF_DIR/RELEASE_NOTES.md` (the workflow run directory,
+      NOT the repo). Do not commit this file. Show the draft to the user and ask if they
+      want to adjust anything before proceeding.
 
       ## 4. Create release branch and bump
 
@@ -67,7 +68,7 @@ states:
       VERSION=$(node -p "require('./package.json').version")
       cd ..
       git checkout -b release/freefsm-v${VERSION}
-      git add freefsm/package.json freefsm/package-lock.json freefsm/RELEASE_NOTES.md
+      git add freefsm/package.json freefsm/package-lock.json
       git commit -m "release: freefsm v${VERSION}"
       git push -u origin release/freefsm-v${VERSION}
       ```
@@ -78,7 +79,7 @@ states:
 
       ```bash
       gh pr create --title "release: freefsm v${VERSION}" \
-        --body-file freefsm/RELEASE_NOTES.md
+        --body-file "$WF_DIR/RELEASE_NOTES.md"
       ```
 
       Record the PR number and VERSION for the next state.
@@ -131,6 +132,7 @@ states:
       ```
 
       The tag format `freefsm-v<version>` triggers the release workflow (npm publish + GitHub Release).
+
     transitions:
       tag pushed: monitor
 
@@ -154,8 +156,9 @@ states:
 
       Once the run completes:
 
-      - If **success**: show the GitHub release URL.
+      - If **success**: update the release with generated notes and show the URL.
         ```bash
+        gh release edit "freefsm-v${VERSION}" --notes-file "$WF_DIR/RELEASE_NOTES.md"
         gh release view "freefsm-v${VERSION}" --json url -q '.url'
         ```
       - If **failure**: show the error.

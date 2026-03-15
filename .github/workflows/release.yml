@@ -28,12 +28,6 @@ jobs:
       - run: npm test
       - run: npm publish --access public --provenance
       - name: Create GitHub Release
-        working-directory: .
-        run: |
-          if [ -f freefsm/RELEASE_NOTES.md ]; then
-            gh release create "${{ github.ref_name }}" --notes-file freefsm/RELEASE_NOTES.md
-          else
-            gh release create "${{ github.ref_name }}" --generate-notes
-          fi
+        run: gh release create "${{ github.ref_name }}" --generate-notes
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
