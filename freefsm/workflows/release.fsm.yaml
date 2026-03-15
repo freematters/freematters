@@ -42,7 +42,24 @@ states:
       - Show your recommended bump type and reasoning
       - Ask the user to confirm or override
 
-      ## 3. Create release branch and bump
+      ## 3. Generate release notes
+
+      Read the template at `freefsm/workflows/release-notes.md` (same directory as this workflow).
+      Fill in the placeholders using the commit analysis from step 2:
+
+      - `{{VERSION}}`: the new version (from step 4 below)
+      - `{{ONE_LINE_SUMMARY}}`: a single-sentence summary of the release theme
+      - `{{NARRATIVE}}`: 2-3 sentences on what changed and why it matters — concise and professional
+      - `{{Breaking Changes}}`: list or omit section entirely if none
+      - `{{Features/Fixes/Other}}`: categorize commits by conventional commit prefix
+      - `{{OWNER}}/{{REPO}}`: GitHub owner/repo
+      - `{{PREV_TAG}}`: the previous release tag
+
+      Write the filled-in notes to `WF_DIR/RELEASE_NOTES.md` (the workflow run directory,
+      NOT the repo). Do not commit this file. Show the draft to the user and ask if they
+      want to adjust anything before proceeding.
+
+      ## 4. Create release branch and bump
 
       ```bash
       cd freefsm
@@ -56,20 +73,13 @@ states:
       git push -u origin release/freefsm-v${VERSION}
       ```
 
-      ## 4. Open PR
+      ## 5. Open PR
+
+      Use the release notes as the PR body:
 
       ```bash
       gh pr create --title "release: freefsm v${VERSION}" \
-        --body "$(cat <<EOF
-      ## Release freefsm v${VERSION}
-
-      ### Commits since last release
-      [paste the commit list here]
-
-      ### Bump type: <patch|minor|major>
-      [one-line reasoning]
-      EOF
-      )"
+        --body-file "$WF_DIR/RELEASE_NOTES.md"
       ```
 
       Record the PR number and VERSION for the next state.
@@ -122,6 +132,7 @@ states:
       ```
 
       The tag format `freefsm-v<version>` triggers the release workflow (npm publish + GitHub Release).
+
     transitions:
       tag pushed: monitor
 
@@ -145,8 +156,9 @@ states:
 
       Once the run completes:
 
-      - If **success**: show the GitHub release URL.
+      - If **success**: update the release with generated notes and show the URL.
         ```bash
+        gh release edit "freefsm-v${VERSION}" --notes-file "$WF_DIR/RELEASE_NOTES.md"
         gh release view "freefsm-v${VERSION}" --json url -q '.url'
         ```
       - If **failure**: show the error.
