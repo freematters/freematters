@@ -254,34 +254,20 @@ states:
 
       7. **React to processed `@bot` comments**: Add 🚀 (rocket) reaction as the
          dedup signal that the request has been handled.
-
-      8. **Append a push summary to the PR description** summarizing what changed in this round.
-         Read the current PR description via `gh pr view <N> --json body --jq .body`.
-         Append a new section at the bottom using this format:
-         ```
-         ## Push round N
-         - <bullet point for each change made in this round>
-         ```
-         Where N is the push round number (count existing `## Push round` headings in the
-         description and add 1). Update the description via `gh pr edit <N> --body "..."`.
-         If there are no meaningful changes (e.g., only a rebase with no conflicts), skip this step.
     todos:
       - Commit all changes (skip if no local changes)
       - Push to remote (force push if rebased)
       - Reply on addressed bot review threads with [from bot] prefix + resolve thread
-      - Reply on addressed @bot inline review threads with [from bot] prefix + resolve (code changes only)
-      - Reply on addressed @bot issue comments with [from bot] prefix (code changes only)
+      - Reply on addressed @bot threads with [from bot] prefix + resolve (code changes only)
       - React to processed @bot comments with 🚀
-      - Update PR description summary if implementation approach changed
-      - Append push summary to PR description
+      - Update PR description if implementation approach changed
     transitions:
       pushed: poll
 
   done:
     prompt: |
-      The PR has been merged or closed. Output a final summary:
+      The PR has been merged or closed. Output a summary:
       - PR URL
-      - Final status (merged or closed)
       - Total `@bot` interactions handled
       - Brief overview of main fixes applied
     transitions: {}
