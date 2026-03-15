@@ -84,7 +84,7 @@ states:
       VERSION=$(${VERSION_READ_CMD})
       cd <repo_root>
       git checkout -b release/${TAG_PREFIX}${VERSION}
-      git add -u
+      git add ${PKG_DIR}
       git commit -m "release: ${TAG_PREFIX}${VERSION}"
       git push -u origin release/${TAG_PREFIX}${VERSION}
       ```
@@ -177,9 +177,12 @@ states:
 
       - If **success** (or no workflow): create/update the release with generated notes and show the URL.
         ```bash
-        gh release create "${TAG_PREFIX}${VERSION}" --title "${TAG_PREFIX}${VERSION}" \
-          --notes-file "$WF_DIR/RELEASE_NOTES.md" || \
-        gh release edit "${TAG_PREFIX}${VERSION}" --notes-file "$WF_DIR/RELEASE_NOTES.md"
+        if gh release view "${TAG_PREFIX}${VERSION}" &>/dev/null; then
+          gh release edit "${TAG_PREFIX}${VERSION}" --notes-file "$WF_DIR/RELEASE_NOTES.md"
+        else
+          gh release create "${TAG_PREFIX}${VERSION}" --title "${TAG_PREFIX}${VERSION}" \
+            --notes-file "$WF_DIR/RELEASE_NOTES.md"
+        fi
         gh release view "${TAG_PREFIX}${VERSION}" --json url -q '.url'
         ```
       - If **failure**: show the error.
