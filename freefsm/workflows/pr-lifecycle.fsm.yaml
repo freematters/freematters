@@ -254,6 +254,16 @@ states:
 
       7. **React to processed `@bot` comments**: Add 🚀 (rocket) reaction as the
          dedup signal that the request has been handled.
+
+      8. **Append a push summary comment** on the PR summarizing what changed in this round.
+         The comment body MUST start with `[from bot]` and use this format:
+         ```
+         [from bot] **Push summary (round N):**
+         - <bullet point for each change made in this round>
+         ```
+         Where N is the push round number (count how many `[from bot] **Push summary` comments
+         already exist on the PR and add 1). If there are no meaningful changes (e.g., only a
+         rebase with no conflicts), skip this step.
     todos:
       - Commit all changes (skip if no local changes)
       - Push to remote (force push if rebased)
@@ -261,13 +271,30 @@ states:
       - Reply on addressed @bot threads with [from bot] prefix + resolve (code changes only)
       - React to processed @bot comments with 🚀
       - Update PR description if implementation approach changed
+      - Append push summary comment on the PR
     transitions:
       pushed: poll
 
   done:
     prompt: |
-      The PR has been merged or closed. Output a summary:
+      The PR has been merged or closed.
+
+      ## Final PR description update
+
+      If the PR was merged and the implementation drifted from the original description,
+      update the PR description to reflect what was actually implemented. Preserve the
+      push summary comments from each round for visibility by appending a
+      `## Push history` section at the end of the description. To build this section:
+      1. Fetch all PR comments and filter for those starting with `[from bot] **Push summary`
+      2. Include each summary as a subsection
+
+      If there are no changes from the current description, skip the update.
+
+      ## Output summary
+
+      Output a final summary:
       - PR URL
+      - Final status (merged or closed)
       - Total `@bot` interactions handled
       - Brief overview of main fixes applied
     transitions: {}
