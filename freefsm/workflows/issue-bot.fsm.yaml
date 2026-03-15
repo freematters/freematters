@@ -117,6 +117,15 @@ guide: |
   - `artifact_comment_ids` — a map of artifact filename to comment node_id
   - `current_etag` — the latest ETag for polling
 
+  ### Error Handling
+
+  - **Rate limit exceeded (429)**: If `gh api` returns HTTP 429, read the `X-RateLimit-Reset`
+    header, wait until that time, then retry.
+  - **Network errors**: If a `gh api` call fails with a connection error, retry after 5 seconds.
+    If it fails 3 times in a row, report the error to the user.
+  - **Issue body update conflict**: If `gh issue edit` fails, re-read the current issue body,
+    re-apply your changes, and retry.
+
   ### Planning Only
 
   This workflow produces planning artifacts. You MUST NOT implement code, run containers,
@@ -129,12 +138,18 @@ states:
     prompt: |
       ## Create Issue
 
+      Before anything else, verify GitHub CLI authentication:
+      ```bash
+      gh auth status
+      ```
+      If this fails, tell the user to run `gh auth login` and stop.
+
       Parse the user's prompt to extract:
       1. **Repository**: The `owner/repo` string (e.g., `freematters/testbed`). The user provides this in their prompt — there is no `--repo` flag.
       2. **Idea**: The description of what they want to build.
       3. **Title**: Generate a concise issue title from the idea.
 
-      Then create a GitHub issue:
+      Then create a GitHub issue (if this fails with 404/403, report the error and ask the user to check the repo name and permissions):
 
       ```bash
       gh issue create --repo {repo} --title "{title}" --body "{body}"
