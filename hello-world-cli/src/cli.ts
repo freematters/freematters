@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { greet } from "./greet.js";
 
 const program = new Command();
 
@@ -9,7 +10,7 @@ program
   .argument("<name>", "name to greet")
   .showHelpAfterError(true)
   .action((name: string) => {
-    console.log(`Hello, ${name}!`);
+    console.log(greet(name));
   });
 
 program.exitOverride();
