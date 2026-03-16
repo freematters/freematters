@@ -77,6 +77,18 @@ function createFsmMcpServer(fsm: Fsm, store: Store, runId: string) {
             };
           }
 
+          if (snapshot.run_status !== "active") {
+            return {
+              isError: true as const,
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Error: run is ${snapshot.run_status}, not active`,
+                },
+              ],
+            };
+          }
+
           const currentState = fsm.states[snapshot.state];
           const expectedTarget = currentState.transitions[args.on];
 
@@ -286,9 +298,6 @@ export async function run(args: RunArgs): Promise<void> {
       }
     }
   } catch (err: unknown) {
-    if (err instanceof CliError) {
-      handleError(err, args.json);
-    }
-    throw err;
+    handleError(err, args.json);
   }
 }

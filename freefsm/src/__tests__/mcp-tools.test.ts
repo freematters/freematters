@@ -292,4 +292,21 @@ describe("terminal state detection", () => {
     expect(snapshot?.run_status).toBe("completed");
     expect(snapshot?.state).toBe("done");
   });
+
+  test("fsm_goto returns error when run is not active (completed)", async () => {
+    const { handlers } = await launchAndGetHandlers();
+
+    // Transition to terminal state
+    await handlers.fsm_goto({ target: "middle", on: "next" }, {});
+    await handlers.fsm_goto({ target: "done", on: "finish" }, {});
+
+    // Try to transition again — run is completed
+    const result = (await handlers.fsm_goto({ target: "middle", on: "next" }, {})) as {
+      content: Array<{ type: string; text: string }>;
+      isError: boolean;
+    };
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("not active");
+  });
 });
