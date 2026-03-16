@@ -1,4 +1,5 @@
 import { basename } from "node:path";
+import { createInterface } from "node:readline";
 import { createSdkMcpServer, query, tool } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
@@ -168,14 +169,61 @@ function createFsmMcpServer(fsm: Fsm, store: Store, runId: string) {
     }
   });
 
+  const requestInput = tool(
+    "request_input",
+    "Ask the human for input via stdin",
+    {
+      prompt: z.string().describe("The question to ask the human"),
+    },
+    async (args) => {
+      process.stderr.write(`${args.prompt}\n`);
+
+      return new Promise<{
+        content: Array<{ type: "text"; text: string }>;
+      }>((resolve) => {
+        const rl = createInterface({
+          input: process.stdin,
+          terminal: false,
+        });
+
+        let resolved = false;
+
+        rl.once("line", (line) => {
+          resolved = true;
+          rl.close();
+          resolve({
+            content: [{ type: "text" as const, text: line }],
+          });
+        });
+
+        rl.once("close", () => {
+          if (resolved) return;
+          // close fired before line — stdin hit EOF
+          resolve({
+            content: [
+              {
+                type: "text" as const,
+                text: "EOF: stdin closed, no input available",
+              },
+            ],
+          });
+        });
+      });
+    },
+  );
+
   return createSdkMcpServer({
     name: "freefsm",
     version: "1.0.0",
-    tools: [fsmGoto, fsmCurrent],
+    tools: [fsmGoto, fsmCurrent, requestInput],
   });
 }
 
-const MCP_TOOL_NAMES = ["mcp__freefsm__fsm_goto", "mcp__freefsm__fsm_current"];
+const MCP_TOOL_NAMES = [
+  "mcp__freefsm__fsm_goto",
+  "mcp__freefsm__fsm_current",
+  "mcp__freefsm__request_input",
+];
 
 export async function run(args: RunArgs): Promise<void> {
   try {

@@ -17,3 +17,9 @@
 - **What was built**: Registered `fsm_goto` and `fsm_current` as in-process MCP tools via `createSdkMcpServer` and `tool()` from the Agent SDK with Zod schemas. `fsm_goto` validates transitions (reusing the same logic as `goto.ts`), commits events via Store within `withLock()`, and returns the new state card. Invalid transitions return error text to the agent (not thrown). Terminal state detection checks for empty transitions and sets `run_status` to `"completed"`. `fsm_current` reads the snapshot and returns the current state card. MCP server is passed to `query()` via `mcpServers` option, and MCP tool names (`mcp__freefsm__fsm_goto`, `mcp__freefsm__fsm_current`) are added to `allowedTools`.
 - **Tests**: 11 tests added, all 104 tests passing (93 existing + 11 new)
 - **Notes**: The existing `run.test.ts` mock needed updating to include `tool` and `createSdkMcpServer` exports since `run.ts` now imports them. Terminal state detection is based on `Object.keys(transitions).length === 0` (general) rather than hardcoding `"done"`. Demo criteria requires live Agent SDK; build and all tests verified.
+
+## Step 4: Add request_input MCP Tool
+- **Files changed**: `freefsm/src/commands/run.ts` (modified), `freefsm/src/__tests__/request-input.test.ts` (new)
+- **What was built**: Added `request_input` as a third in-process MCP tool. It writes the prompt to `process.stderr`, reads a line from `process.stdin` via `readline`, and returns the user's input. EOF on stdin returns `"EOF: stdin closed, no input available"` to the agent. `mcp__freefsm__request_input` added to `allowedTools`.
+- **Tests**: 5 tests added, all 109 tests passing (104 existing + 5 new)
+- **Notes**: Used a `resolved` flag to prevent the readline `close` event from racing with the `line` event (both fire when a line is read then the interface closes). No deviations from spec.

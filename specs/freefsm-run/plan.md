@@ -4,7 +4,7 @@
 - [x] Step 1: Add `@anthropic-ai/claude-agent-sdk` and `zod` dependencies
 - [x] Step 2: Implement `run` command with minimal agent loop (no MCP tools yet)
 - [x] Step 3: Add FSM MCP tools (`fsm_goto`, `fsm_current`)
-- [ ] Step 4: Add `request_input` MCP tool (stdin-based)
+- [x] Step 4: Add `request_input` MCP tool (stdin-based)
 - [ ] Step 5: Add `allowed_tools` YAML schema extension
 - [ ] Step 6: Integration testing and cleanup
 
