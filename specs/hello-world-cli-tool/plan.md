@@ -4,7 +4,7 @@
 ## Checklist
 - [x] Step 1: Create CLI entry point with argument parsing
 - [x] Step 2: Add greeting logic and tests
-- [ ] Step 3: Add --uppercase flag
+- [x] Step 3: Add --uppercase flag
 
 ---
 

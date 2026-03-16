@@ -8,9 +8,10 @@ program
   .name("hello")
   .description("A minimal CLI tool that prints a greeting")
   .argument("<name>", "name to greet")
+  .option("-u, --uppercase", "convert greeting to uppercase")
   .showHelpAfterError(true)
-  .action((name: string) => {
-    console.log(greet(name));
+  .action((name: string, options: { uppercase?: boolean }) => {
+    console.log(greet(name, { uppercase: options.uppercase }));
   });
 
 program.exitOverride();
