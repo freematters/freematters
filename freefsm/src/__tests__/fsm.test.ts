@@ -608,6 +608,106 @@ states:
   });
 });
 
+describe("loadFsm — allowed_tools validation", () => {
+  test("accepts YAML with allowed_tools field", () => {
+    const p = writeYaml(
+      "valid-allowed-tools.yaml",
+      `
+version: 1
+guide: "Tool-restricted workflow"
+initial: start
+allowed_tools:
+  - Read
+  - Bash
+  - Edit
+states:
+  start:
+    prompt: "Do something."
+    transitions:
+      next: done
+  done:
+    prompt: "Finished."
+    transitions: {}
+`,
+    );
+    const fsm = loadFsm(p);
+    expect(fsm.allowed_tools).toEqual(["Read", "Bash", "Edit"]);
+  });
+
+  test("accepts YAML without allowed_tools (backward compatible)", () => {
+    const p = writeYaml("valid-no-allowed-tools.yaml", MINIMAL_VALID);
+    const fsm = loadFsm(p);
+    expect(fsm.allowed_tools).toBeUndefined();
+  });
+
+  test("allowed_tools must be an array", () => {
+    expectSchemaInvalid(
+      `
+version: 1
+guide: "x"
+initial: start
+allowed_tools: "Read"
+states:
+  start:
+    prompt: "x"
+    transitions:
+      go: done
+  done:
+    prompt: "x"
+    transitions: {}
+`,
+      "invalid-allowed-tools-string.yaml",
+      /allowed_tools.*array/,
+    );
+  });
+
+  test("allowed_tools items must be strings", () => {
+    expectSchemaInvalid(
+      `
+version: 1
+guide: "x"
+initial: start
+allowed_tools:
+  - Read
+  - 42
+states:
+  start:
+    prompt: "x"
+    transitions:
+      go: done
+  done:
+    prompt: "x"
+    transitions: {}
+`,
+      "invalid-allowed-tools-number.yaml",
+      /allowed_tools.*must be non-empty strings/,
+    );
+  });
+
+  test("allowed_tools items must be non-empty", () => {
+    expectSchemaInvalid(
+      `
+version: 1
+guide: "x"
+initial: start
+allowed_tools:
+  - Read
+  - ""
+states:
+  start:
+    prompt: "x"
+    transitions:
+      go: done
+  done:
+    prompt: "x"
+    transitions: {}
+`,
+      "invalid-allowed-tools-empty-item.yaml",
+      /allowed_tools.*must be non-empty strings/,
+    );
+  });
+});
+
 describe("loadFsm — file errors", () => {
   test("non-existent file throws", () => {
     expect(() => loadFsm("/tmp/does-not-exist.yaml")).toThrow();

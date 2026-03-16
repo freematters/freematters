@@ -19,8 +19,10 @@
     "check": "biome check --write ."
   },
   "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.76",
     "commander": "^14.0.3",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
@@ -34,7 +36,7 @@
   "engines": {
     "node": ">=18"
   },
-  "files": ["dist/", "workflows/", "skills/", "hooks/", ".claude-plugin/"],
+  "files": ["dist/", "prompts/", "workflows/", "skills/", "hooks/", ".claude-plugin/"],
   "repository": {
     "type": "git",
     "url": "https://github.com/freematters/freematters",

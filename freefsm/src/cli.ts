@@ -9,6 +9,7 @@ import { goto } from "./commands/goto.js";
 import { history } from "./commands/history.js";
 import { install } from "./commands/install.js";
 import { list } from "./commands/list.js";
+import { run as runCmd } from "./commands/run.js";
 import { start } from "./commands/start.js";
 import { validate } from "./commands/validate.js";
 import { main as postToolUseMain } from "./hooks/post-tool-use.js";
@@ -54,6 +55,21 @@ program
   .action((_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     start({
+      fsmPath: resolve(_fsmPath),
+      runId: opts.runId as string | undefined,
+      root: resolveRoot(root),
+      json: json ?? false,
+    });
+  });
+
+program
+  .command("run")
+  .description("launch an Agent SDK session to execute a workflow autonomously")
+  .argument("<fsm_path>", "path to FSM YAML file")
+  .option("--run-id <id>", "run identifier (auto-generated if omitted)")
+  .action(async (_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
+    const { root, json } = getGlobalOpts(cmd);
+    await runCmd({
       fsmPath: resolve(_fsmPath),
       runId: opts.runId as string | undefined,
       root: resolveRoot(root),
