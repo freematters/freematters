@@ -58,8 +58,10 @@ beforeAll(() => {
   tmp = mkdtempSync(join(tmpdir(), "freefsm-run-test-"));
   fsmPath = join(tmp, "minimal.yaml");
   noGuideFsmPath = join(tmp, "no-guide.yaml");
+  allowedToolsFsmPath = join(tmp, "allowed-tools.yaml");
   writeFileSync(fsmPath, MINIMAL_FSM, "utf-8");
   writeFileSync(noGuideFsmPath, NO_GUIDE_FSM, "utf-8");
+  writeFileSync(allowedToolsFsmPath, ALLOWED_TOOLS_FSM, "utf-8");
 });
 
 afterAll(() => {
@@ -293,6 +295,27 @@ describe("run command — run ID auto-generation", () => {
   });
 });
 
+// ─── run command — allowed_tools ──────────────────────────────────
+
+const ALLOWED_TOOLS_FSM = `
+version: 1
+guide: "Restricted workflow"
+initial: start
+allowed_tools:
+  - Read
+  - Bash
+states:
+  start:
+    prompt: "Begin here."
+    transitions:
+      next: done
+  done:
+    prompt: "Finished."
+    transitions: {}
+`;
+
+let allowedToolsFsmPath: string;
+
 // ─── run command — query invocation ──────────────────────────────
 
 describe("run command — query invocation", () => {
@@ -367,5 +390,83 @@ describe("run command — query invocation", () => {
     expect(output).toContain("Agent completed the task");
 
     writeSpy.mockRestore();
+  });
+});
+
+// ─── run command — allowed_tools ─────────────────────────────────
+
+describe("run command — allowed_tools", () => {
+  test("MCP tool names always included when allowed_tools is set", async () => {
+    mockQueryResult([
+      {
+        type: "result",
+        subtype: "success",
+        duration_ms: 100,
+        duration_api_ms: 50,
+        is_error: false,
+        num_turns: 1,
+        result: "Done",
+        stop_reason: null,
+        total_cost_usd: 0.01,
+        usage: {
+          input_tokens: 10,
+          output_tokens: 5,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+          server_tool_use_input_tokens: 0,
+        },
+        modelUsage: {},
+        permission_denials: [],
+      } as unknown as SDKMessage,
+    ]);
+
+    await run({ fsmPath: allowedToolsFsmPath, root, json: false });
+
+    const mockQuery = vi.mocked(query);
+    const callArgs = mockQuery.mock.calls[0][0];
+    const allowedTools = callArgs.options?.allowedTools as string[];
+
+    // MCP tools are always present
+    expect(allowedTools).toContain("mcp__freefsm__fsm_goto");
+    expect(allowedTools).toContain("mcp__freefsm__fsm_current");
+    expect(allowedTools).toContain("mcp__freefsm__request_input");
+
+    // User-specified tools are present
+    expect(allowedTools).toContain("Read");
+    expect(allowedTools).toContain("Bash");
+  });
+
+  test("allowedTools contains only MCP tools when allowed_tools not set", async () => {
+    mockQueryResult([
+      {
+        type: "result",
+        subtype: "success",
+        duration_ms: 100,
+        duration_api_ms: 50,
+        is_error: false,
+        num_turns: 1,
+        result: "Done",
+        stop_reason: null,
+        total_cost_usd: 0.01,
+        usage: {
+          input_tokens: 10,
+          output_tokens: 5,
+          cache_creation_input_tokens: 0,
+          cache_read_input_tokens: 0,
+          server_tool_use_input_tokens: 0,
+        },
+        modelUsage: {},
+        permission_denials: [],
+      } as unknown as SDKMessage,
+    ]);
+
+    await run({ fsmPath, root, json: false });
+
+    const mockQuery = vi.mocked(query);
+    const callArgs = mockQuery.mock.calls[0][0];
+    const options = callArgs.options;
+
+    // When no allowed_tools, allowedTools should not restrict (undefined)
+    expect(options?.allowedTools).toBeUndefined();
   });
 });

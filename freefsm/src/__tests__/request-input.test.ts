@@ -136,13 +136,13 @@ describe("request_input tool", () => {
     expect(names).toContain("request_input");
   });
 
-  test("mcp__freefsm__request_input is in allowedTools", async () => {
+  test("allowedTools not set when FSM has no allowed_tools", async () => {
     await launchAndGetHandlers();
 
     const mockQuery = vi.mocked(query);
     const callArgs = mockQuery.mock.calls[0][0];
-    const allowed = callArgs.options?.allowedTools as string[];
-    expect(allowed).toContain("mcp__freefsm__request_input");
+    // When FSM has no allowed_tools, allowedTools should be undefined (no restriction)
+    expect(callArgs.options?.allowedTools).toBeUndefined();
   });
 
   test("writes prompt to stderr", async () => {

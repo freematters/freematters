@@ -263,12 +263,16 @@ export async function run(args: RunArgs): Promise<void> {
     const initialMessage = formatStateCard(card);
     const systemPrompt = buildSystemPrompt(fsm);
 
+    const allowedTools = fsm.allowed_tools
+      ? [...MCP_TOOL_NAMES, ...fsm.allowed_tools]
+      : undefined;
+
     const session = query({
       prompt: initialMessage,
       options: {
         systemPrompt,
         mcpServers: { freefsm: fsmServer },
-        allowedTools: [...MCP_TOOL_NAMES],
+        ...(allowedTools !== undefined && { allowedTools }),
       },
     });
 

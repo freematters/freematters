@@ -14,6 +14,7 @@ export interface Fsm {
   guide?: string;
   initial: string;
   states: Record<string, FsmState>;
+  allowed_tools?: string[];
 }
 
 export class FsmError extends Error {
@@ -61,6 +62,18 @@ export function loadFsm(path: string): Fsm {
     (typeof obj.guide !== "string" || obj.guide.length === 0)
   ) {
     fail(`"guide" must be a non-empty string if provided`);
+  }
+
+  // allowed_tools: optional string[]
+  if (obj.allowed_tools !== undefined && obj.allowed_tools !== null) {
+    if (!Array.isArray(obj.allowed_tools)) {
+      fail(`"allowed_tools" must be an array of strings`);
+    }
+    for (const item of obj.allowed_tools) {
+      if (typeof item !== "string" || item.length === 0) {
+        fail(`"allowed_tools" items must be non-empty strings`);
+      }
+    }
   }
 
   if (typeof obj.initial !== "string" || obj.initial.length === 0) {
@@ -197,6 +210,9 @@ export function loadFsm(path: string): Fsm {
   };
   if (typeof obj.guide === "string") {
     fsm.guide = obj.guide;
+  }
+  if (Array.isArray(obj.allowed_tools)) {
+    fsm.allowed_tools = obj.allowed_tools as string[];
   }
   return fsm;
 }

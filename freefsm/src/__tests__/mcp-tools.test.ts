@@ -153,14 +153,13 @@ describe("MCP tool registration", () => {
     expect(callArgs.options?.mcpServers).toHaveProperty("freefsm");
   });
 
-  test("adds MCP tool names to allowedTools", async () => {
+  test("does not restrict allowedTools when FSM has no allowed_tools", async () => {
     await launchAndGetHandlers();
 
     const mockQuery = vi.mocked(query);
     const callArgs = mockQuery.mock.calls[0][0];
-    const allowed = callArgs.options?.allowedTools as string[];
-    expect(allowed).toContain("mcp__freefsm__fsm_goto");
-    expect(allowed).toContain("mcp__freefsm__fsm_current");
+    // When FSM has no allowed_tools, allowedTools should be undefined (no restriction)
+    expect(callArgs.options?.allowedTools).toBeUndefined();
   });
 });
 

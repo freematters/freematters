@@ -23,3 +23,9 @@
 - **What was built**: Added `request_input` as a third in-process MCP tool. It writes the prompt to `process.stderr`, reads a line from `process.stdin` via `readline`, and returns the user's input. EOF on stdin returns `"EOF: stdin closed, no input available"` to the agent. `mcp__freefsm__request_input` added to `allowedTools`.
 - **Tests**: 5 tests added, all 109 tests passing (104 existing + 5 new)
 - **Notes**: Used a `resolved` flag to prevent the readline `close` event from racing with the `line` event (both fire when a line is read then the interface closes). No deviations from spec.
+
+## Step 5: Add allowed_tools YAML Schema Extension
+- **Files changed**: `freefsm/src/fsm.ts` (modified), `freefsm/src/commands/run.ts` (modified), `freefsm/src/__tests__/fsm.test.ts` (modified), `freefsm/src/__tests__/run.test.ts` (modified), `freefsm/src/__tests__/mcp-tools.test.ts` (modified), `freefsm/src/__tests__/request-input.test.ts` (modified)
+- **What was built**: Extended the `Fsm` interface with optional `allowed_tools?: string[]` field. Added validation in `loadFsm()` (must be array of non-empty strings if present). In `run.ts`, when `fsm.allowed_tools` is set, MCP tool names are prepended and passed as `allowedTools` to `query()`. When unset, `allowedTools` is omitted entirely so the agent has full toolset access.
+- **Tests**: 7 tests added (5 in fsm.test.ts, 2 in run.test.ts), 2 existing tests updated to match new behavior; all 116 tests passing (109 existing + 7 new)
+- **Notes**: Behavioral change from Steps 3-4: previously `allowedTools` always contained MCP tool names even without `allowed_tools` in YAML, which unnecessarily restricted the agent to only MCP tools. Now `allowedTools` is only set when the YAML explicitly declares `allowed_tools`, giving full toolset access by default. Updated 2 pre-existing tests in `mcp-tools.test.ts` and `request-input.test.ts` to reflect this corrected behavior.
