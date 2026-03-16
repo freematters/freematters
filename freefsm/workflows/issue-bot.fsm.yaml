@@ -30,31 +30,54 @@ guide: |
 
   Rules that apply across ALL states:
 
-  ### ETag-Based Comment Polling
+  ### Comment Polling
 
-  Whenever you need to wait for a user reply on the issue, use this exact polling pattern:
+  Whenever you need to wait for a user reply on the issue, use this polling pattern.
+  The poll command MUST be run in the background so you do not block.
+
+  The comment count is persisted in the run directory so polls across different
+  background commands don't miss comments added in between.
 
   ```bash
-  # Get latest comments with ETag
-  RESPONSE=$(gh api repos/{owner}/{repo}/issues/{n}/comments --include)
-  ETAG=$(echo "$RESPONSE" | grep -i etag | awk '{print $2}' | tr -d '\r')
-
-  # Poll loop
-  while true; do
-    RESPONSE=$(gh api repos/{owner}/{repo}/issues/{n}/comments \
-      -H "If-None-Match: $ETAG" --include 2>&1)
-    if echo "$RESPONSE" | grep -q "304"; then
-      sleep 1
-    else
-      ETAG=$(echo "$RESPONSE" | grep -i etag | awk '{print $2}' | tr -d '\r')
-      # Extract new comment, filter by issue creator
-      break
-    fi
+  RUN_DIR="$HOME/.freefsm/runs/{run_id}"
+  COUNT_FILE="$RUN_DIR/comment_count"
+  # Read persisted count, or fetch current if first poll
+  if [ -f "$COUNT_FILE" ]; then \
+    LAST_COUNT=$(cat "$COUNT_FILE"); \
+  else \
+    LAST_COUNT=$(gh api 'repos/{owner}/{repo}/issues/{n}' --jq '.comments'); \
+    echo "$LAST_COUNT" > "$COUNT_FILE"; \
+  fi && \
+  while true; do \
+    NEW_COUNT=$(gh api 'repos/{owner}/{repo}/issues/{n}' --jq '.comments' 2>/dev/null); \
+    if [ "$NEW_COUNT" != "$LAST_COUNT" ]; then \
+      # Fetch latest comment using --paginate to handle any number of comments
+      COMMENT_ID=$(gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate --jq '.[-1].id'); \
+      COMMENT_USER=$(gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate --jq '.[-1].user.login'); \
+      COMMENT_BODY=$(gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate --jq '.[-1].body'); \
+      # React with eyes immediately
+      gh api "repos/{owner}/{repo}/issues/comments/$COMMENT_ID/reactions" -f content=eyes > /dev/null 2>&1; \
+      # Persist new count
+      echo "$NEW_COUNT" > "$COUNT_FILE"; \
+      # Only process if from the issue creator
+      if [ "$COMMENT_USER" = "{issue_creator}" ]; then \
+        echo "NEW_COMMENT: $COMMENT_BODY"; \
+        break; \
+      fi; \
+      LAST_COUNT=$NEW_COUNT; \
+    fi; \
+    sleep 1; \
   done
   ```
 
-  Poll at 1-second intervals. 304 responses do not count against GitHub rate limits.
-  You MUST keep polling until a new comment arrives — there is no timeout.
+  This pattern persists the comment count in `~/.freefsm/runs/{run_id}/comment_count`
+  so consecutive polls don't miss comments added between background tasks. Run the poll
+  in the background.
+
+  ### Reply Prefix
+
+  Every issue comment you post MUST be prefixed with `[bot reply]` so users can easily
+  distinguish bot replies from human comments.
 
   ### Creator-Only Filtering
 
@@ -353,7 +376,7 @@ states:
       Process:
       1. Fetch all comments on the issue:
          ```bash
-         gh api repos/{owner}/{repo}/issues/{n}/comments
+         gh api 'repos/{owner}/{repo}/issues/{n}/comments?per_page=100'
          ```
       2. Identify artifact comments (those starting with `## requirements.md`, `## research/...`, etc.).
       3. Read through all artifacts and produce a structured summary covering:
@@ -407,7 +430,7 @@ states:
       Process:
       1. Fetch all comments on the issue to read requirements and research artifacts:
          ```bash
-         gh api repos/{owner}/{repo}/issues/{n}/comments
+         gh api 'repos/{owner}/{repo}/issues/{n}/comments?per_page=100'
          ```
       2. Synthesize all requirements and research findings into a design document.
       3. Post the design as a `## design.md` comment:
@@ -492,7 +515,7 @@ states:
       Process:
       1. Fetch all comments to read the latest `## design.md` artifact:
          ```bash
-         gh api repos/{owner}/{repo}/issues/{n}/comments
+         gh api 'repos/{owner}/{repo}/issues/{n}/comments?per_page=100'
          ```
       2. Produce an implementation plan following this structure:
          - Each step builds on previous steps

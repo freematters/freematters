@@ -24,12 +24,17 @@
 
 version: 1
 guide: |
-  Spec-to-Code workflow. Implements a spec directory (typically produced by the PDD workflow)
+  Spec-to-Code workflow. Implements a spec (from a local directory or a GitHub issue)
   into working, tested code through strict TDD practices.
 
-  Input: A `./specs/<slug>/` directory containing at minimum:
-    - design.md — authoritative design document with components, interfaces, data models
-    - plan.md   — numbered implementation steps with test requirements and demo criteria
+  Input (two modes):
+    - **Local mode**: A `./specs/<slug>/` directory containing at minimum design.md and plan.md
+    - **Issue mode**: A GitHub issue reference `owner/repo#N` (a spec-ready issue from issue-bot)
+      The load-spec state downloads artifact comments to `./specs/<slug>/` automatically.
+
+  The argument determines the mode:
+    - If it matches `owner/repo#N` (e.g., `freematters/freematters#37`) → issue mode
+    - Otherwise → local mode (treated as a directory path)
 
   Rules that apply across ALL states:
 
@@ -46,6 +51,20 @@ guide: |
     After each step is committed, append a summary. Sub-agents MUST read this file
     for context on what has been built so far.
 
+  ### Issue Mode Rules (only when source is owner/repo#N)
+
+  When the workflow is started with an issue reference, these additional rules apply:
+
+  - All comments posted to the issue MUST be prefixed with `[from bot]`
+  - Push to remote after every commit so commit SHAs are visitable
+  - Update the issue body checklist after each step completion
+  - Remember these values across states:
+    - `owner` — repo owner
+    - `repo` — repo name
+    - `issue_number` — the issue number
+    - `branch_name` — the working branch (e.g., `issue-37-freefsm-run`)
+    - `source_mode` — "issue" (vs "local" for local mode)
+
 initial: load-spec
 
 states:
@@ -53,9 +72,58 @@ states:
     prompt: |
       ## Load Specification
 
-      Read the spec directory and understand what needs to be built.
+      Detect input mode and load the spec.
 
-      Process:
+      ### Step 0: Detect mode
+
+      Check if the argument matches `owner/repo#N` (regex: `[\w.-]+/[\w.-]+#\d+`).
+      - If yes → **issue mode**. Remember `source_mode = "issue"`, parse `owner`, `repo`, `issue_number`.
+      - If no → **local mode**. Remember `source_mode = "local"`. The argument is the spec directory path.
+
+      ### Issue mode: download artifacts from issue
+
+      1. Validate the issue exists and has the `spec-ready` label:
+         ```bash
+         gh api 'repos/{owner}/{repo}/issues/{issue_number}' --jq '.labels[].name'
+         ```
+         If no `spec-ready` label, warn the user and ask if they want to proceed anyway.
+
+      2. Fetch all artifact comments from the issue:
+         ```bash
+         gh api 'repos/{owner}/{repo}/issues/{issue_number}/comments' --paginate \
+           --jq '.[] | select(.body | startswith("## ")) | {id: .id, title: (.body | split("\n")[0]), body: .body}'
+         ```
+         Identify comments whose body starts with:
+         - `## design.md` → save to `./specs/<slug>/design.md`
+         - `## plan.md` → save to `./specs/<slug>/plan.md`
+         - `## requirements.md` → save to `./specs/<slug>/requirements.md`
+         - `## research/` → save to `./specs/<slug>/research/<topic>.md`
+         - `## e2e.md` → save to `./specs/<slug>/e2e.md`
+
+         For each artifact, strip the `## filename` header line before saving — the file content
+         starts from the line after the header.
+
+      3. Derive slug from the issue title (lowercase, replace spaces/special chars with hyphens,
+         e.g., "feat: freefsm run" → `freefsm-run`).
+
+      4. Create a working branch:
+         ```bash
+         git checkout -b issue-{issue_number}-{slug}
+         ```
+
+      5. Post a `[from bot]` comment on the issue:
+         ```
+         [from bot] Starting implementation. Tracking on branch `issue-{issue_number}-{slug}`.
+         ```
+
+      6. Remember `branch_name` for later states.
+
+      ### Local mode: read from directory (unchanged)
+
+      The argument is the spec directory path (e.g., `./specs/my-feature/`).
+
+      ### Common: parse and present
+
       1. Read `./specs/<slug>/plan.md` — parse the checklist and identify all implementation steps
       2. Read `./specs/<slug>/design.md` — understand architecture, components, interfaces, and data models
       3. Optionally read `./specs/<slug>/requirements.md` and `./specs/<slug>/research/*.md` for additional context
@@ -65,9 +133,10 @@ states:
       - Number of implementation steps
       - Current progress (which steps are already checked off, if any)
       - The first uncompleted step title
+      - Source mode: local or issue (with issue URL if applicable)
 
       If `./specs/<slug>/plan.md` or `./specs/<slug>/design.md` does not exist, inform the user and suggest
-      running the PDD workflow first.
+      running the PDD workflow first (or the issue-bot workflow for issue-driven specs).
 
       Create a todo item for each uncompleted step (using the step title). Mark already-completed steps as done.
 
@@ -157,6 +226,30 @@ states:
       - Commit message
       - Progress: "Step N/M complete"
 
+      ### Issue mode additional steps
+
+      If `source_mode == "issue"`, also:
+
+      4. Push to remote:
+         ```bash
+         git push -u origin {branch_name}   # first push
+         git push                            # subsequent pushes
+         ```
+
+      5. Update the issue body checklist — re-read the issue body, change `- [ ] Step N`
+         to `- [x] Step N`, then update:
+         ```bash
+         gh issue edit {issue_number} --repo {owner}/{repo} --body "{updated_body}"
+         ```
+
+      6. Post a `[from bot]` progress comment on the issue:
+         ```
+         [from bot] Step N/M complete: <step title>
+         - **Commit**: https://github.com/{owner}/{repo}/commit/{sha}
+         - **Files changed**: <list of key files>
+         - **Tests**: <count> added, all passing
+         ```
+
       Then transition back to implement for the next step.
       If this was the last step, transition to done.
     transitions:
@@ -184,6 +277,12 @@ states:
          - **Affected steps**: <which plan steps are impacted>
          ```
       5. Log a brief summary of the change (no need to wait for user confirmation)
+
+      ### Issue mode additional step
+
+      If `source_mode == "issue"`, post a `[from bot]` comment on the issue describing
+      the spec issue found and the local fix applied. Do NOT edit the original issue
+      artifact comments — the local copy is the working copy during implementation.
 
       After recording the fix, transition back to implement to continue autonomously.
     transitions:
@@ -341,6 +440,8 @@ states:
 
       Stage and commit the fixes: `fix: address review issues (round N)`
 
+      If `source_mode == "issue"`, push to remote after committing.
+
       ### 4. Re-review
 
       Transition back to review for a fresh review of the updated code.
@@ -392,4 +493,34 @@ states:
 
       If the workflow was started because the spec was missing, remind the user to run
       the PDD workflow (`/freefsm:start pdd`) first.
+
+      ### Issue mode additional steps
+
+      If `source_mode == "issue"`, also:
+
+      1. Ensure all commits are pushed to remote:
+         ```bash
+         git push
+         ```
+
+      2. Post a `[from bot]` summary comment on the issue:
+         ```
+         [from bot] Implementation complete!
+         - **Branch**: `{branch_name}`
+         - **Steps completed**: N/N
+         - **Total commits**: X
+         - **Tests**: Y tests, all passing
+
+         Ready for PR — run `/pr` to create a pull request.
+         ```
+
+      3. Add `implementation-complete` label to the issue:
+         ```bash
+         gh issue edit {issue_number} --repo {owner}/{repo} --add-label implementation-complete
+         ```
+         If the label does not exist, create it first:
+         ```bash
+         gh label create implementation-complete --repo {owner}/{repo} \
+           --description "Implementation is complete, ready for PR" --color 1D76DB
+         ```
     transitions: {}
