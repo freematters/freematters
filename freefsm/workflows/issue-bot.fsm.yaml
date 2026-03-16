@@ -30,31 +30,37 @@ guide: |
 
   Rules that apply across ALL states:
 
-  ### ETag-Based Comment Polling
+  ### Comment Polling
 
-  Whenever you need to wait for a user reply on the issue, use this exact polling pattern:
+  Whenever you need to wait for a user reply on the issue, run the bundled polling script
+  as a **background bash job** so the conversation is not blocked.
 
+  The script is at `poll_issue.py` in the same directory as this workflow YAML.
+  Find it via:
   ```bash
-  # Get latest comments with ETag
-  RESPONSE=$(gh api repos/{owner}/{repo}/issues/{n}/comments --include)
-  ETAG=$(echo "$RESPONSE" | grep -i etag | awk '{print $2}' | tr -d '\r')
-
-  # Poll loop
-  while true; do
-    RESPONSE=$(gh api repos/{owner}/{repo}/issues/{n}/comments \
-      -H "If-None-Match: $ETAG" --include 2>&1)
-    if echo "$RESPONSE" | grep -q "304"; then
-      sleep 1
-    else
-      ETAG=$(echo "$RESPONSE" | grep -i etag | awk '{print $2}' | tr -d '\r')
-      # Extract new comment, filter by issue creator
-      break
-    fi
-  done
+  SCRIPT_DIR="$(dirname "$(readlink -f "$(freefsm current --run-id {run_id} -j | jq -r '.data.fsm_path')")")"
   ```
 
-  Poll at 1-second intervals. 304 responses do not count against GitHub rate limits.
-  You MUST keep polling until a new comment arrives — there is no timeout.
+  Run it:
+  ```bash
+  python3 "$SCRIPT_DIR/poll_issue.py" {owner} {repo} {n} {issue_creator} \
+    --run-id {run_id}
+  ```
+
+  The script:
+  - Polls the issue's comment count every second
+  - When new comments arrive, fetches ALL new comments (no drops)
+  - Reacts with 👀 to every new comment
+  - Filters for comments from `{issue_creator}` only
+  - Prints `NEW_COMMENT: <body>` for each matching comment
+  - Persists the comment count in `~/.freefsm/runs/{run_id}/comment_count`
+
+  Run the script in the background. When it completes, read the output for the comment.
+
+  ### Reply Prefix
+
+  Every issue comment you post MUST be prefixed with `[bot reply]` so users can easily
+  distinguish bot replies from human comments.
 
   ### Creator-Only Filtering
 
@@ -353,7 +359,7 @@ states:
       Process:
       1. Fetch all comments on the issue:
          ```bash
-         gh api repos/{owner}/{repo}/issues/{n}/comments
+         gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate
          ```
       2. Identify artifact comments (those starting with `## requirements.md`, `## research/...`, etc.).
       3. Read through all artifacts and produce a structured summary covering:
@@ -407,7 +413,7 @@ states:
       Process:
       1. Fetch all comments on the issue to read requirements and research artifacts:
          ```bash
-         gh api repos/{owner}/{repo}/issues/{n}/comments
+         gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate
          ```
       2. Synthesize all requirements and research findings into a design document.
       3. Post the design as a `## design.md` comment:
@@ -492,7 +498,7 @@ states:
       Process:
       1. Fetch all comments to read the latest `## design.md` artifact:
          ```bash
-         gh api repos/{owner}/{repo}/issues/{n}/comments
+         gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate
          ```
       2. Produce an implementation plan following this structure:
          - Each step builds on previous steps
