@@ -1,0 +1,32 @@
+{
+  "name": "@freematters/hello-world-cli",
+  "version": "0.1.0",
+  "description": "A minimal CLI tool that accepts a name argument and prints a greeting",
+  "type": "module",
+  "main": "dist/cli.js",
+  "bin": {
+    "hello": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "fmt": "biome format --write .",
+    "lint": "biome lint .",
+    "check": "biome check --write ."
+  },
+  "dependencies": {
+    "commander": "^14.0.3"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}
