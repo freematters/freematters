@@ -503,14 +503,16 @@ states:
          git push
          ```
 
-      2. Post a `[from bot]` summary comment on the issue:
+      2. Post the implementation summary as a `[from bot]` comment on the issue.
+         The comment should include the full content of `./specs/<slug>/implementation-summary.md`
+         prefixed with `[from bot]` and a note about the branch:
          ```
-         [from bot] Implementation complete!
-         - **Branch**: `{branch_name}`
-         - **Steps completed**: N/N
-         - **Total commits**: X
-         - **Tests**: Y tests, all passing
+         [from bot] ## implementation-summary.md
 
+         {full content of implementation-summary.md}
+
+         ---
+         **Branch**: `{branch_name}`
          Ready for PR — run `/pr` to create a pull request.
          ```
 
