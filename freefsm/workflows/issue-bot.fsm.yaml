@@ -32,47 +32,30 @@ guide: |
 
   ### Comment Polling
 
-  Whenever you need to wait for a user reply on the issue, use this polling pattern.
-  The poll command MUST be run in the background so you do not block.
+  Whenever you need to wait for a user reply on the issue, run the bundled polling script
+  as a **background bash job** so the conversation is not blocked.
 
-  The comment count is persisted in the run directory so polls across different
-  background commands don't miss comments added in between.
-
+  The script is at `poll_issue.py` in the same directory as this workflow YAML.
+  Find it via:
   ```bash
-  RUN_DIR="$HOME/.freefsm/runs/{run_id}"
-  COUNT_FILE="$RUN_DIR/comment_count"
-  # Read persisted count, or fetch current if first poll
-  if [ -f "$COUNT_FILE" ]; then \
-    LAST_COUNT=$(cat "$COUNT_FILE"); \
-  else \
-    LAST_COUNT=$(gh api 'repos/{owner}/{repo}/issues/{n}' --jq '.comments'); \
-    echo "$LAST_COUNT" > "$COUNT_FILE"; \
-  fi && \
-  while true; do \
-    NEW_COUNT=$(gh api 'repos/{owner}/{repo}/issues/{n}' --jq '.comments' 2>/dev/null); \
-    if [ "$NEW_COUNT" != "$LAST_COUNT" ]; then \
-      # Fetch latest comment using --paginate to handle any number of comments
-      COMMENT_ID=$(gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate --jq '.[-1].id'); \
-      COMMENT_USER=$(gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate --jq '.[-1].user.login'); \
-      COMMENT_BODY=$(gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate --jq '.[-1].body'); \
-      # React with eyes immediately
-      gh api "repos/{owner}/{repo}/issues/comments/$COMMENT_ID/reactions" -f content=eyes > /dev/null 2>&1; \
-      # Persist new count
-      echo "$NEW_COUNT" > "$COUNT_FILE"; \
-      # Only process if from the issue creator
-      if [ "$COMMENT_USER" = "{issue_creator}" ]; then \
-        echo "NEW_COMMENT: $COMMENT_BODY"; \
-        break; \
-      fi; \
-      LAST_COUNT=$NEW_COUNT; \
-    fi; \
-    sleep 1; \
-  done
+  SCRIPT_DIR="$(dirname "$(readlink -f "$(freefsm current --run-id {run_id} -j | jq -r '.data.fsm_path')")")"
   ```
 
-  This pattern persists the comment count in `~/.freefsm/runs/{run_id}/comment_count`
-  so consecutive polls don't miss comments added between background tasks. Run the poll
-  in the background.
+  Run it:
+  ```bash
+  python3 "$SCRIPT_DIR/poll_issue.py" {owner} {repo} {n} {issue_creator} \
+    --run-id {run_id}
+  ```
+
+  The script:
+  - Polls the issue's comment count every second
+  - When new comments arrive, fetches ALL new comments (no drops)
+  - Reacts with 👀 to every new comment
+  - Filters for comments from `{issue_creator}` only
+  - Prints `NEW_COMMENT: <body>` for each matching comment
+  - Persists the comment count in `~/.freefsm/runs/{run_id}/comment_count`
+
+  Run the script in the background. When it completes, read the output for the comment.
 
   ### Reply Prefix
 
