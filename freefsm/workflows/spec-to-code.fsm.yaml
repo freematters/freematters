@@ -111,12 +111,18 @@ states:
          git checkout -b issue-{issue_number}-{slug}
          ```
 
-      5. Post a `[from bot]` comment on the issue:
+      5. Add `doing` label to the issue:
+         ```bash
+         gh label create doing --repo {owner}/{repo} --description "Implementation in progress" --color FBCA04 2>/dev/null || true
+         gh issue edit {issue_number} --repo {owner}/{repo} --add-label doing
+         ```
+
+      6. Post a `[from bot]` comment on the issue:
          ```
          [from bot] Starting implementation. Tracking on branch `issue-{issue_number}-{slug}`.
          ```
 
-      6. Remember `branch_name` for later states.
+      7. Remember `branch_name` for later states.
 
       ### Local mode: read from directory (unchanged)
 
@@ -516,13 +522,10 @@ states:
          Ready for PR — run `/pr` to create a pull request.
          ```
 
-      3. Add `implementation-complete` label to the issue:
+      3. Remove `doing` label and add `done` label to the issue:
          ```bash
-         gh issue edit {issue_number} --repo {owner}/{repo} --add-label implementation-complete
-         ```
-         If the label does not exist, create it first:
-         ```bash
-         gh label create implementation-complete --repo {owner}/{repo} \
-           --description "Implementation is complete, ready for PR" --color 1D76DB
+         gh issue edit {issue_number} --repo {owner}/{repo} --remove-label doing
+         gh label create done --repo {owner}/{repo} --description "Implementation complete" --color 0E8A16 2>/dev/null || true
+         gh issue edit {issue_number} --repo {owner}/{repo} --add-label done
          ```
     transitions: {}
