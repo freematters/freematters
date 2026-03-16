@@ -1,5 +1,7 @@
-import { basename } from "node:path";
+import { readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 import { createInterface } from "node:readline";
+import { fileURLToPath } from "node:url";
 import { createSdkMcpServer, query, tool } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
@@ -20,24 +22,19 @@ function generateRunId(fsmPath: string): string {
   return `${name}-${Date.now()}`;
 }
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const PROMPTS_DIR = join(__dirname, "../../prompts");
+
+function loadPrompt(name: string): string {
+  return readFileSync(join(PROMPTS_DIR, `${name}.md`), "utf-8");
+}
+
 function buildSystemPrompt(fsm: Fsm): string {
   const fsmName = fsm.guide ? fsm.guide.split(/[.\n]/)[0] : "workflow";
-  return `You are an FSM-driven agent executing the "${fsmName}" workflow.
-
-## FSM Guide
-${fsm.guide ?? "No guide provided."}
-
-## How to Use FSM Tools
-- Call \`fsm_current\` to see your current state and instructions.
-- Call \`fsm_goto\` with \`target\` (state name) and \`on\` (transition label) to move to the next state.
-- Call \`request_input\` when you need information from the human.
-- Execute the state's instructions before transitioning.
-- The workflow ends when you reach a state with no transitions.
-
-## Rules
-- Follow state instructions exactly.
-- Do NOT skip states or transitions.
-- Only use valid transition labels shown in the state card.`;
+  const template = loadPrompt("run-system");
+  return template
+    .replace("{{FSM_NAME}}", fsmName)
+    .replace("{{FSM_GUIDE}}", fsm.guide ?? "No guide provided.");
 }
 
 function createFsmMcpServer(fsm: Fsm, store: Store, runId: string) {
@@ -283,6 +280,8 @@ export async function run(args: RunArgs): Promise<void> {
       prompt: initialMessage,
       options: {
         systemPrompt,
+        permissionMode: "bypassPermissions",
+        allowDangerouslySkipPermissions: true,
         mcpServers: { freefsm: fsmServer },
         ...(allowedTools !== undefined && { allowedTools }),
       },
