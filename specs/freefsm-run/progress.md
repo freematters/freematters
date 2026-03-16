@@ -12,3 +12,8 @@
 - **Tests**: 7 tests added, all 93 tests passing (86 existing + 7 new)
 - **Notes**: No MCP tools yet (Step 3). The agent can talk and use built-in Claude Code tools but cannot transition the FSM autonomously. Demo verified: `freefsm run workflows/pdd.fsm.yaml` launched an agent session that received the state card and responded.
 
+## Step 3: Add FSM MCP Tools
+- **Files changed**: `freefsm/src/commands/run.ts` (modified), `freefsm/src/__tests__/mcp-tools.test.ts` (new), `freefsm/src/__tests__/run.test.ts` (modified — updated mock)
+- **What was built**: Registered `fsm_goto` and `fsm_current` as in-process MCP tools via `createSdkMcpServer` and `tool()` from the Agent SDK with Zod schemas. `fsm_goto` validates transitions (reusing the same logic as `goto.ts`), commits events via Store within `withLock()`, and returns the new state card. Invalid transitions return error text to the agent (not thrown). Terminal state detection checks for empty transitions and sets `run_status` to `"completed"`. `fsm_current` reads the snapshot and returns the current state card. MCP server is passed to `query()` via `mcpServers` option, and MCP tool names (`mcp__freefsm__fsm_goto`, `mcp__freefsm__fsm_current`) are added to `allowedTools`.
+- **Tests**: 11 tests added, all 104 tests passing (93 existing + 11 new)
+- **Notes**: The existing `run.test.ts` mock needed updating to include `tool` and `createSdkMcpServer` exports since `run.ts` now imports them. Terminal state detection is based on `Object.keys(transitions).length === 0` (general) rather than hardcoding `"done"`. Demo criteria requires live Agent SDK; build and all tests verified.

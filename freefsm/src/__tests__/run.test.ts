@@ -6,6 +6,15 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vit
 // Mock the agent SDK before importing the module under test
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: vi.fn(),
+  createSdkMcpServer: vi.fn(() => ({
+    type: "sdk",
+    name: "freefsm",
+    instance: {},
+  })),
+  tool: vi.fn((name: string, _desc: string, _schema: unknown, handler: unknown) => ({
+    name,
+    handler,
+  })),
 }));
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
