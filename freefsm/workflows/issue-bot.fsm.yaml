@@ -359,7 +359,7 @@ states:
       Process:
       1. Fetch all comments on the issue:
          ```bash
-         gh api 'repos/{owner}/{repo}/issues/{n}/comments?per_page=100'
+         gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate
          ```
       2. Identify artifact comments (those starting with `## requirements.md`, `## research/...`, etc.).
       3. Read through all artifacts and produce a structured summary covering:
@@ -413,7 +413,7 @@ states:
       Process:
       1. Fetch all comments on the issue to read requirements and research artifacts:
          ```bash
-         gh api 'repos/{owner}/{repo}/issues/{n}/comments?per_page=100'
+         gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate
          ```
       2. Synthesize all requirements and research findings into a design document.
       3. Post the design as a `## design.md` comment:
@@ -498,7 +498,7 @@ states:
       Process:
       1. Fetch all comments to read the latest `## design.md` artifact:
          ```bash
-         gh api 'repos/{owner}/{repo}/issues/{n}/comments?per_page=100'
+         gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate
          ```
       2. Produce an implementation plan following this structure:
          - Each step builds on previous steps

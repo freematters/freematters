@@ -91,7 +91,7 @@ states:
       2. Fetch all artifact comments from the issue:
          ```bash
          gh api 'repos/{owner}/{repo}/issues/{issue_number}/comments' --paginate \
-           --jq '.[] | select(.body | startswith("## ")) | {id: .id, title: (.body | split("\n")[0]), body: .body}'
+           --jq '.[] | select(.body | test("^## (design\\.md|plan\\.md|requirements\\.md|research/|e2e\\.md)")) | {id: .id, title: (.body | split("\n")[0]), body: .body}'
          ```
          Identify comments whose body starts with:
          - `## design.md` → save to `./specs/<slug>/design.md`
