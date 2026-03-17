@@ -12,11 +12,16 @@ export interface GenArgs {
   json: boolean;
 }
 
+export interface GenFromYamlResult {
+  markdown: string;
+  pathCount: number;
+}
+
 /**
  * Generate a test plan from a YAML file path (deterministic, no LLM needed).
  * Exported for unit testing.
  */
-export function generateFromYaml(fsmPath: string): string {
+export function generateFromYaml(fsmPath: string): GenFromYamlResult {
   const fsm = loadFsm(fsmPath);
   const paths = enumeratePaths(fsm);
   const fsmName = basename(fsmPath, ".fsm.yaml");
@@ -79,7 +84,7 @@ export function generateFromYaml(fsmPath: string): string {
   lines.push("- Remove any created run data");
   lines.push("");
 
-  return lines.join("\n");
+  return { markdown: lines.join("\n"), pathCount: paths.length };
 }
 
 /**
@@ -95,10 +100,13 @@ function isYamlPath(source: string): boolean {
 export async function gen(args: GenArgs): Promise<void> {
   try {
     let markdown: string;
+    let pathCount = 1;
 
     if (isYamlPath(args.source)) {
       // YAML mode: deterministic path enumeration
-      markdown = generateFromYaml(args.source);
+      const result = generateFromYaml(args.source);
+      markdown = result.markdown;
+      pathCount = result.pathCount;
     } else {
       // Prompt mode: requires Claude agent (not implemented in YAML-only scope)
       throw new CliError(
@@ -124,7 +132,7 @@ export async function gen(args: GenArgs): Promise<void> {
           jsonSuccess("Test plan generated", {
             path: args.output,
             steps: parseResult.plan.steps.length,
-            paths: markdown.match(/\(path \d+/g)?.length ?? 1,
+            paths: pathCount,
           }),
         );
       } else {

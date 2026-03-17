@@ -83,32 +83,30 @@ export async function verify(args: VerifyArgs): Promise<void> {
     }
 
     // Execute the verification loop
-    {
-      const verifyResult = await verifyCore({
-        plan,
-        testDir: args.testDir,
-        model: args.model,
-        dangerouslyBypassPermissions: args.dangerouslyBypassPermissions,
-      });
+    const verifyResult = await verifyCore({
+      plan,
+      testDir: args.testDir,
+      model: args.model,
+      dangerouslyBypassPermissions: args.dangerouslyBypassPermissions,
+    });
 
-      if (args.json) {
-        printJson(
-          jsonSuccess("Verification complete", {
-            verdict: verifyResult.jsonReport.verdict,
-            steps_passed: verifyResult.jsonReport.steps_passed,
-            steps_failed: verifyResult.jsonReport.steps_failed,
-            reportPath: verifyResult.reportPath,
-          }),
-        );
-      } else {
-        const { jsonReport, reportPath } = verifyResult;
-        process.stdout.write(
-          `\nVerdict: ${jsonReport.verdict} ` +
-            `(${jsonReport.steps_passed} passed, ` +
-            `${jsonReport.steps_failed} failed)\n`,
-        );
-        process.stdout.write(`Report: ${reportPath}\n`);
-      }
+    if (args.json) {
+      printJson(
+        jsonSuccess("Verification complete", {
+          verdict: verifyResult.jsonReport.verdict,
+          steps_passed: verifyResult.jsonReport.steps_passed,
+          steps_failed: verifyResult.jsonReport.steps_failed,
+          reportPath: verifyResult.reportPath,
+        }),
+      );
+    } else {
+      const { jsonReport, reportPath } = verifyResult;
+      process.stdout.write(
+        `\nVerdict: ${jsonReport.verdict} ` +
+          `(${jsonReport.steps_passed} passed, ` +
+          `${jsonReport.steps_failed} failed)\n`,
+      );
+      process.stdout.write(`Report: ${reportPath}\n`);
     }
   } catch (err: unknown) {
     handleError(err, args.json);

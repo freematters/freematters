@@ -80,6 +80,10 @@ export function buildTestPlanContext(plan: TestPlan): string {
 /**
  * Map verifier FSM state names to step numbers for transcript logging.
  * setup=0, execute-steps=1, evaluate=2, report=3, done=4.
+ *
+ * COUPLING: These keys must match the state names defined in
+ * workflows/verifier.fsm.yaml. If states are renamed there, update
+ * this map accordingly — a missing key silently produces `undefined`.
  */
 const VERIFIER_STATE_STEP: Record<string, number> = {
   setup: 0,
@@ -349,7 +353,7 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
 
     // Stream processing errors propagate immediately (no retry)
     for await (const message of session) {
-      logger.processMessage(message as { type: string; [key: string]: unknown });
+      logger.processMessage(message);
 
       if (message.type === "result") {
         const resultMsg = message as SDKMessage & {
@@ -362,7 +366,7 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
       }
     }
   } finally {
-    logger.close();
+    await logger.close();
 
     // Generate reports in finally block so partial reports are written even on errors
     // Read transcript once and pass to both report functions

@@ -67,7 +67,7 @@ describe("generateFromYaml — YAML mode", () => {
     const fsmPath = join(tmp, "simple.fsm.yaml");
     writeFileSync(fsmPath, SIMPLE_FSM_YAML, "utf-8");
 
-    const markdown = generateFromYaml(fsmPath);
+    const { markdown } = generateFromYaml(fsmPath);
 
     // Must parse successfully with the Step 1 parser
     const result = parseTestPlan(markdown);
@@ -82,7 +82,7 @@ describe("generateFromYaml — YAML mode", () => {
     const fsmPath = join(tmp, "three-state.fsm.yaml");
     writeFileSync(fsmPath, THREE_STATE_FSM_YAML, "utf-8");
 
-    const markdown = generateFromYaml(fsmPath);
+    const { markdown } = generateFromYaml(fsmPath);
 
     const result = parseTestPlan(markdown);
     expect(result.ok).toBe(true);
@@ -96,7 +96,7 @@ describe("generateFromYaml — YAML mode", () => {
     const fsmPath = join(tmp, "branching.fsm.yaml");
     writeFileSync(fsmPath, BRANCHING_FSM_YAML, "utf-8");
 
-    const markdown = generateFromYaml(fsmPath);
+    const { markdown } = generateFromYaml(fsmPath);
 
     const result = parseTestPlan(markdown);
     expect(result.ok).toBe(true);
@@ -110,7 +110,7 @@ describe("generateFromYaml — YAML mode", () => {
     const fsmPath = join(tmp, "simple2.fsm.yaml");
     writeFileSync(fsmPath, SIMPLE_FSM_YAML, "utf-8");
 
-    const markdown = generateFromYaml(fsmPath);
+    const { markdown } = generateFromYaml(fsmPath);
     const result = parseTestPlan(markdown);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -122,7 +122,7 @@ describe("generateFromYaml — YAML mode", () => {
     const fsmPath = join(tmp, "simple3.fsm.yaml");
     writeFileSync(fsmPath, SIMPLE_FSM_YAML, "utf-8");
 
-    const markdown = generateFromYaml(fsmPath);
+    const { markdown } = generateFromYaml(fsmPath);
     const result = parseTestPlan(markdown);
     expect(result.ok).toBe(true);
     if (!result.ok) return;

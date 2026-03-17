@@ -73,12 +73,10 @@ describe("freefsm e2e verify — CLI arg validation", () => {
   });
 
   test("creates --test-dir if it does not exist", () => {
-    const planPath = join(tmp, "valid-plan.md");
-    // reuse from previous test
-    if (!existsSync(planPath)) {
-      writeFileSync(
-        planPath,
-        `# Test: Dir creation
+    const planPath = join(tmp, "dir-creation-plan.md");
+    writeFileSync(
+      planPath,
+      `# Test: Dir creation
 
 ## Setup
 - x
@@ -90,9 +88,8 @@ describe("freefsm e2e verify — CLI arg validation", () => {
 ## Expected Outcomes
 - ok
 `,
-        "utf-8",
-      );
-    }
+      "utf-8",
+    );
     const testDir = join(tmp, `new-dir-${Date.now()}`);
     run(`e2e verify ${planPath} --test-dir ${testDir} --parse-only -j`);
     expect(existsSync(testDir)).toBe(true);

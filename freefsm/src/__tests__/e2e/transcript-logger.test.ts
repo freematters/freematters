@@ -14,8 +14,8 @@ beforeEach(() => {
   logger = new TranscriptLogger(tmp);
 });
 
-afterEach(() => {
-  logger.close();
+afterEach(async () => {
+  await logger.close();
   rmSync(tmp, { recursive: true, force: true });
 });
 
@@ -26,7 +26,7 @@ function readJsonl<T>(filePath: string): T[] {
 }
 
 describe("TranscriptLogger — transcript.jsonl", () => {
-  test("writes a timestamped entry to transcript.jsonl", () => {
+  test("writes a timestamped entry to transcript.jsonl", async () => {
     logger.logTranscript({
       type: "action",
       step: 1,
@@ -34,6 +34,7 @@ describe("TranscriptLogger — transcript.jsonl", () => {
       evidence: "exit_code=0",
     });
 
+    await logger.close();
     const entries = readJsonl<TranscriptEntry>(join(tmp, "transcript.jsonl"));
     expect(entries).toHaveLength(1);
     expect(entries[0].type).toBe("action");
@@ -44,7 +45,7 @@ describe("TranscriptLogger — transcript.jsonl", () => {
     expect(new Date(entries[0].ts).toISOString()).toBe(entries[0].ts);
   });
 
-  test("appends multiple entries to transcript.jsonl", () => {
+  test("appends multiple entries to transcript.jsonl", async () => {
     logger.logTranscript({
       type: "action",
       step: 1,
@@ -62,6 +63,7 @@ describe("TranscriptLogger — transcript.jsonl", () => {
       content: "Step passed",
     });
 
+    await logger.close();
     const entries = readJsonl<TranscriptEntry>(join(tmp, "transcript.jsonl"));
     expect(entries).toHaveLength(3);
     expect(entries[0].type).toBe("action");
@@ -69,12 +71,13 @@ describe("TranscriptLogger — transcript.jsonl", () => {
     expect(entries[2].type).toBe("judgment");
   });
 
-  test("supports all entry types: action, observation, judgment, error", () => {
+  test("supports all entry types: action, observation, judgment, error", async () => {
     const types = ["action", "observation", "judgment", "error"] as const;
     for (const type of types) {
       logger.logTranscript({ type, step: 0, content: `${type} entry` });
     }
 
+    await logger.close();
     const entries = readJsonl<TranscriptEntry>(join(tmp, "transcript.jsonl"));
     expect(entries).toHaveLength(4);
     for (let i = 0; i < types.length; i++) {
@@ -84,7 +87,7 @@ describe("TranscriptLogger — transcript.jsonl", () => {
 });
 
 describe("TranscriptLogger — api.jsonl", () => {
-  test("writes API request/response pairs to api.jsonl", () => {
+  test("writes API request/response pairs to api.jsonl", async () => {
     logger.logApi({
       direction: "request",
       data: { model: "claude-sonnet-4-20250514", messages: [] },
@@ -94,6 +97,7 @@ describe("TranscriptLogger — api.jsonl", () => {
       data: { id: "msg_123", content: [{ type: "text", text: "Hello" }] },
     });
 
+    await logger.close();
     const entries = readJsonl<{ ts: string; direction: string; data: unknown }>(
       join(tmp, "api.jsonl"),
     );
@@ -107,7 +111,7 @@ describe("TranscriptLogger — api.jsonl", () => {
 });
 
 describe("TranscriptLogger — SDK message processing", () => {
-  test("processMessage logs assistant messages to transcript", () => {
+  test("processMessage logs assistant messages to transcript", async () => {
     // Simulate an SDKAssistantMessage-like object
     logger.processMessage({
       type: "assistant",
@@ -117,14 +121,15 @@ describe("TranscriptLogger — SDK message processing", () => {
       uuid: "msg-1",
       session_id: "sess-1",
       parent_tool_use_id: null,
-    });
+    } as never);
 
+    await logger.close();
     const entries = readJsonl<TranscriptEntry>(join(tmp, "transcript.jsonl"));
     expect(entries.length).toBeGreaterThanOrEqual(1);
     expect(entries[0].content).toContain("I will run the test step now.");
   });
 
-  test("processMessage logs result messages to transcript", () => {
+  test("processMessage logs result messages to transcript", async () => {
     logger.processMessage({
       type: "result",
       subtype: "success",
@@ -134,29 +139,26 @@ describe("TranscriptLogger — SDK message processing", () => {
       is_error: false,
       uuid: "msg-2",
       session_id: "sess-1",
-    });
+    } as never);
 
+    await logger.close();
     const entries = readJsonl<TranscriptEntry>(join(tmp, "transcript.jsonl"));
     expect(entries.length).toBeGreaterThanOrEqual(1);
     const last = entries[entries.length - 1];
     expect(last.content).toContain("Test completed successfully");
   });
 
-  test("processMessage ignores stream_event messages (no transcript entry)", () => {
+  test("processMessage ignores stream_event messages (no transcript entry)", async () => {
     logger.processMessage({
       type: "stream_event",
       event: {},
       uuid: "msg-3",
       session_id: "sess-1",
       parent_tool_use_id: null,
-    });
+    } as never);
 
-    const transcriptPath = join(tmp, "transcript.jsonl");
-    try {
-      const content = readFileSync(transcriptPath, "utf-8").trim();
-      expect(content).toBe("");
-    } catch {
-      // File doesn't exist yet — that's fine, no entries were written
-    }
+    await logger.close();
+    const content = readFileSync(join(tmp, "transcript.jsonl"), "utf-8").trim();
+    expect(content).toBe("");
   });
 });
