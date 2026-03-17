@@ -321,35 +321,31 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
 
     // Retry loop for agent API setup failures (3 attempts, exponential backoff)
     // Only retries the query() call, not stream processing errors
-    let session: AsyncIterable<SDKMessage>;
-    let lastError: unknown;
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-      try {
-        session = query({
-          prompt: initialMessage,
-          options: queryOptions,
-        });
-        lastError = undefined;
-        break;
-      } catch (err: unknown) {
-        lastError = err;
-        const errMsg = err instanceof Error ? err.message : String(err);
-        logger.logTranscript({
-          type: "error",
-          step: 0,
-          content: `Agent API attempt ${attempt}/${MAX_RETRIES} failed: ${errMsg}`,
-        });
+    const session = await (async () => {
+      let lastSetupError: unknown;
+      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        try {
+          return query({
+            prompt: initialMessage,
+            options: queryOptions,
+          });
+        } catch (err: unknown) {
+          lastSetupError = err;
+          const errMsg = err instanceof Error ? err.message : String(err);
+          logger.logTranscript({
+            type: "error",
+            step: 0,
+            content: `Agent API attempt ${attempt}/${MAX_RETRIES} failed: ${errMsg}`,
+          });
 
-        if (attempt < MAX_RETRIES) {
-          const backoffMs = INITIAL_BACKOFF_MS * 2 ** (attempt - 1);
-          await new Promise((resolve) => setTimeout(resolve, backoffMs));
+          if (attempt < MAX_RETRIES) {
+            const backoffMs = INITIAL_BACKOFF_MS * 2 ** (attempt - 1);
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+          }
         }
       }
-    }
-
-    if (lastError || !session) {
-      throw lastError ?? new Error("Failed to create agent session");
-    }
+      throw lastSetupError ?? new Error("Failed to create agent session");
+    })();
 
     // Stream processing errors propagate immediately (no retry)
     for await (const message of session) {
