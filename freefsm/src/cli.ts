@@ -4,6 +4,8 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { Command } from "commander";
 import { current } from "./commands/current.js";
+import { gen } from "./commands/e2e/gen.js";
+import { verify } from "./commands/e2e/verify.js";
 import { finish } from "./commands/finish.js";
 import { goto } from "./commands/goto.js";
 import { history } from "./commands/history.js";
@@ -172,6 +174,37 @@ program
       process.exit(2);
     }
     install(platform as "claude" | "codex");
+  });
+
+// --- e2e command group ---
+const e2eCmd = program.command("e2e").description("end-to-end testing commands");
+
+e2eCmd
+  .command("verify")
+  .description("execute a test plan and produce a report")
+  .argument("<plan>", "path to test plan markdown file")
+  .requiredOption("--test-dir <path>", "output directory for artifacts")
+  .action((_plan: string, opts: Record<string, unknown>, cmd: Command) => {
+    const { json } = getGlobalOpts(cmd);
+    verify({
+      planPath: resolve(_plan),
+      testDir: resolve(opts.testDir as string),
+      json: json ?? false,
+    });
+  });
+
+e2eCmd
+  .command("gen")
+  .description("generate a test plan from a workflow or prompt")
+  .argument("<source>", "path to FSM YAML or free-text prompt")
+  .option("--output <file>", "output file path (default: stdout)")
+  .action((_source: string, opts: Record<string, unknown>, cmd: Command) => {
+    const { json } = getGlobalOpts(cmd);
+    gen({
+      source: resolve(_source),
+      output: opts.output ? resolve(opts.output as string) : undefined,
+      json: json ?? false,
+    });
   });
 
 // Hidden hook commands (not shown in --help)
