@@ -16,6 +16,7 @@ export interface VerifyCoreArgs {
   plan: TestPlan;
   testDir: string;
   model?: string;
+  dangerouslyBypassPermissions?: boolean;
 }
 
 export interface VerifyCoreResult {
@@ -73,75 +74,16 @@ export function buildTestPlanContext(plan: TestPlan): string {
 }
 
 /**
- * Build the system prompt that instructs the agent to execute the test plan.
- * Kept for backward compatibility and used in tests.
+ * Map verifier FSM state names to step numbers for transcript logging.
+ * setup=0, execute-steps=1, evaluate=2, report=3, done=4.
  */
-export function buildVerifySystemPrompt(plan: TestPlan): string {
-  const lines: string[] = [];
-
-  lines.push(`# E2E Test Verification: ${plan.name}`);
-  lines.push("");
-  lines.push(
-    "You are an automated E2E test verifier. Your job is to execute the test plan below, " +
-      "observe the results, and judge whether each step passes or fails.",
-  );
-  lines.push("");
-
-  // Setup
-  if (plan.setup.length > 0) {
-    lines.push("## Setup");
-    lines.push("Execute these setup steps first:");
-    for (const item of plan.setup) {
-      lines.push(`- ${item}`);
-    }
-    lines.push("");
-  }
-
-  // Steps
-  lines.push("## Steps");
-  lines.push("Execute each step in order. For each step:");
-  lines.push("1. Run the described action");
-  lines.push("2. Observe the result");
-  lines.push("3. Compare against the expected outcome");
-  lines.push("4. Judge PASS or FAIL with evidence");
-  lines.push("");
-  for (let i = 0; i < plan.steps.length; i++) {
-    const step = plan.steps[i];
-    lines.push(`### Step ${i + 1}: ${step.name}`);
-    lines.push(`**Action**: ${step.action}`);
-    if (step.expected) {
-      lines.push(`**Expected**: ${step.expected}`);
-    }
-    lines.push("");
-  }
-
-  // Expected Outcomes
-  lines.push("## Expected Outcomes");
-  lines.push("After all steps, verify these overall outcomes:");
-  for (const outcome of plan.expectedOutcomes) {
-    lines.push(`- ${outcome}`);
-  }
-  lines.push("");
-
-  // Cleanup
-  if (plan.cleanup.length > 0) {
-    lines.push("## Cleanup");
-    lines.push("After verification, execute these cleanup steps:");
-    for (const item of plan.cleanup) {
-      lines.push(`- ${item}`);
-    }
-    lines.push("");
-  }
-
-  // Instructions for output format
-  lines.push("## Output Format");
-  lines.push("After executing all steps, provide a summary with:");
-  lines.push("- Per-step verdict (PASS/FAIL) with evidence");
-  lines.push("- Overall verdict (PASS if all steps pass, FAIL otherwise)");
-  lines.push("- Any errors or unexpected observations");
-
-  return lines.join("\n");
-}
+const VERIFIER_STATE_STEP: Record<string, number> = {
+  setup: 0,
+  "execute-steps": 1,
+  evaluate: 2,
+  report: 3,
+  done: 4,
+};
 
 function loadPrompt(name: string): string {
   return readFileSync(join(PROMPTS_DIR, `${name}.md`), "utf-8");
@@ -155,7 +97,12 @@ function buildFsmSystemPrompt(fsm: Fsm): string {
     .replace("{{FSM_GUIDE}}", fsm.guide ?? "No guide provided.");
 }
 
-function createVerifierMcpServer(fsm: Fsm, store: Store, runId: string) {
+function createVerifierMcpServer(
+  fsm: Fsm,
+  store: Store,
+  runId: string,
+  logger: TranscriptLogger,
+) {
   const fsmGoto = tool(
     "fsm_goto",
     "Transition FSM to a new state",
@@ -232,6 +179,12 @@ function createVerifierMcpServer(fsm: Fsm, store: Store, runId: string) {
             { run_status: newStatus, state: args.target },
             { lockHeld: true },
           );
+
+          // Update transcript logger step based on FSM state transition
+          const stepNum = VERIFIER_STATE_STEP[args.target];
+          if (stepNum !== undefined) {
+            logger.setStep(stepNum);
+          }
 
           const card = stateCardFromFsm(args.target, targetState);
           let text = formatStateCard(card);
@@ -327,8 +280,8 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
   const logger = new TranscriptLogger(testDir);
 
   try {
-    // Create FSM MCP server for state management
-    const fsmServer = createVerifierMcpServer(fsm, store, runId);
+    // Create FSM MCP server for state management (with logger for step tracking)
+    const fsmServer = createVerifierMcpServer(fsm, store, runId, logger);
 
     // Build system prompt from FSM template (includes fsm_goto/fsm_current instructions)
     const systemPrompt = buildFsmSystemPrompt(fsm);
@@ -339,14 +292,24 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
     const testPlanContext = buildTestPlanContext(plan);
     const initialMessage = `${stateCardText}\n\n---\n\n${testPlanContext}`;
 
+    // Build query options — only bypass permissions when explicitly requested
+    const queryOptions: Parameters<typeof query>[0]["options"] = {
+      systemPrompt,
+      mcpServers: { freefsm: fsmServer },
+    };
+
+    if (args.dangerouslyBypassPermissions) {
+      queryOptions.permissionMode = "bypassPermissions";
+      queryOptions.allowDangerouslySkipPermissions = true;
+    }
+
+    if (args.model) {
+      queryOptions.model = args.model;
+    }
+
     const session = query({
       prompt: initialMessage,
-      options: {
-        systemPrompt,
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        mcpServers: { freefsm: fsmServer },
-      },
+      options: queryOptions,
     });
 
     for await (const message of session) {

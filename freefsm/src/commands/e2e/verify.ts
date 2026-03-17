@@ -10,6 +10,8 @@ export interface VerifyArgs {
   testDir: string;
   json: boolean;
   parseOnly?: boolean;
+  dangerouslyBypassPermissions?: boolean;
+  model?: string;
 }
 
 export async function verify(args: VerifyArgs): Promise<void> {
@@ -37,18 +39,31 @@ export async function verify(args: VerifyArgs): Promise<void> {
 
     const { plan } = result;
 
-    if (args.json) {
-      // In JSON mode, print parsed plan summary before running
-      printJson(
-        jsonSuccess("Test plan parsed", {
-          name: plan.name,
-          setup: plan.setup.length,
-          steps: plan.steps.length,
-          expectedOutcomes: plan.expectedOutcomes.length,
-          cleanup: plan.cleanup.length,
-        }),
-      );
-    } else {
+    if (args.parseOnly) {
+      // In parse-only mode, output the parsed plan summary and return
+      if (args.json) {
+        printJson(
+          jsonSuccess("Test plan parsed", {
+            name: plan.name,
+            setup: plan.setup.length,
+            steps: plan.steps.length,
+            expectedOutcomes: plan.expectedOutcomes.length,
+            cleanup: plan.cleanup.length,
+          }),
+        );
+      } else {
+        process.stdout.write(`Test plan: ${plan.name}\n`);
+        process.stdout.write(`  Setup: ${plan.setup.length} items\n`);
+        process.stdout.write(`  Steps: ${plan.steps.length}\n`);
+        process.stdout.write(`  Expected outcomes: ${plan.expectedOutcomes.length}\n`);
+        process.stdout.write(`  Cleanup: ${plan.cleanup.length} items\n`);
+        process.stdout.write(`  Output: ${args.testDir}\n`);
+      }
+      return;
+    }
+
+    // Print human-readable summary before running (not in JSON mode to avoid double output)
+    if (!args.json) {
       process.stdout.write(`Test plan: ${plan.name}\n`);
       process.stdout.write(`  Setup: ${plan.setup.length} items\n`);
       process.stdout.write(`  Steps: ${plan.steps.length}\n`);
@@ -57,11 +72,13 @@ export async function verify(args: VerifyArgs): Promise<void> {
       process.stdout.write(`  Output: ${args.testDir}\n`);
     }
 
-    // Execute the verification loop (skip if --parse-only)
-    if (!args.parseOnly) {
+    // Execute the verification loop
+    {
       const verifyResult = await verifyCore({
         plan,
         testDir: args.testDir,
+        model: args.model,
+        dangerouslyBypassPermissions: args.dangerouslyBypassPermissions,
       });
 
       if (args.json) {

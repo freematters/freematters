@@ -32,7 +32,15 @@ function readTranscript(testDir: string): TranscriptEntry[] {
     return [];
   }
   if (!content) return [];
-  return content.split("\n").map((line) => JSON.parse(line) as TranscriptEntry);
+  const entries: TranscriptEntry[] = [];
+  for (const line of content.split("\n")) {
+    try {
+      entries.push(JSON.parse(line) as TranscriptEntry);
+    } catch {
+      // Skip malformed lines
+    }
+  }
+  return entries;
 }
 
 /**

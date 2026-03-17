@@ -35,12 +35,14 @@ export function enumeratePaths(fsm: Fsm): FsmPath[] {
       return;
     }
 
+    let reachedUnvisited = false;
     for (const [label, target] of transitionEntries) {
       if (visited.has(target)) {
-        // Skip cycles — but still record the path up to here if it's a dead end
+        // Skip cycles
         continue;
       }
 
+      reachedUnvisited = true;
       visited.add(target);
       visitedStates.push(target);
       transitionLabels.push(label);
@@ -50,6 +52,16 @@ export function enumeratePaths(fsm: Fsm): FsmPath[] {
       visitedStates.pop();
       transitionLabels.pop();
       visited.delete(target);
+    }
+
+    // All successors already visited (cycle-only) and current state is non-terminal:
+    // record the path up to the current state so it is not lost.
+    if (!reachedUnvisited) {
+      paths.push({
+        name: visitedStates.join(" -> "),
+        states: [...visitedStates],
+        transitions: [...transitionLabels],
+      });
     }
   }
 

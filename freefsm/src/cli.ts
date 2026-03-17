@@ -185,6 +185,11 @@ e2eCmd
   .argument("<plan>", "path to test plan markdown file")
   .requiredOption("--test-dir <path>", "output directory for artifacts")
   .option("--parse-only", "parse the test plan without executing the agent")
+  .option("--model <model>", "Claude model to use")
+  .option(
+    "--dangerously-bypass-permissions",
+    "bypass all permission checks (use with caution)",
+  )
   .action(async (_plan: string, opts: Record<string, unknown>, cmd: Command) => {
     const { json } = getGlobalOpts(cmd);
     await verify({
@@ -192,6 +197,9 @@ e2eCmd
       testDir: resolve(opts.testDir as string),
       json: json ?? false,
       parseOnly: (opts.parseOnly as boolean) ?? false,
+      model: opts.model as string | undefined,
+      dangerouslyBypassPermissions:
+        (opts.dangerouslyBypassPermissions as boolean) ?? false,
     });
   });
 

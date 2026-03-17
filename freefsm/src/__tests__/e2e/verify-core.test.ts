@@ -27,7 +27,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 // Import after mocking
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { TestPlan } from "../../e2e/parser.js";
-import { buildVerifySystemPrompt, verifyCore } from "../../e2e/verify-runner.js";
+import { buildTestPlanContext, verifyCore } from "../../e2e/verify-runner.js";
 
 const SAMPLE_PLAN: TestPlan = {
   name: "Basic workflow test",
@@ -67,29 +67,29 @@ function readJsonl<T>(filePath: string): T[] {
   return content.split("\n").map((line) => JSON.parse(line) as T);
 }
 
-describe("buildVerifySystemPrompt", () => {
-  test("includes the test plan name in the system prompt", () => {
-    const prompt = buildVerifySystemPrompt(SAMPLE_PLAN);
-    expect(prompt).toContain("Basic workflow test");
+describe("buildTestPlanContext", () => {
+  test("includes the test plan name", () => {
+    const ctx = buildTestPlanContext(SAMPLE_PLAN);
+    expect(ctx).toContain("Basic workflow test");
   });
 
-  test("includes all test steps in the system prompt", () => {
-    const prompt = buildVerifySystemPrompt(SAMPLE_PLAN);
-    expect(prompt).toContain("Start workflow");
-    expect(prompt).toContain("Transition");
-    expect(prompt).toContain("freefsm start workflow.yaml");
-    expect(prompt).toContain("freefsm goto done --on next");
+  test("includes all test steps", () => {
+    const ctx = buildTestPlanContext(SAMPLE_PLAN);
+    expect(ctx).toContain("Start workflow");
+    expect(ctx).toContain("Transition");
+    expect(ctx).toContain("freefsm start workflow.yaml");
+    expect(ctx).toContain("freefsm goto done --on next");
   });
 
-  test("includes expected outcomes in the system prompt", () => {
-    const prompt = buildVerifySystemPrompt(SAMPLE_PLAN);
-    expect(prompt).toContain("Workflow completes successfully");
+  test("includes expected outcomes", () => {
+    const ctx = buildTestPlanContext(SAMPLE_PLAN);
+    expect(ctx).toContain("Workflow completes successfully");
   });
 
-  test("includes setup and cleanup instructions", () => {
-    const prompt = buildVerifySystemPrompt(SAMPLE_PLAN);
-    expect(prompt).toContain("Install freefsm");
-    expect(prompt).toContain("Remove temp dir");
+  test("includes setup and cleanup", () => {
+    const ctx = buildTestPlanContext(SAMPLE_PLAN);
+    expect(ctx).toContain("Install freefsm");
+    expect(ctx).toContain("Remove temp dir");
   });
 });
 
@@ -237,7 +237,7 @@ describe("verifyCore — agent execution loop", () => {
     expect(result.reportPath).toBe(join(tmp, "test-report.md"));
   });
 
-  test("query is called with bypassPermissions mode", async () => {
+  test("query does NOT bypass permissions by default", async () => {
     mockMessages.push({
       type: "result",
       subtype: "success",
@@ -257,7 +257,62 @@ describe("verifyCore — agent execution loop", () => {
     await verifyCore({ plan: SAMPLE_PLAN, testDir: tmp });
 
     const callArgs = vi.mocked(query).mock.calls[0][0];
+    expect(callArgs.options?.permissionMode).toBeUndefined();
+    expect(callArgs.options?.allowDangerouslySkipPermissions).toBeUndefined();
+  });
+
+  test("query bypasses permissions when dangerouslyBypassPermissions is set", async () => {
+    mockMessages.push({
+      type: "result",
+      subtype: "success",
+      result: "Done",
+      duration_ms: 500,
+      duration_api_ms: 400,
+      is_error: false,
+      num_turns: 1,
+      total_cost_usd: 0.002,
+      usage: { input_tokens: 30, output_tokens: 15, server_tool_use_input_tokens: 0 },
+      modelUsage: {},
+      permission_denials: [],
+      uuid: "msg-1",
+      session_id: "sess-1",
+    });
+
+    await verifyCore({
+      plan: SAMPLE_PLAN,
+      testDir: tmp,
+      dangerouslyBypassPermissions: true,
+    });
+
+    const callArgs = vi.mocked(query).mock.calls[0][0];
     expect(callArgs.options?.permissionMode).toBe("bypassPermissions");
     expect(callArgs.options?.allowDangerouslySkipPermissions).toBe(true);
+  });
+
+  test("query passes model when specified", async () => {
+    mockMessages.push({
+      type: "result",
+      subtype: "success",
+      result: "Done",
+      duration_ms: 500,
+      duration_api_ms: 400,
+      is_error: false,
+      num_turns: 1,
+      total_cost_usd: 0.002,
+      usage: { input_tokens: 30, output_tokens: 15, server_tool_use_input_tokens: 0 },
+      modelUsage: {},
+      permission_denials: [],
+      uuid: "msg-1",
+      session_id: "sess-1",
+    });
+
+    await verifyCore({
+      plan: SAMPLE_PLAN,
+      testDir: tmp,
+      model: "claude-opus-4-20250514",
+    });
+
+    const callArgs = vi.mocked(query).mock.calls[0][0];
+    expect(callArgs.options?.model).toBe("claude-opus-4-20250514");
   });
 });
