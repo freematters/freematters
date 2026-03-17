@@ -1,14 +1,8 @@
 # Flow:
 #
-#   load-spec → implement ←--+←--------+
-#                   |         |          |
-#                   +-----(failed, max 5)
-#                   |                    |
-#                   +---(spec issue)→ spec-error
-#                   |
-#                 commit
-#                   |
-#               implement (next step)
+#   load-spec → implement ←--+
+#                   |         |
+#                commit + loop (next step)
 #                   |
 #                e2e-test (all steps complete)
 #                   |  (self-fix up to 5x on failure, then flag user)
@@ -40,7 +34,7 @@ guide: |
 
   - TDD discipline: Write tests BEFORE implementation. RED → GREEN → REFACTOR cycle.
   - One step at a time: Implement exactly one plan.md step per cycle.
-  - Spec is authoritative: design.md is the source of truth. Flag issues rather than deviate.
+  - Spec is authoritative: design.md is the source of truth.
   - Demoable after each step: Every completed step MUST leave the system working.
   - YAGNI & KISS: Only what the spec requires, simplest solution that works.
   - Commit atomically: Each completed step gets its own git commit.
@@ -78,9 +72,10 @@ states:
 
       Check if the argument matches `owner/repo#N` (regex: `[\w.-]+/[\w.-]+#\d+`).
       - If yes → **issue mode**. Remember `source_mode = "issue"`, parse `owner`, `repo`, `issue_number`.
+        Derive `slug` from the issue title (lowercase, strip `feat:`/`fix:` prefixes, replace non-alphanumeric with hyphens).
       - If no → **local mode**. Remember `source_mode = "local"`. The argument is the spec directory path.
 
-      ### Issue mode: download artifacts from issue
+      ### Issue mode: download artifacts and prepare
 
       1. Validate the issue exists and has the `spec-ready` label:
          ```bash
@@ -88,41 +83,16 @@ states:
          ```
          If no `spec-ready` label, warn the user and ask if they want to proceed anyway.
 
-      2. Fetch all artifact comments from the issue:
+      2. Download spec artifacts:
          ```bash
-         gh api 'repos/{owner}/{repo}/issues/{issue_number}/comments' --paginate \
-           --jq '.[] | select(.body | test("^## (design\\.md|plan\\.md|requirements\\.md|research/|e2e\\.md)")) | {id: .id, title: (.body | split("\n")[0]), body: .body}'
+         python3 freefsm/workflows/download_spec.py {owner} {repo} {issue_number} --slug {slug}
          ```
-         Identify comments whose body starts with:
-         - `## design.md` → save to `./specs/<slug>/design.md`
-         - `## plan.md` → save to `./specs/<slug>/plan.md`
-         - `## requirements.md` → save to `./specs/<slug>/requirements.md`
-         - `## research/` → save to `./specs/<slug>/research/<topic>.md`
-         - `## e2e.md` → save to `./specs/<slug>/e2e.md`
 
-         For each artifact, strip the `## filename` header line before saving — the file content
-         starts from the line after the header.
-
-      3. Derive slug from the issue title (lowercase, replace spaces/special chars with hyphens,
-         e.g., "feat: freefsm run" → `freefsm-run`).
-
-      4. Create a working branch:
+      3. Prepare implementation (create branch, add `doing` label, post start comment):
          ```bash
-         git checkout -b issue-{issue_number}-{slug}
+         python3 freefsm/workflows/prepare_implementation.py {owner} {repo} {issue_number} {slug}
          ```
-
-      5. Add `doing` label to the issue:
-         ```bash
-         gh label create doing --repo {owner}/{repo} --description "Implementation in progress" --color FBCA04 2>/dev/null || true
-         gh issue edit {issue_number} --repo {owner}/{repo} --add-label doing
-         ```
-
-      6. Post a `[from bot]` comment on the issue:
-         ```
-         [from bot] Starting implementation. Tracking on branch `issue-{issue_number}-{slug}`.
-         ```
-
-      7. Remember `branch_name` for later states.
+         Returns JSON with `branch_name`. Remember `branch_name` for later states.
 
       ### Local mode: read from directory (unchanged)
 
@@ -153,7 +123,7 @@ states:
 
   implement:
     prompt: |
-      ## Implement & Validate Next Step
+      ## Implement, Validate & Commit Next Step
 
       ### 1. Select
 
@@ -183,7 +153,9 @@ states:
       >    - **What was built**: <1-2 sentence summary>
       >    - **Tests**: <number of tests added, all passing/failing>
       >    - **Notes**: <any gotchas, workarounds, or deviations from spec>
-      > 7. Report: tests passed/failed, demo result, lint issues, any spec deviations
+      > 7. If the spec is ambiguous or has minor issues, use your best judgment to
+      >    work around them. Note any spec deviations in progress.md under **Notes**.
+      > 8. Report: tests passed/failed, demo result, lint issues, any spec deviations
       >
       > Do NOT modify plan.md — the orchestrator handles plan.md updates.
 
@@ -192,38 +164,10 @@ states:
       If sub-agents are not available in your runtime, do the work directly.
       Do NOT skip sub-agent dispatch just because the task seems simple.
 
-      ### 3. Review result
+      ### 3. Commit & Mark Complete
 
-      Review the sub-agent's output:
-      - **All tests pass + demo verified** → commit
-      - **Validation failed (< 5 attempts)** → dispatch sub-agent again with failure feedback
-      - **Validation failed (>= 5 attempts)** → stop and flag to user, ask how to proceed
-      - **Spec issue found** → spec-error (fix spec before continuing)
+      The sub-agent has already tested and validated. Proceed directly to commit.
 
-      ### Constraints
-      - You MUST NOT write implementation before tests exist
-      - You MUST reference design.md — do not invent interfaces
-      - If the spec is ambiguous or wrong, STOP and flag
-      - Implement ONLY the current step — no future steps
-      - You MUST dispatch a sub-agent, even if the task seems simple.
-        The orchestrator's job is to manage workflow state, not to write code itself.
-    todos:
-      - Find next unchecked step in plan.md
-      - Dispatch sub-agent to implement and validate the step
-      - Review sub-agent output
-    transitions:
-      step done: commit
-      all steps complete: done
-      spec issue found: spec-error
-      max retries exceeded: done
-
-  commit:
-    prompt: |
-      ## Commit & Mark Complete
-
-      The current step has been implemented and validated.
-
-      Process:
       1. Update `./specs/<slug>/plan.md` — change `- [ ] Step N` to `- [x] Step N`
       2. Stage all relevant files (new and modified, including progress.md and plan.md)
       3. Create a git commit: `feat(scope): step N - <step title>`
@@ -232,7 +176,7 @@ states:
       - Commit message
       - Progress: "Step N/M complete"
 
-      ### Issue mode additional steps
+      #### Issue mode additional steps
 
       If `source_mode == "issue"`, also:
 
@@ -256,43 +200,18 @@ states:
          - **Tests**: <count> added, all passing
          ```
 
-      Then transition back to implement for the next step.
-      If this was the last step, transition to done.
+      Then loop back to step 1 for the next unchecked step.
+
+      ### Constraints
+      - You MUST NOT write implementation before tests exist
+      - You MUST reference design.md — do not invent interfaces
+      - Implement ONLY the current step — no future steps
+      - You MUST dispatch a sub-agent, even if the task seems simple.
+        The orchestrator's job is to manage workflow state, not to write code itself.
     transitions:
-      more tasks remain: implement
-      all tasks complete: e2e-test
-
-  spec-error:
-    prompt: |
-      ## Spec Issue Detected
-
-      A problem was found in the spec during implementation. Fix it before continuing.
-
-      Process:
-      1. **Backup** the current spec file before modifying:
-         - Copy `./specs/<slug>/design.md` → `./specs/<slug>/design.md.bak.<timestamp>`
-         - If plan.md also needs changes, back it up similarly
-      2. **Describe the issue** — explain what was found and why the spec is wrong or ambiguous
-      3. **Fix the spec** — update design.md (and plan.md if needed) to resolve the issue
-      4. **Record the modification** in `./specs/<slug>/progress.md`:
-         ```
-         ## Spec Modification (Step N context)
-         - **Issue**: <what was wrong>
-         - **Fix**: <what was changed>
-         - **Backup**: <backup file path>
-         - **Affected steps**: <which plan steps are impacted>
-         ```
-      5. Log a brief summary of the change (no need to wait for user confirmation)
-
-      ### Issue mode additional step
-
-      If `source_mode == "issue"`, post a `[from bot]` comment on the issue describing
-      the spec issue found and the local fix applied. Do NOT edit the original issue
-      artifact comments — the local copy is the working copy during implementation.
-
-      After recording the fix, transition back to implement to continue autonomously.
-    transitions:
-      spec fixed: implement
+      more steps remain: implement
+      all steps complete: e2e-test
+      max retries exceeded: done
 
   e2e-test:
     prompt: |
@@ -479,13 +398,6 @@ states:
       ## Implementation Complete
 
       All steps from plan.md have been implemented, tested, and committed.
-
-      **Check for spec modifications**: Look for `## Spec Modification` entries in
-      `./specs/<slug>/progress.md` and `.bak.*` files in `./specs/<slug>/`. If any exist,
-      prominently report to the user:
-      - What spec changes were made during implementation
-      - Which backup files were created
-      - Suggest the user review the updated spec to ensure it still reflects intent
 
       Write `./specs/<slug>/implementation-summary.md` with:
       1. **Overview** — one paragraph describing what was built
