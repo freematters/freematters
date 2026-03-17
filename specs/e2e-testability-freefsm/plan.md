@@ -5,7 +5,7 @@
 - [x] Step 1: CLI scaffolding and test plan parser
 - [x] Step 2: TranscriptLogger and `freefsm e2e verify` core loop
 - [x] Step 3: ReportGenerator and `test-report.md` output
-- [ ] Step 4: `verifier.fsm.yaml` workflow
+- [x] Step 4: `verifier.fsm.yaml` workflow
 - [ ] Step 5: `freefsm e2e gen` command
 - [ ] Step 6: Dogfood — self-test freefsm with the e2e framework
 

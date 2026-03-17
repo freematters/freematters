@@ -164,7 +164,7 @@ describe("verifyCore — agent execution loop", () => {
     expect(assistantEntry).toBeDefined();
   });
 
-  test("calls query with system prompt containing the test plan", async () => {
+  test("calls query with FSM system prompt and test plan in initial message", async () => {
     mockMessages.push({
       type: "result",
       subtype: "success",
@@ -185,8 +185,13 @@ describe("verifyCore — agent execution loop", () => {
 
     expect(query).toHaveBeenCalledOnce();
     const callArgs = vi.mocked(query).mock.calls[0][0];
-    expect(callArgs.options?.systemPrompt).toContain("Basic workflow test");
-    expect(callArgs.options?.systemPrompt).toContain("Start workflow");
+    // System prompt now contains FSM template (not the test plan directly)
+    expect(callArgs.options?.systemPrompt).toContain("FSM");
+    expect(callArgs.options?.systemPrompt).toContain("fsm_goto");
+    // Test plan info is in the initial message (prompt)
+    const prompt = callArgs.prompt as string;
+    expect(prompt).toContain("Basic workflow test");
+    expect(prompt).toContain("Start workflow");
   });
 
   test("generates test-report.md and returns VerifyCoreResult", async () => {
