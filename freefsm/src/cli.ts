@@ -200,9 +200,9 @@ e2eCmd
   .description("generate a test plan from a workflow or prompt")
   .argument("<source>", "path to FSM YAML or free-text prompt")
   .option("--output <file>", "output file path (default: stdout)")
-  .action((_source: string, opts: Record<string, unknown>, cmd: Command) => {
+  .action(async (_source: string, opts: Record<string, unknown>, cmd: Command) => {
     const { json } = getGlobalOpts(cmd);
-    gen({
+    await gen({
       source: resolve(_source),
       output: opts.output ? resolve(opts.output as string) : undefined,
       json: json ?? false,
