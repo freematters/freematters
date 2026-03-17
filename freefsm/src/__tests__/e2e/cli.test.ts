@@ -1,10 +1,8 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-
-const CLI = resolve(__dirname, "../../../dist/cli.js");
+import { runCli } from "./helpers.js";
 
 let tmp: string;
 
@@ -20,21 +18,7 @@ function run(
   args: string,
   opts: { expectFail?: boolean } = {},
 ): { stdout: string; stderr: string; exitCode: number } {
-  try {
-    const stdout = execFileSync("node", [CLI, ...args.split(/\s+/)], {
-      encoding: "utf-8",
-      env: { ...process.env, FREEFSM_ROOT: undefined },
-    });
-    return { stdout, stderr: "", exitCode: 0 };
-  } catch (err: unknown) {
-    const e = err as { status: number; stdout: string; stderr: string };
-    if (!opts.expectFail) {
-      throw new Error(
-        `CLI failed unexpectedly (exit ${e.status}):\n${e.stderr}\n${e.stdout}`,
-      );
-    }
-    return { stdout: e.stdout ?? "", stderr: e.stderr ?? "", exitCode: e.status };
-  }
+  return runCli(args, { ...opts, env: { FREEFSM_ROOT: undefined } });
 }
 
 describe("freefsm e2e verify — CLI arg validation", () => {

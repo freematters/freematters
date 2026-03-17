@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import type { TranscriptEntry } from "../../e2e/transcript-logger.js";
+import { readJsonl } from "./helpers.js";
 
 // Mock the Agent SDK query function
 const mockMessages: Array<{ type: string; [key: string]: unknown }> = [];
@@ -59,13 +60,6 @@ afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
   vi.clearAllMocks();
 });
-
-function readJsonl<T>(filePath: string): T[] {
-  if (!existsSync(filePath)) return [];
-  const content = readFileSync(filePath, "utf-8").trim();
-  if (!content) return [];
-  return content.split("\n").map((line) => JSON.parse(line) as T);
-}
 
 describe("buildTestPlanContext", () => {
   test("includes the test plan name", () => {

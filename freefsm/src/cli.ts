@@ -190,10 +190,10 @@ e2eCmd
     "--dangerously-bypass-permissions",
     "bypass all permission checks (use with caution)",
   )
-  .action(async (_plan: string, opts: Record<string, unknown>, cmd: Command) => {
+  .action(async (planPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { json } = getGlobalOpts(cmd);
     await verify({
-      planPath: resolve(_plan),
+      planPath: resolve(planPath),
       testDir: resolve(opts.testDir as string),
       json: json ?? false,
       parseOnly: (opts.parseOnly as boolean) ?? false,

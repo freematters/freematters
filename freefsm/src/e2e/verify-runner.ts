@@ -8,7 +8,11 @@ import { type Fsm, loadFsm } from "../fsm.js";
 import { formatStateCard, stateCardFromFsm } from "../output.js";
 import { type RunStatus, Store } from "../store.js";
 import type { TestPlan } from "./parser.js";
-import { generateJsonReport, generateReport } from "./report-generator.js";
+import {
+  generateJsonReport,
+  generateReport,
+  readTranscript,
+} from "./report-generator.js";
 import type { JsonReport } from "./report-generator.js";
 import { TranscriptLogger } from "./transcript-logger.js";
 
@@ -246,6 +250,12 @@ function createVerifierMcpServer(
 }
 
 /**
+ * Retry configuration for agent API calls.
+ */
+const MAX_RETRIES = 3;
+const INITIAL_BACKOFF_MS = 1000;
+
+/**
  * Core verification loop: loads the verifier.fsm.yaml workflow, initializes
  * an FSM run, launches an Agent SDK session with FSM MCP tools, streams
  * messages through TranscriptLogger, generates a report, and returns results.
@@ -278,6 +288,7 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
   );
 
   const logger = new TranscriptLogger(testDir);
+  const reportPath = join(testDir, "test-report.md");
 
   try {
     // Create FSM MCP server for state management (with logger for step tracking)
@@ -307,34 +318,63 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
       queryOptions.model = args.model;
     }
 
-    const session = query({
-      prompt: initialMessage,
-      options: queryOptions,
-    });
+    // Retry loop for agent API failures (3 attempts, exponential backoff)
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const session = query({
+          prompt: initialMessage,
+          options: queryOptions,
+        });
 
-    for await (const message of session) {
-      logger.processMessage(message as { type: string; [key: string]: unknown });
+        for await (const message of session) {
+          logger.processMessage(message as { type: string; [key: string]: unknown });
 
-      if (message.type === "result") {
-        const resultMsg = message as SDKMessage & {
-          type: "result";
-          result?: string;
-        };
-        if (resultMsg.result) {
-          process.stdout.write(`${resultMsg.result}\n`);
+          if (message.type === "result") {
+            const resultMsg = message as SDKMessage & {
+              type: "result";
+              result?: string;
+            };
+            if (resultMsg.result) {
+              process.stdout.write(`${resultMsg.result}\n`);
+            }
+          }
+        }
+
+        // Success — break out of retry loop
+        lastError = undefined;
+        break;
+      } catch (err: unknown) {
+        lastError = err;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        logger.logTranscript({
+          type: "error",
+          step: 0,
+          content: `Agent API attempt ${attempt}/${MAX_RETRIES} failed: ${errMsg}`,
+        });
+
+        if (attempt < MAX_RETRIES) {
+          const backoffMs = INITIAL_BACKOFF_MS * 2 ** (attempt - 1);
+          await new Promise((resolve) => setTimeout(resolve, backoffMs));
         }
       }
     }
+
+    if (lastError) {
+      throw lastError;
+    }
   } finally {
     logger.close();
+
+    // Generate report in finally block so partial reports are written even on errors
+    const entries = readTranscript(testDir);
+    const reportContent = generateReport(plan, testDir, entries);
+    writeFileSync(reportPath, reportContent, "utf-8");
   }
 
-  // Generate report after agent session completes
-  const reportContent = generateReport(plan, testDir);
-  const reportPath = join(testDir, "test-report.md");
-  writeFileSync(reportPath, reportContent, "utf-8");
-
-  const jsonReport = generateJsonReport(plan, testDir);
+  // Read transcript once and pass to both report functions
+  const entries = readTranscript(testDir);
+  const jsonReport = generateJsonReport(plan, testDir, entries);
 
   return { reportPath, jsonReport };
 }

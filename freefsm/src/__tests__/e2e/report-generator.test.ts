@@ -164,7 +164,7 @@ describe("generateReport — markdown output", () => {
     expect(report).toContain("5.1s");
   });
 
-  test("report includes date and total duration", () => {
+  test("report includes date from first transcript entry and total duration", () => {
     const entries: TranscriptEntry[] = [
       {
         ts: "2026-03-17T12:00:00.000Z",
@@ -183,7 +183,7 @@ describe("generateReport — markdown output", () => {
 
     const report = generateReport(SAMPLE_PLAN, tmp);
 
-    expect(report).toContain("**Date**:");
+    expect(report).toContain("**Date**: 2026-03-17T12:00:00.000Z");
     expect(report).toContain("**Duration**:");
   });
 

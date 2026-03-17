@@ -1,93 +1,93 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+import { readJsonl } from "./helpers.js";
 
 // ─── Tests for verifier.fsm.yaml schema validation ──────────────
 
-import { loadFsm } from "../../fsm.js";
+import { type Fsm, loadFsm } from "../../fsm.js";
 
 const VERIFIER_FSM_PATH = resolve(__dirname, "../../../workflows/verifier.fsm.yaml");
 
+// Load FSM once and share across all tests in this describe block
+let verifierFsm: Fsm;
+
 describe("verifier.fsm.yaml — schema validation", () => {
+  beforeAll(() => {
+    verifierFsm = loadFsm(VERIFIER_FSM_PATH);
+  });
+
   test("workflow file exists", () => {
     expect(existsSync(VERIFIER_FSM_PATH)).toBe(true);
   });
 
   test("passes loadFsm schema validation", () => {
-    const fsm = loadFsm(VERIFIER_FSM_PATH);
-    expect(fsm.version).toBe(1);
-    expect(fsm.initial).toBe("setup");
+    expect(verifierFsm.version).toBe(1);
+    expect(verifierFsm.initial).toBe("setup");
   });
 
   test("has all required states: setup, execute-steps, evaluate, report, done", () => {
-    const fsm = loadFsm(VERIFIER_FSM_PATH);
-    expect(fsm.states).toHaveProperty("setup");
-    expect(fsm.states).toHaveProperty("execute-steps");
-    expect(fsm.states).toHaveProperty("evaluate");
-    expect(fsm.states).toHaveProperty("report");
-    expect(fsm.states).toHaveProperty("done");
+    expect(verifierFsm.states).toHaveProperty("setup");
+    expect(verifierFsm.states).toHaveProperty("execute-steps");
+    expect(verifierFsm.states).toHaveProperty("evaluate");
+    expect(verifierFsm.states).toHaveProperty("report");
+    expect(verifierFsm.states).toHaveProperty("done");
   });
 
   test("setup transitions to execute-steps", () => {
-    const fsm = loadFsm(VERIFIER_FSM_PATH);
-    const targets = Object.values(fsm.states.setup.transitions);
+    const targets = Object.values(verifierFsm.states.setup.transitions);
     expect(targets).toContain("execute-steps");
   });
 
   test("execute-steps transitions to evaluate", () => {
-    const fsm = loadFsm(VERIFIER_FSM_PATH);
-    const targets = Object.values(fsm.states["execute-steps"].transitions);
+    const targets = Object.values(verifierFsm.states["execute-steps"].transitions);
     expect(targets).toContain("evaluate");
   });
 
   test("evaluate transitions to report", () => {
-    const fsm = loadFsm(VERIFIER_FSM_PATH);
-    const targets = Object.values(fsm.states.evaluate.transitions);
+    const targets = Object.values(verifierFsm.states.evaluate.transitions);
     expect(targets).toContain("report");
   });
 
   test("report transitions to done", () => {
-    const fsm = loadFsm(VERIFIER_FSM_PATH);
-    const targets = Object.values(fsm.states.report.transitions);
+    const targets = Object.values(verifierFsm.states.report.transitions);
     expect(targets).toContain("done");
   });
 
   test("done is a terminal state with no transitions", () => {
-    const fsm = loadFsm(VERIFIER_FSM_PATH);
-    expect(Object.keys(fsm.states.done.transitions)).toHaveLength(0);
+    expect(Object.keys(verifierFsm.states.done.transitions)).toHaveLength(0);
   });
 
   test("each state has a non-empty prompt", () => {
-    const fsm = loadFsm(VERIFIER_FSM_PATH);
-    for (const [name, state] of Object.entries(fsm.states)) {
+    for (const [name, state] of Object.entries(verifierFsm.states)) {
       expect(state.prompt.length).toBeGreaterThan(0);
     }
   });
 
   test("state prompts reference test plan sections", () => {
-    const fsm = loadFsm(VERIFIER_FSM_PATH);
     // setup should mention test plan and prerequisites
-    expect(fsm.states.setup.prompt.toLowerCase()).toMatch(
+    expect(verifierFsm.states.setup.prompt.toLowerCase()).toMatch(
       /test plan|setup|prerequisite/,
     );
     // execute-steps should mention executing steps
-    expect(fsm.states["execute-steps"].prompt.toLowerCase()).toMatch(
+    expect(verifierFsm.states["execute-steps"].prompt.toLowerCase()).toMatch(
       /step|execute|evidence/,
     );
     // evaluate should mention comparing or judging outcomes
-    expect(fsm.states.evaluate.prompt.toLowerCase()).toMatch(
+    expect(verifierFsm.states.evaluate.prompt.toLowerCase()).toMatch(
       /outcome|verdict|compare|judge/,
     );
     // report should mention writing report
-    expect(fsm.states.report.prompt.toLowerCase()).toMatch(/report|test-report/);
+    expect(verifierFsm.states.report.prompt.toLowerCase()).toMatch(
+      /report|test-report/,
+    );
   });
 
   test("has a guide field describing the verification workflow", () => {
-    const fsm = loadFsm(VERIFIER_FSM_PATH);
-    expect(fsm.guide).toBeDefined();
-    expect(fsm.guide?.length).toBeGreaterThan(0);
-    expect(fsm.guide?.toLowerCase()).toMatch(/verif|test|e2e/);
+    expect(verifierFsm.guide).toBeDefined();
+    expect(verifierFsm.guide?.length).toBeGreaterThan(0);
+    expect(verifierFsm.guide?.toLowerCase()).toMatch(/verif|test|e2e/);
   });
 });
 
@@ -147,13 +147,6 @@ afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
   vi.clearAllMocks();
 });
-
-function readJsonl<T>(filePath: string): T[] {
-  if (!existsSync(filePath)) return [];
-  const content = readFileSync(filePath, "utf-8").trim();
-  if (!content) return [];
-  return content.split("\n").map((line) => JSON.parse(line) as T);
-}
 
 describe("verifyCore — FSM-driven execution", () => {
   test("query is called with verifier workflow system prompt", async () => {

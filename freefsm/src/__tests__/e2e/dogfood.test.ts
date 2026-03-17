@@ -1,11 +1,10 @@
-import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { parseTestPlan } from "../../e2e/parser.js";
+import { runCli as runCliHelper } from "./helpers.js";
 
-const CLI = resolve(__dirname, "../../../dist/cli.js");
 const E2E_DIR = resolve(__dirname, "../../../e2e");
 
 let tmp: string;
@@ -22,21 +21,7 @@ function runCli(
   args: string,
   opts: { expectFail?: boolean } = {},
 ): { stdout: string; stderr: string; exitCode: number } {
-  try {
-    const stdout = execFileSync("node", [CLI, ...args.split(/\s+/)], {
-      encoding: "utf-8",
-      env: { ...process.env, FREEFSM_ROOT: tmp },
-    });
-    return { stdout, stderr: "", exitCode: 0 };
-  } catch (err: unknown) {
-    const e = err as { status: number; stdout: string; stderr: string };
-    if (!opts.expectFail) {
-      throw new Error(
-        `CLI failed unexpectedly (exit ${e.status}):\n${e.stderr}\n${e.stdout}`,
-      );
-    }
-    return { stdout: e.stdout ?? "", stderr: e.stderr ?? "", exitCode: e.status };
-  }
+  return runCliHelper(args, { ...opts, env: { FREEFSM_ROOT: tmp } });
 }
 
 // --- Test plan file existence and validity ---
@@ -163,12 +148,12 @@ states:
 
 // --- npm run test:e2e script validation ---
 
-describe("package.json test:e2e script", () => {
-  test("test:e2e script is defined in package.json", () => {
+describe("package.json test:e2e:parse script", () => {
+  test("test:e2e:parse script is defined in package.json", () => {
     const pkg = JSON.parse(
       readFileSync(resolve(__dirname, "../../../package.json"), "utf-8"),
     );
-    expect(pkg.scripts["test:e2e"]).toBeDefined();
-    expect(typeof pkg.scripts["test:e2e"]).toBe("string");
+    expect(pkg.scripts["test:e2e:parse"]).toBeDefined();
+    expect(typeof pkg.scripts["test:e2e:parse"]).toBe("string");
   });
 });

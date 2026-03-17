@@ -19,7 +19,7 @@ export interface GenArgs {
 export function generateFromYaml(fsmPath: string): string {
   const fsm = loadFsm(fsmPath);
   const paths = enumeratePaths(fsm);
-  const fsmName = basename(fsmPath, ".fsm.yaml").replace(/\.yaml$/, "");
+  const fsmName = basename(fsmPath, ".fsm.yaml");
 
   const lines: string[] = [];
   lines.push(`# Test: ${fsmName} workflow`);

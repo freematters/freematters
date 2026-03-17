@@ -23,7 +23,7 @@ export interface JsonReport {
 /**
  * Read transcript.jsonl from testDir and parse into entries.
  */
-function readTranscript(testDir: string): TranscriptEntry[] {
+export function readTranscript(testDir: string): TranscriptEntry[] {
   const path = join(testDir, "transcript.jsonl");
   let content: string;
   try {
@@ -112,6 +112,13 @@ function computeStepResults(plan: TestPlan, entries: TranscriptEntry[]): StepRes
 }
 
 /**
+ * Escape pipe characters in table cell content to prevent breaking markdown tables.
+ */
+function escapeTableCell(text: string): string {
+  return text.replace(/\|/g, "\\|");
+}
+
+/**
  * Format a duration in milliseconds as a human-readable string.
  */
 function formatDuration(ms: number): string {
@@ -120,28 +127,37 @@ function formatDuration(ms: number): string {
 }
 
 /**
- * Generate a markdown test report from the transcript and test plan.
+ * Generate a markdown test report from transcript entries and the test plan.
+ * If entries are provided, uses them directly; otherwise reads from testDir.
  */
-export function generateReport(plan: TestPlan, testDir: string): string {
-  const entries = readTranscript(testDir);
-  const stepResults = computeStepResults(plan, entries);
+export function generateReport(
+  plan: TestPlan,
+  testDir: string,
+  entries?: TranscriptEntry[],
+): string {
+  const resolvedEntries = entries ?? readTranscript(testDir);
+  const stepResults = computeStepResults(plan, resolvedEntries);
 
   const allPass = stepResults.every((r) => r.verdict === "PASS");
   const overallVerdict: StepVerdict = allPass ? "PASS" : "FAIL";
 
   // Compute total duration from first to last transcript entry
   let totalDuration = "N/A";
-  if (entries.length >= 2) {
-    const first = new Date(entries[0].ts).getTime();
-    const last = new Date(entries[entries.length - 1].ts).getTime();
+  if (resolvedEntries.length >= 2) {
+    const first = new Date(resolvedEntries[0].ts).getTime();
+    const last = new Date(resolvedEntries[resolvedEntries.length - 1].ts).getTime();
     totalDuration = formatDuration(last - first);
   }
+
+  // Use first transcript entry timestamp instead of current time for determinism
+  const reportDate =
+    resolvedEntries.length > 0 ? resolvedEntries[0].ts : new Date().toISOString();
 
   const lines: string[] = [];
 
   // Header
   lines.push(`# Test Report: ${plan.name}`);
-  lines.push(`**Date**: ${new Date().toISOString()}`);
+  lines.push(`**Date**: ${reportDate}`);
   lines.push(`**Verdict**: ${overallVerdict}`);
   lines.push(`**Duration**: ${totalDuration}`);
   lines.push("");
@@ -153,7 +169,9 @@ export function generateReport(plan: TestPlan, testDir: string): string {
   lines.push("|------|------|---------|----------|");
   for (const result of stepResults) {
     const dur = result.duration !== null ? formatDuration(result.duration) : "N/A";
-    lines.push(`| ${result.step} | ${result.name} | ${result.verdict} | ${dur} |`);
+    lines.push(
+      `| ${result.step} | ${escapeTableCell(result.name)} | ${result.verdict} | ${dur} |`,
+    );
   }
   lines.push("");
 
@@ -182,10 +200,15 @@ export function generateReport(plan: TestPlan, testDir: string): string {
 /**
  * Generate a JSON report summary.
  * Returns { verdict, steps_passed, steps_failed }.
+ * If entries are provided, uses them directly; otherwise reads from testDir.
  */
-export function generateJsonReport(plan: TestPlan, testDir: string): JsonReport {
-  const entries = readTranscript(testDir);
-  const stepResults = computeStepResults(plan, entries);
+export function generateJsonReport(
+  plan: TestPlan,
+  testDir: string,
+  entries?: TranscriptEntry[],
+): JsonReport {
+  const resolvedEntries = entries ?? readTranscript(testDir);
+  const stepResults = computeStepResults(plan, resolvedEntries);
 
   const stepsPassed = stepResults.filter((r) => r.verdict === "PASS").length;
   const stepsFailed = stepResults.filter((r) => r.verdict === "FAIL").length;

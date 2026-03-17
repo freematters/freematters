@@ -50,6 +50,10 @@ export function parseTestPlan(markdown: string): ParseResult {
   const expectedOutcomes = parseListItems(sections.get("Expected Outcomes") ?? "");
   const cleanup = parseListItems(sections.get("Cleanup") ?? "");
 
+  if (steps.length === 0) {
+    return { ok: false, error: "Steps section must contain at least one step" };
+  }
+
   return {
     ok: true,
     plan: { name, setup, steps, expectedOutcomes, cleanup },

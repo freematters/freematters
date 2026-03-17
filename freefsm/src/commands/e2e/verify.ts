@@ -1,5 +1,4 @@
-import { readFileSync } from "node:fs";
-import { mkdirSync } from "node:fs";
+import { constants, accessSync, mkdirSync, readFileSync } from "node:fs";
 import { parseTestPlan } from "../../e2e/parser.js";
 import { verifyCore } from "../../e2e/verify-runner.js";
 import { CliError } from "../../errors.js";
@@ -34,8 +33,19 @@ export async function verify(args: VerifyArgs): Promise<void> {
       });
     }
 
-    // Create test-dir if it doesn't exist
+    // Create test-dir if it doesn't exist and verify it is writable
     mkdirSync(args.testDir, { recursive: true });
+    try {
+      accessSync(args.testDir, constants.W_OK);
+    } catch {
+      throw new CliError(
+        "ARGS_INVALID",
+        `Test directory is not writable: ${args.testDir}`,
+        {
+          context: { fsmPath: args.planPath },
+        },
+      );
+    }
 
     const { plan } = result;
 
