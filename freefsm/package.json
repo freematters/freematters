@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "node dist/cli.js e2e verify e2e/simple-workflow.md --test-dir e2e/results/simple-workflow --parse-only && node dist/cli.js e2e verify e2e/error-handling.md --test-dir e2e/results/error-handling --parse-only",
     "test:watch": "vitest",
     "fmt": "biome format --write .",
     "lint": "biome lint .",

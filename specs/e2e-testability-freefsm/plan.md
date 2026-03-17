@@ -7,7 +7,7 @@
 - [x] Step 3: ReportGenerator and `test-report.md` output
 - [x] Step 4: `verifier.fsm.yaml` workflow
 - [x] Step 5: `freefsm e2e gen` command
-- [ ] Step 6: Dogfood — self-test freefsm with the e2e framework
+- [x] Step 6: Dogfood — self-test freefsm with the e2e framework
 
 ---
 
