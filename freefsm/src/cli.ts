@@ -184,12 +184,14 @@ e2eCmd
   .description("execute a test plan and produce a report")
   .argument("<plan>", "path to test plan markdown file")
   .requiredOption("--test-dir <path>", "output directory for artifacts")
-  .action((_plan: string, opts: Record<string, unknown>, cmd: Command) => {
+  .option("--parse-only", "parse the test plan without executing the agent")
+  .action(async (_plan: string, opts: Record<string, unknown>, cmd: Command) => {
     const { json } = getGlobalOpts(cmd);
-    verify({
+    await verify({
       planPath: resolve(_plan),
       testDir: resolve(opts.testDir as string),
       json: json ?? false,
+      parseOnly: (opts.parseOnly as boolean) ?? false,
     });
   });
 

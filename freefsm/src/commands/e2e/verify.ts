@@ -1,16 +1,18 @@
 import { readFileSync } from "node:fs";
 import { mkdirSync } from "node:fs";
 import { parseTestPlan } from "../../e2e/parser.js";
+import { verifyCore } from "../../e2e/verify-runner.js";
 import { CliError } from "../../errors.js";
-import { handleError, jsonError, jsonSuccess, printJson } from "../../output.js";
+import { handleError, jsonSuccess, printJson } from "../../output.js";
 
 export interface VerifyArgs {
   planPath: string;
   testDir: string;
   json: boolean;
+  parseOnly?: boolean;
 }
 
-export function verify(args: VerifyArgs): void {
+export async function verify(args: VerifyArgs): Promise<void> {
   try {
     // Read the test plan file
     let planContent: string;
@@ -36,6 +38,7 @@ export function verify(args: VerifyArgs): void {
     const { plan } = result;
 
     if (args.json) {
+      // In JSON mode, print parsed plan summary before running
       printJson(
         jsonSuccess("Test plan parsed", {
           name: plan.name,
@@ -52,6 +55,11 @@ export function verify(args: VerifyArgs): void {
       process.stdout.write(`  Expected outcomes: ${plan.expectedOutcomes.length}\n`);
       process.stdout.write(`  Cleanup: ${plan.cleanup.length} items\n`);
       process.stdout.write(`  Output: ${args.testDir}\n`);
+    }
+
+    // Execute the verification loop (skip if --parse-only)
+    if (!args.parseOnly) {
+      await verifyCore({ plan, testDir: args.testDir });
     }
   } catch (err: unknown) {
     handleError(err, args.json);

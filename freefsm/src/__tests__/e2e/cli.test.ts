@@ -76,7 +76,9 @@ describe("freefsm e2e verify — CLI arg validation", () => {
       "utf-8",
     );
     const testDir = join(tmp, "out-test");
-    const { stdout, exitCode } = run(`e2e verify ${planPath} --test-dir ${testDir} -j`);
+    const { stdout, exitCode } = run(
+      `e2e verify ${planPath} --test-dir ${testDir} --parse-only -j`,
+    );
     expect(exitCode).toBe(0);
 
     const parsed = JSON.parse(stdout);
@@ -108,7 +110,7 @@ describe("freefsm e2e verify — CLI arg validation", () => {
       );
     }
     const testDir = join(tmp, `new-dir-${Date.now()}`);
-    run(`e2e verify ${planPath} --test-dir ${testDir} -j`);
+    run(`e2e verify ${planPath} --test-dir ${testDir} --parse-only -j`);
     expect(existsSync(testDir)).toBe(true);
   });
 
