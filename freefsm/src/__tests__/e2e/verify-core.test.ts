@@ -189,6 +189,49 @@ describe("verifyCore — agent execution loop", () => {
     expect(callArgs.options?.systemPrompt).toContain("Start workflow");
   });
 
+  test("generates test-report.md and returns VerifyCoreResult", async () => {
+    mockMessages.push({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "Executing step 1..." }],
+      },
+      uuid: "msg-1",
+      session_id: "sess-1",
+      parent_tool_use_id: null,
+    });
+    mockMessages.push({
+      type: "result",
+      subtype: "success",
+      result: "All steps completed",
+      duration_ms: 3000,
+      duration_api_ms: 2000,
+      is_error: false,
+      num_turns: 2,
+      total_cost_usd: 0.01,
+      usage: { input_tokens: 100, output_tokens: 50, server_tool_use_input_tokens: 0 },
+      modelUsage: {},
+      permission_denials: [],
+      uuid: "msg-2",
+      session_id: "sess-1",
+    });
+
+    const result = await verifyCore({ plan: SAMPLE_PLAN, testDir: tmp });
+
+    // test-report.md should exist
+    expect(existsSync(join(tmp, "test-report.md"))).toBe(true);
+    const reportContent = readFileSync(join(tmp, "test-report.md"), "utf-8");
+    expect(reportContent).toContain("# Test Report: Basic workflow test");
+
+    // result should contain jsonReport
+    expect(result.jsonReport).toBeDefined();
+    expect(result.jsonReport.verdict).toBe("FAIL"); // no judgment entries → FAIL
+    expect(result.jsonReport.steps_passed).toBe(0);
+    expect(result.jsonReport.steps_failed).toBe(2);
+
+    // reportPath should point to the file
+    expect(result.reportPath).toBe(join(tmp, "test-report.md"));
+  });
+
   test("query is called with bypassPermissions mode", async () => {
     mockMessages.push({
       type: "result",

@@ -1,12 +1,21 @@
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import type { TestPlan } from "./parser.js";
+import { generateJsonReport, generateReport } from "./report-generator.js";
+import type { JsonReport } from "./report-generator.js";
 import { TranscriptLogger } from "./transcript-logger.js";
 
 export interface VerifyCoreArgs {
   plan: TestPlan;
   testDir: string;
   model?: string;
+}
+
+export interface VerifyCoreResult {
+  reportPath: string;
+  jsonReport: JsonReport;
 }
 
 /**
@@ -81,9 +90,9 @@ export function buildVerifySystemPrompt(plan: TestPlan): string {
 
 /**
  * Core verification loop: launches an Agent SDK session with the test plan,
- * streams messages through TranscriptLogger, and lets the agent execute autonomously.
+ * streams messages through TranscriptLogger, generates a report, and returns results.
  */
-export async function verifyCore(args: VerifyCoreArgs): Promise<void> {
+export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult> {
   const { plan, testDir } = args;
 
   const logger = new TranscriptLogger(testDir);
@@ -117,4 +126,13 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<void> {
   } finally {
     logger.close();
   }
+
+  // Generate report after agent session completes
+  const reportContent = generateReport(plan, testDir);
+  const reportPath = join(testDir, "test-report.md");
+  writeFileSync(reportPath, reportContent, "utf-8");
+
+  const jsonReport = generateJsonReport(plan, testDir);
+
+  return { reportPath, jsonReport };
 }
