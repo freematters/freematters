@@ -153,7 +153,9 @@ states:
       >    - **What was built**: <1-2 sentence summary>
       >    - **Tests**: <number of tests added, all passing/failing>
       >    - **Notes**: <any gotchas, workarounds, or deviations from spec>
-      > 7. Report: tests passed/failed, demo result, lint issues, any spec deviations
+      > 7. If the spec is ambiguous or has minor issues, use your best judgment to
+      >    work around them. Note any spec deviations in progress.md under **Notes**.
+      > 8. Report: tests passed/failed, demo result, lint issues, any spec deviations
       >
       > Do NOT modify plan.md — the orchestrator handles plan.md updates.
 
