@@ -112,18 +112,28 @@ def main() -> None:
                 args.owner, args.repo, args.issue_number, last_count
             )
 
+            has_user_comment = False
             for comment in new_comments:
-                # React with 👀 to every new comment
+                # Skip bot replies entirely
+                if comment["body"].startswith("[bot reply]"):
+                    continue
+
+                # React with 👀 to user comments
                 react_eyes(args.owner, args.repo, comment["id"])
 
                 # Only report comments from the creator
                 if comment["user_login"] == args.creator:
                     print(f"NEW_COMMENT: {comment['body']}")
                     sys.stdout.flush()
+                    has_user_comment = True
 
-            # Persist new count and exit (one batch at a time)
+            # Persist new count
+            last_count = new_count
             count_file.write_text(str(new_count))
-            break
+
+            # Only exit if we found a real user comment
+            if has_user_comment:
+                break
 
         time.sleep(args.interval)
 

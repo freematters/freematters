@@ -1,0 +1,125 @@
+# Flow:
+#
+#   setup → execute-steps → evaluate → report → done
+#
+
+version: 1
+guide: |
+  E2E test verifier workflow. Drives a Claude agent through structured verification
+  of a test plan: setup the environment, execute each test step, evaluate outcomes,
+  and generate a report.
+
+  The test plan is provided as context in the initial message. The agent reads the
+  test plan sections (Setup, Steps, Expected Outcomes, Cleanup) and executes them
+  in sequence through the FSM states.
+
+  Rules:
+  - Execute steps exactly as described in the test plan.
+  - Collect evidence (command output, file contents, exit codes) for every action.
+  - Judge each step as PASS or FAIL with justification.
+  - Do NOT skip steps or invent steps not in the plan.
+  - Always proceed through all states — do not stop early.
+
+initial: setup
+
+states:
+  setup:
+    prompt: |
+      ## Setup
+
+      Read the test plan provided in the initial context.
+
+      Execute all setup steps listed under "## Setup" in the test plan:
+      - Verify prerequisites are met (tools installed, services running, etc.)
+      - Create any required fixtures, directories, or test data
+      - If a setup step fails, log the failure and continue with remaining setup steps
+
+      After completing setup, report what was done and any issues encountered.
+    transitions:
+      setup complete: execute-steps
+
+  execute-steps:
+    prompt: |
+      ## Execute Test Steps
+
+      Execute each test step from the "## Steps" section of the test plan, in order.
+
+      For each step:
+      1. Run the described action exactly as specified
+      2. Observe and record the actual result (stdout, stderr, exit code, file changes)
+      3. Compare the actual result against the expected outcome
+      4. Judge the step as PASS or FAIL:
+         - PASS: The observed result matches or satisfies the expected outcome
+         - FAIL: The observed result does not match the expected outcome
+      5. Record evidence for the judgment (exact output, error messages, file contents)
+
+      Do NOT stop on failure — execute all remaining steps even if one fails.
+      Collect comprehensive evidence for each step to support debugging.
+    transitions:
+      all steps executed: evaluate
+
+  evaluate:
+    prompt: |
+      ## Evaluate Overall Outcomes
+
+      Compare all observations against the "## Expected Outcomes" section of the test plan.
+
+      For each expected outcome:
+      1. Review evidence from the executed steps
+      2. Determine if the outcome is satisfied
+      3. Record the verdict with supporting evidence
+
+      Determine the overall verdict:
+      - PASS: All steps passed AND all expected outcomes are satisfied
+      - FAIL: Any step failed OR any expected outcome is not satisfied
+
+      If there are cleanup steps in the test plan, execute them now. Log cleanup
+      results but do not let cleanup failures change the overall verdict.
+
+      Summarize:
+      - Per-step verdicts with evidence
+      - Overall verdict (PASS/FAIL)
+      - Any unexpected observations or issues
+    transitions:
+      evaluation complete: report
+
+  report:
+    prompt: |
+      ## Generate Report
+
+      Write a test-report.md file to the test output directory with the following structure:
+
+      ```markdown
+      # Test Report: <test-name>
+      **Date**: <ISO date>
+      **Verdict**: PASS | FAIL
+      **Duration**: <total time>
+
+      ## Results
+
+      | Step | Name | Verdict | Duration |
+      |------|------|---------|----------|
+      | 1 | ... | PASS/FAIL | ... |
+
+      ## Failures
+      ### Step N: <step-name>
+      **Expected**: ...
+      **Observed**: ...
+      **Evidence**: ...
+
+      ## Cleanup Status
+      - [x] <completed cleanup>
+      - [ ] <failed cleanup>
+      ```
+
+      Include all per-step verdicts, evidence, and failure details.
+      The report must contain enough information for a follow-up agent to debug any failures.
+    transitions:
+      report written: done
+
+  done:
+    prompt: |
+      The verification is complete. The test report has been written.
+      Provide a final summary: overall verdict, number of steps passed/failed,
+      and the path to the test report file.
+    transitions: {}
