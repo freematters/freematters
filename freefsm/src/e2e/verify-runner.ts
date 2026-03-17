@@ -270,7 +270,7 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
   // Initialize FSM store and run
   const fsmRoot = join(testDir, ".freefsm");
   const store = new Store(fsmRoot);
-  const runId = `verifier-${Date.now()}`;
+  const runId = `verifier-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   store.initRun(runId, verifierFsmPath);
 
   // Commit start event
@@ -289,6 +289,7 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
 
   const logger = new TranscriptLogger(testDir);
   const reportPath = join(testDir, "test-report.md");
+  let finalEntries: import("./transcript-logger.js").TranscriptEntry[] = [];
 
   try {
     // Create FSM MCP server for state management (with logger for step tracking)
@@ -318,30 +319,16 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
       queryOptions.model = args.model;
     }
 
-    // Retry loop for agent API failures (3 attempts, exponential backoff)
+    // Retry loop for agent API setup failures (3 attempts, exponential backoff)
+    // Only retries the query() call, not stream processing errors
+    let session: AsyncIterable<SDKMessage>;
     let lastError: unknown;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const session = query({
+        session = query({
           prompt: initialMessage,
           options: queryOptions,
         });
-
-        for await (const message of session) {
-          logger.processMessage(message as { type: string; [key: string]: unknown });
-
-          if (message.type === "result") {
-            const resultMsg = message as SDKMessage & {
-              type: "result";
-              result?: string;
-            };
-            if (resultMsg.result) {
-              process.stdout.write(`${resultMsg.result}\n`);
-            }
-          }
-        }
-
-        // Success — break out of retry loop
         lastError = undefined;
         break;
       } catch (err: unknown) {
@@ -360,21 +347,35 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
       }
     }
 
-    if (lastError) {
-      throw lastError;
+    if (lastError || !session) {
+      throw lastError ?? new Error("Failed to create agent session");
+    }
+
+    // Stream processing errors propagate immediately (no retry)
+    for await (const message of session) {
+      logger.processMessage(message as { type: string; [key: string]: unknown });
+
+      if (message.type === "result") {
+        const resultMsg = message as SDKMessage & {
+          type: "result";
+          result?: string;
+        };
+        if (resultMsg.result) {
+          process.stdout.write(`${resultMsg.result}\n`);
+        }
+      }
     }
   } finally {
     logger.close();
 
-    // Generate report in finally block so partial reports are written even on errors
-    const entries = readTranscript(testDir);
-    const reportContent = generateReport(plan, testDir, entries);
+    // Generate reports in finally block so partial reports are written even on errors
+    // Read transcript once and pass to both report functions
+    finalEntries = readTranscript(testDir);
+    const reportContent = generateReport(plan, testDir, finalEntries);
     writeFileSync(reportPath, reportContent, "utf-8");
   }
 
-  // Read transcript once and pass to both report functions
-  const entries = readTranscript(testDir);
-  const jsonReport = generateJsonReport(plan, testDir, entries);
+  const jsonReport = generateJsonReport(plan, testDir, finalEntries);
 
   return { reportPath, jsonReport };
 }
