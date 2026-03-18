@@ -56,7 +56,7 @@ jobs:
       - run: npm run build
       - run: npm run test:claude
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
   integration:
     runs-on: ubuntu-latest

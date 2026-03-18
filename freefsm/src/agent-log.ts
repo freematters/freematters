@@ -60,9 +60,8 @@ export function formatToolArgs(
 function logToolUse(name: string, input: Record<string, unknown> | undefined): void {
   const toolName = name ?? "unknown";
   const args = formatToolArgs(toolName, input);
-  const ts_ = new Date().toISOString().replace("T", " ").replace("Z", "");
   process.stderr.write(
-    `${colors.dim}[${ts_}]${colors.reset} ${colors.cyan}⚡ ${toolName}${colors.reset}${colors.dim}${args}${colors.reset}\n`,
+    `${colors.dim}[${ts()}]${colors.reset} ${colors.cyan}⚡ ${toolName}${colors.reset}${colors.dim}${args}${colors.reset}\n`,
   );
 }
 

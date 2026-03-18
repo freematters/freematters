@@ -49,26 +49,31 @@ export class AgentSession {
    */
   async wait(timeout: number): Promise<TurnResult> {
     const output: string[] = [];
-    let timedOut = false;
+    const deadline = Date.now() + timeout;
+    const iterator = this.session.stream();
 
-    const timer = setTimeout(() => {
-      timedOut = true;
-    }, timeout);
-
-    try {
-      for await (const message of this.session.stream()) {
-        if (timedOut) break;
-        this.processMessage(message, output);
+    while (true) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) {
+        return { output: output.join("\n---\n") || "[timeout]" };
       }
-    } finally {
-      clearTimeout(timer);
+
+      const timeoutPromise = new Promise<"timeout">((resolve) =>
+        setTimeout(() => resolve("timeout"), remaining),
+      );
+      const nextPromise = iterator.next().then((r) => r);
+
+      const result = await Promise.race([nextPromise, timeoutPromise]);
+
+      if (result === "timeout") {
+        return { output: output.join("\n---\n") || "[timeout]" };
+      }
+
+      if (result.done) break;
+      this.processMessage(result.value, output);
     }
 
-    const text = output.join("\n---\n");
-    if (timedOut) {
-      return { output: text || "[timeout]" };
-    }
-    return { output: text };
+    return { output: output.join("\n---\n") };
   }
 
   close(): void {
