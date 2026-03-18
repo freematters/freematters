@@ -2,10 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 
-const VERIFIER_FSM = resolve(
-  __dirname,
-  "../../../workflows/verifier.fsm.yaml",
-);
+const VERIFIER_FSM = resolve(__dirname, "../../../workflows/verifier.fsm.yaml");
 
 describe("verifier.fsm.yaml", () => {
   test("file exists", () => {

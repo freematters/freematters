@@ -32,7 +32,10 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
   const reportPath = join(testDir, "test-report.md");
 
   const dualLogger = new DualStreamLogger();
-  const verifierServer = createVerifierMcpServer({ logger: dualLogger, verbose: args.verbose });
+  const verifierServer = createVerifierMcpServer({
+    logger: dualLogger,
+    verbose: args.verbose,
+  });
 
   const prompt = [
     `Run the e2e verifier workflow with: /freefsm:start ${VERIFIER_FSM}`,
@@ -73,7 +76,9 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
           if (block.type === "text" && block.text) {
             dualLogger.logVerifier(block.text);
           } else if (block.type === "tool_use" && block.name && args.verbose) {
-            dualLogger.logVerifier(`⚡ ${block.name}${formatToolArgs(block.name, block.input)}`);
+            dualLogger.logVerifier(
+              `⚡ ${block.name}${formatToolArgs(block.name, block.input)}`,
+            );
           }
         }
       }

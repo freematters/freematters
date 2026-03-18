@@ -89,7 +89,10 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
         return {
           isError: true as const,
           content: [
-            { type: "text" as const, text: "No agent session is active. Call run_agent first." },
+            {
+              type: "text" as const,
+              text: "No agent session is active. Call run_agent first.",
+            },
           ],
         };
       }
@@ -100,9 +103,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
           logger?.logEmbedded(result.output);
         }
         return {
-          content: [
-            { type: "text" as const, text: JSON.stringify(result) },
-          ],
+          content: [{ type: "text" as const, text: JSON.stringify(result) }],
         };
       } catch (err: unknown) {
         if (err instanceof Error && err.message === "timeout") {
@@ -127,9 +128,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
       if (!session) {
         return {
           isError: true as const,
-          content: [
-            { type: "text" as const, text: "No agent session is active." },
-          ],
+          content: [{ type: "text" as const, text: "No agent session is active." }],
         };
       }
 
@@ -137,9 +136,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
         logger?.logInput(args.text);
         session.send(args.text);
         return {
-          content: [
-            { type: "text" as const, text: JSON.stringify({ ok: true }) },
-          ],
+          content: [{ type: "text" as const, text: JSON.stringify({ ok: true }) }],
         };
       } catch (err: unknown) {
         return {

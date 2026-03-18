@@ -27,7 +27,7 @@ describe("verifier MCP tools (real SDK)", () => {
     const { runAgent, wait } = server.tools;
 
     const startResult = (await runAgent.handler(
-      { prompt: "Reply with exactly: MCP_TOOL_OK" , model: "claude-haiku-4-5-20251001" },
+      { prompt: "Reply with exactly: MCP_TOOL_OK", model: "claude-haiku-4-5-20251001" },
       {},
     )) as ToolResult;
     expect(parseResult(startResult)).toEqual({ ok: true });
@@ -46,13 +46,20 @@ describe("verifier MCP tools (real SDK)", () => {
       {},
     );
 
-    const turn1 = parseResult((await wait.handler({ timeout: 30_000 }, {})) as ToolResult);
+    const turn1 = parseResult(
+      (await wait.handler({ timeout: 30_000 }, {})) as ToolResult,
+    );
     expect(turn1.output).toContain("TURN_A");
 
-    const sendResult = (await send.handler({ text: "Now reply with exactly: TURN_B" }, {})) as ToolResult;
+    const sendResult = (await send.handler(
+      { text: "Now reply with exactly: TURN_B" },
+      {},
+    )) as ToolResult;
     expect(parseResult(sendResult)).toEqual({ ok: true });
 
-    const turn2 = parseResult((await wait.handler({ timeout: 30_000 }, {})) as ToolResult);
+    const turn2 = parseResult(
+      (await wait.handler({ timeout: 30_000 }, {})) as ToolResult,
+    );
     expect(turn2.output).toContain("TURN_B");
   }, 120_000);
 

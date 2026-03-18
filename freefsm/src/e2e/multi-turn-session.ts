@@ -12,7 +12,7 @@
  *   for await (const msg of session.stream()) { ... } // next turn
  */
 
-import { query, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { type SDKMessage, query } from "@anthropic-ai/claude-agent-sdk";
 
 export class MultiTurnSession {
   private messageQueue: string[] = [];

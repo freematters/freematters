@@ -204,10 +204,7 @@ export function createFsmMcpServer(
   });
 }
 
-const MCP_TOOL_NAMES = [
-  "mcp__freefsm__fsm_goto",
-  "mcp__freefsm__fsm_current",
-];
+const MCP_TOOL_NAMES = ["mcp__freefsm__fsm_goto", "mcp__freefsm__fsm_current"];
 
 const log = agentLog;
 
