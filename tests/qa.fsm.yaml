@@ -1,0 +1,34 @@
+version: 1
+guide: |
+  Interactive Q&A workflow for testing human-in-the-loop interaction.
+  You MUST wait for the user's response before proceeding at every step.
+
+initial: ask-name
+
+states:
+  ask-name:
+    prompt: |
+      Ask the user: "What is your name?"
+      Wait for their response, then greet them by name and proceed.
+    transitions:
+      answered: ask-hobby
+
+  ask-hobby:
+    prompt: |
+      Ask the user: "What is your favorite hobby?"
+      Wait for their response, then comment on it briefly and proceed.
+    transitions:
+      answered: summarize
+
+  summarize:
+    prompt: |
+      Summarize what you learned about the user (name and hobby) in a short paragraph.
+      Present the summary and say goodbye.
+      Then goto done.
+    transitions:
+      summarized: done
+
+  done:
+    prompt: |
+      The Q&A session is complete. No further action needed.
+    transitions: {}
