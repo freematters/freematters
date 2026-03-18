@@ -73,7 +73,9 @@ export class AgentSession {
   // Turn synchronization
   private turnOutput: string[] = [];
   private turnResolve: ((result: TurnResult) => void) | undefined;
+  private turnReject: ((err: Error) => void) | undefined;
   private consumeDone = false;
+  private consumeError: Error | undefined;
 
   constructor(options: AgentSessionOptions = {}) {
     this.options = options;
@@ -122,15 +124,22 @@ export class AgentSession {
    * Returns accumulated assistant text from this turn.
    */
   wait(timeout: number): Promise<TurnResult> {
+    if (this.consumeError) {
+      const err = this.consumeError;
+      this.consumeError = undefined;
+      return Promise.reject(err);
+    }
+
     if (this.consumeDone) {
       const output = this.turnOutput.join("\n");
       this.turnOutput = [];
       return Promise.resolve({ output });
     }
 
-    return new Promise<TurnResult>((resolve) => {
+    return new Promise<TurnResult>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.turnResolve = undefined;
+        this.turnReject = undefined;
         const output = this.turnOutput.join("\n");
         this.turnOutput = [];
         resolve({ output: output || "[timeout]" });
@@ -139,6 +148,10 @@ export class AgentSession {
       this.turnResolve = (result: TurnResult) => {
         clearTimeout(timer);
         resolve(result);
+      };
+      this.turnReject = (err: Error) => {
+        clearTimeout(timer);
+        reject(err);
       };
     });
   }
@@ -196,8 +209,18 @@ export class AgentSession {
         }
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      this.turnOutput.push(`[session error] ${msg}`);
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.consumeDone = true;
+      if (this.turnReject) {
+        const rejector = this.turnReject;
+        this.turnResolve = undefined;
+        this.turnReject = undefined;
+        rejector(error);
+      } else {
+        // No one waiting yet — store for next wait() call
+        this.consumeError = error;
+      }
+      return;
     }
 
     this.consumeDone = true;
@@ -207,6 +230,7 @@ export class AgentSession {
       this.turnOutput = [];
       const resolver = this.turnResolve;
       this.turnResolve = undefined;
+      this.turnReject = undefined;
       resolver({ output });
     }
   }
