@@ -79,6 +79,7 @@ export class AgentSession {
   private async consumeStream(): Promise<TurnResult> {
     const stream = this.session.stream();
     const turnOutput: string[] = [];
+    let isError = false;
 
     for await (const message of stream) {
       if (message.type === "assistant") {
@@ -99,6 +100,21 @@ export class AgentSession {
           } else if (block.type === "tool_use" && block.name) {
             this.onToolUse?.(block.name, block.input ?? {});
           }
+        }
+      } else if (message.type === "result") {
+        const resultMsg = message as {
+          type: "result";
+          result?: string;
+          is_error?: boolean;
+          subtype?: string;
+        };
+        if (resultMsg.is_error) {
+          isError = true;
+          if (resultMsg.result) {
+            turnOutput.push(`[error] ${resultMsg.result}`);
+          }
+        } else if (resultMsg.result) {
+          turnOutput.push(resultMsg.result);
         }
       }
     }
