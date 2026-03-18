@@ -1,17 +1,14 @@
 /**
- * Verifier MCP tools — controls an embedded agent via V2 SDK session.
+ * Verifier MCP tools — controls an embedded Claude Code session.
  *
  * Tools:
- *   run_agent(fsm_path) — starts a session, sends initial prompt, returns handle
- *   wait(timeout)       — waits for agent to finish current turn
- *   send(text)          — sends a message to resume the agent
+ *   run_agent(prompt) — starts a Claude Code session with the given prompt
+ *   wait(timeout)     — waits for the agent to finish its current turn
+ *   send(text)        — sends a follow-up message to the agent
  */
 
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { loadFsm } from "../fsm.js";
-import { formatStateCard, stateCardFromFsm } from "../output.js";
-import { Store } from "../store.js";
 import { AgentSession } from "./agent-session.js";
 import type { DualStreamLogger } from "./dual-stream-logger.js";
 
@@ -22,16 +19,12 @@ export interface VerifierMcpServerOptions {
 export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
   const logger = options?.logger;
   let session: AgentSession | undefined;
-  let storeRoot: string | undefined;
-  let runId: string | undefined;
 
   const runAgent = tool(
     "run_agent",
-    "Start an embedded freefsm agent session. Returns { run_id, store_root }.",
+    "Start an embedded Claude Code agent session with the given prompt.",
     {
-      fsm_path: z.string().describe("Path to the FSM YAML file"),
-      prompt: z.string().optional().describe("Additional context for the agent"),
-      root: z.string().optional().describe("Store root directory"),
+      prompt: z.string().describe("The initial prompt for the agent"),
       model: z.string().optional().describe("Claude model override"),
     },
     async (args) => {
@@ -45,51 +38,14 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
       }
 
       try {
-        // Load FSM and init store
-        const fsm = loadFsm(args.fsm_path);
-        storeRoot = args.root ?? `/tmp/freefsm-embedded-${Date.now()}`;
-        const name = args.fsm_path.replace(/^.*\//, "").replace(/\.(fsm\.)?ya?ml$/i, "");
-        runId = `${name}-${Date.now()}`;
-
-        const store = new Store(storeRoot);
-        store.initRun(runId, args.fsm_path);
-        store.commit(
-          runId,
-          {
-            event: "start",
-            from_state: null,
-            to_state: fsm.initial,
-            on_label: null,
-            actor: "system",
-            reason: null,
-          },
-          { run_status: "active", state: fsm.initial },
-        );
-
-        // Build initial message with state card
-        const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
-        const stateCard = formatStateCard(card);
-        const fsmGuide = fsm.guide ?? "No guide provided.";
-        const systemContext = `You are running the "${name}" workflow.\n\n## FSM Guide\n\n${fsmGuide}`;
-
-        let initialMessage = `${systemContext}\n\n${stateCard}`;
-        if (args.prompt) {
-          initialMessage += `\n\n## Additional Context\n\n${args.prompt}`;
-        }
-
-        // Create session with FSM MCP tools
-        session = new AgentSession({
-          model: args.model,
-        });
-
-        // Send initial prompt to start the first turn
-        await session.send(initialMessage);
+        session = new AgentSession({ model: args.model });
+        await session.send(args.prompt);
 
         return {
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify({ run_id: runId, store_root: storeRoot }),
+              text: JSON.stringify({ ok: true, session_id: session.getSessionId() }),
             },
           ],
         };
@@ -110,7 +66,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
 
   const wait = tool(
     "wait",
-    "Wait for the embedded agent to complete its current turn. Returns { output, done }.",
+    "Wait for the embedded agent to complete its current turn. Returns { output }.",
     {
       timeout: z
         .number()
@@ -153,7 +109,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
 
   const send = tool(
     "send",
-    "Send a message to the embedded agent to start a new turn.",
+    "Send a follow-up message to the embedded agent to start a new turn.",
     {
       text: z.string().describe("The message text to send"),
     },
