@@ -6,8 +6,7 @@
  * agent through the MessageBus.
  */
 
-import { basename } from "node:path";
-import { runCore } from "../commands/run.js";
+import { generateRunId, runCore } from "../commands/run.js";
 import { MessageBus } from "./message-bus.js";
 
 export interface EmbeddedRunOptions {
@@ -16,11 +15,6 @@ export interface EmbeddedRunOptions {
   prompt?: string;
   model?: string;
   logFn?: (msg: string, color?: string) => void;
-}
-
-function generateRunId(fsmPath: string): string {
-  const name = basename(fsmPath).replace(/\.(fsm\.)?ya?ml$/i, "");
-  return `${name}-${Date.now()}`;
 }
 
 export class EmbeddedRun {
@@ -53,13 +47,16 @@ export class EmbeddedRun {
       runId: this.runId,
       root: this.storeRoot,
       prompt: this.options.prompt,
+      model: this.options.model,
       bus: this.bus,
       logFn,
     })
       .then((result) => {
         this.bus.markExited(result.isError ? 1 : 0);
       })
-      .catch(() => {
+      .catch((err: unknown) => {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.bus.enqueueOutput(`[embedded error] ${msg}`);
         this.bus.markExited(1);
       });
   }

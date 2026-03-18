@@ -40,6 +40,18 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
       model: z.string().optional().describe("Claude model override"),
     },
     async (args) => {
+      if (activeRun) {
+        return {
+          isError: true as const,
+          content: [
+            {
+              type: "text" as const,
+              text: "An embedded run is already active. Wait for it to exit before starting another.",
+            },
+          ],
+        };
+      }
+
       const run = new EmbeddedRun(args.fsm_path, {
         root: args.root,
         prompt: args.prompt,

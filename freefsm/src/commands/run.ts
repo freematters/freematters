@@ -29,11 +29,12 @@ export interface RunCoreOptions {
   runId?: string;
   root: string;
   prompt?: string;
+  model?: string;
   bus?: MessageBus;
   logFn?: (msg: string, color?: string) => void;
 }
 
-function generateRunId(fsmPath: string): string {
+export function generateRunId(fsmPath: string): string {
   const name = basename(fsmPath).replace(/\.(fsm\.)?ya?ml$/i, "");
   return `${name}-${Date.now()}`;
 }
@@ -338,6 +339,7 @@ export async function runCore(
     allowDangerouslySkipPermissions: true,
     mcpServers: { freefsm: fsmServer },
     ...(allowedTools !== undefined && { allowedTools }),
+    ...(opts.model !== undefined && { model: opts.model }),
   };
 
   let isError = false;
