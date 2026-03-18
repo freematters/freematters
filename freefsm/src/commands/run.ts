@@ -3,8 +3,9 @@ import { basename, dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { createSdkMcpServer, query, tool } from "@anthropic-ai/claude-agent-sdk";
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { agentLog, colors as c, logSdkMessage } from "../agent-log.js";
+import type { MessageBus } from "../e2e/message-bus.js";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import { formatStateCard, handleError, stateCardFromFsm } from "../output.js";
@@ -15,6 +16,21 @@ export interface RunArgs {
   runId?: string;
   root: string;
   json: boolean;
+  prompt?: string;
+}
+
+/**
+ * Options for the shared runCore function.
+ * When `bus` is provided, request_input uses the MessageBus instead of readline,
+ * and result output goes to the bus instead of stdout.
+ */
+export interface RunCoreOptions {
+  fsmPath: string;
+  runId?: string;
+  root: string;
+  prompt?: string;
+  bus?: MessageBus;
+  logFn?: (msg: string, color?: string) => void;
 }
 
 function generateRunId(fsmPath: string): string {
@@ -37,7 +53,13 @@ function buildSystemPrompt(fsm: Fsm): string {
     .replace("{{FSM_GUIDE}}", fsm.guide ?? "No guide provided.");
 }
 
-function createFsmMcpServer(fsm: Fsm, store: Store, runId: string) {
+function createFsmMcpServer(
+  fsm: Fsm,
+  store: Store,
+  runId: string,
+  logFn: (msg: string, color?: string) => void = () => {},
+  bus?: MessageBus,
+) {
   const fsmGoto = tool(
     "fsm_goto",
     "Transition FSM to a new state",
@@ -106,6 +128,11 @@ function createFsmMcpServer(fsm: Fsm, store: Store, runId: string) {
           const targetState = fsm.states[args.target];
           const isTerminal = Object.keys(targetState.transitions).length === 0;
           const newStatus: RunStatus = isTerminal ? "completed" : "active";
+
+          logFn(
+            `fsm_goto: ${snapshot.state} —[${args.on}]→ ${args.target}${isTerminal ? " (terminal)" : ""}`,
+            c.green,
+          );
 
           store.commit(
             runId,
@@ -185,6 +212,17 @@ function createFsmMcpServer(fsm: Fsm, store: Store, runId: string) {
       prompt: z.string().describe("The question to ask the human"),
     },
     async (args) => {
+      logFn(`request_input: ${args.prompt}`, c.magenta);
+
+      if (bus) {
+        // Embedded mode: use MessageBus instead of readline
+        const input = await bus.enqueueInputRequest(args.prompt);
+        return {
+          content: [{ type: "text" as const, text: input }],
+        };
+      }
+
+      // CLI mode: use readline on stdin
       process.stderr.write(`${args.prompt}\n`);
 
       return new Promise<{
@@ -234,68 +272,154 @@ const MCP_TOOL_NAMES = [
   "mcp__freefsm__request_input",
 ];
 
-export async function run(args: RunArgs): Promise<void> {
+const log = agentLog;
+
+/**
+ * Core run logic shared between CLI run() and EmbeddedRun.
+ *
+ * Initializes the store, creates the FSM MCP server, and runs the agent loop.
+ * When `opts.bus` is provided, request_input uses the bus instead of readline,
+ * and result output goes to the bus instead of stdout.
+ *
+ * Returns `{ runId, isError }` so callers can inspect the result.
+ */
+export async function runCore(
+  opts: RunCoreOptions,
+): Promise<{ runId: string; isError: boolean }> {
+  const fsm: Fsm = loadFsm(opts.fsmPath);
+  const runId = opts.runId ?? generateRunId(opts.fsmPath);
+  const logFn = opts.logFn ?? log;
+
+  logFn(`run=${runId} fsm=${opts.fsmPath}`, c.cyan);
+
+  const store = new Store(opts.root);
   try {
-    const fsm: Fsm = loadFsm(args.fsmPath);
-    const runId = args.runId ?? generateRunId(args.fsmPath);
-
-    const store = new Store(args.root);
-    try {
-      store.initRun(runId, args.fsmPath);
-    } catch (err: unknown) {
-      if (err instanceof Error && err.message.includes("already exists")) {
-        throw new CliError(
-          "RUN_EXISTS",
-          "run already exists, use a different --run-id",
-          { context: { runId } },
-        );
-      }
-      throw err;
+    store.initRun(runId, opts.fsmPath);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message.includes("already exists")) {
+      throw new CliError("RUN_EXISTS", "run already exists, use a different --run-id", {
+        context: { runId },
+      });
     }
+    throw err;
+  }
 
-    store.commit(
-      runId,
-      {
-        event: "start",
-        from_state: null,
-        to_state: fsm.initial,
-        on_label: null,
-        actor: "system",
-        reason: null,
-      },
-      { run_status: "active", state: fsm.initial },
-    );
+  store.commit(
+    runId,
+    {
+      event: "start",
+      from_state: null,
+      to_state: fsm.initial,
+      on_label: null,
+      actor: "system",
+      reason: null,
+    },
+    { run_status: "active", state: fsm.initial },
+  );
 
-    const fsmServer = createFsmMcpServer(fsm, store, runId);
+  logFn(`state=${fsm.initial} (initial)`, c.green);
 
-    const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
-    const initialMessage = formatStateCard(card);
-    const systemPrompt = buildSystemPrompt(fsm);
+  const fsmServer = createFsmMcpServer(fsm, store, runId, logFn, opts.bus);
 
-    const allowedTools = fsm.allowed_tools
-      ? [...MCP_TOOL_NAMES, ...fsm.allowed_tools]
-      : undefined;
+  const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
+  const stateCard = formatStateCard(card);
+  const initialMessage = opts.prompt
+    ? `${stateCard}\n\n## User Prompt\n\n${opts.prompt}`
+    : stateCard;
+  const systemPrompt = buildSystemPrompt(fsm);
 
-    const session = query({
-      prompt: initialMessage,
-      options: {
-        systemPrompt,
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        mcpServers: { freefsm: fsmServer },
-        ...(allowedTools !== undefined && { allowedTools }),
-      },
-    });
+  const allowedTools = fsm.allowed_tools
+    ? [...MCP_TOOL_NAMES, ...fsm.allowed_tools]
+    : undefined;
 
+  const queryOpts = {
+    systemPrompt,
+    permissionMode: "bypassPermissions" as const,
+    allowDangerouslySkipPermissions: true,
+    mcpServers: { freefsm: fsmServer },
+    ...(allowedTools !== undefined && { allowedTools }),
+  };
+
+  let isError = false;
+  const MAX_SESSIONS = 10;
+  let attempt = 0;
+  let prompt = initialMessage;
+  for (;;) {
+    attempt++;
+    logFn(`session #${attempt} starting`, c.cyan);
+
+    const session = query({ prompt, options: queryOpts });
     for await (const message of session) {
+      logSdkMessage(message, { sessionNum: attempt });
       if (message.type === "result") {
-        const resultMsg = message as SDKMessage & {
+        const resultMsg = message as {
           type: "result";
           result: string;
+          is_error?: boolean;
         };
-        process.stdout.write(`${resultMsg.result}\n`);
+        if (resultMsg.is_error) {
+          isError = true;
+        }
+        if (opts.bus) {
+          // Embedded mode: route result to bus
+          opts.bus.enqueueOutput(resultMsg.result);
+        } else {
+          // CLI mode: write to stdout
+          process.stdout.write(`${resultMsg.result}\n`);
+        }
       }
     }
+
+    const snap = store.readSnapshot(runId);
+    if (!snap || snap.run_status !== "active") {
+      logFn(
+        `run finished: ${snap?.run_status ?? "unknown"} state=${snap?.state ?? "?"}`,
+        c.green,
+      );
+      break;
+    }
+
+    const currentState = fsm.states[snap.state];
+    if (!currentState || Object.keys(currentState.transitions).length === 0) {
+      logFn(`run finished: terminal state=${snap.state}`, c.green);
+      break;
+    }
+
+    if (attempt >= MAX_SESSIONS) {
+      logFn(`max sessions (${MAX_SESSIONS}) reached, aborting run`, c.red);
+      store.commit(
+        runId,
+        {
+          event: "finish",
+          from_state: snap.state,
+          to_state: snap.state,
+          on_label: null,
+          actor: "system",
+          reason: "max_sessions_exceeded",
+        },
+        { run_status: "aborted", state: snap.state },
+      );
+      break;
+    }
+
+    logFn(
+      `session ended but workflow not complete, state=${snap.state} — retrying`,
+      c.magenta,
+    );
+    prompt = `The workflow is not complete yet. Continue executing the current state. If you need user input, use \`request_input\`. Do NOT stop until you reach a terminal state.\n\n${formatStateCard(stateCardFromFsm(snap.state, currentState))}`;
+  }
+
+  return { runId, isError };
+}
+
+export async function run(args: RunArgs): Promise<void> {
+  try {
+    await runCore({
+      fsmPath: args.fsmPath,
+      runId: args.runId,
+      root: args.root,
+      prompt: args.prompt,
+    });
   } catch (err: unknown) {
     handleError(err, args.json);
   }

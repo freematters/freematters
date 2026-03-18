@@ -2,7 +2,7 @@
 
 ## Checklist
 - [x] Step 1: MessageBus
-- [ ] Step 2: EmbeddedRun — adapt `run()` to embedded mode
+- [x] Step 2: EmbeddedRun — adapt `run()` to embedded mode
 - [ ] Step 3: Verifier MCP tools + end-to-end wiring
 - [ ] Step 4: DualStreamLogger
 - [ ] Step 5: Replace `freefsm e2e verify` command
