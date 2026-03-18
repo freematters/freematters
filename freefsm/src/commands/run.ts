@@ -26,6 +26,7 @@ export interface RunArgs {
   json: boolean;
   prompt?: string;
   verbose?: boolean;
+  stay?: boolean;
 }
 
 export interface RunCoreOptions {
@@ -35,6 +36,7 @@ export interface RunCoreOptions {
   prompt?: string;
   model?: string;
   verbose?: boolean;
+  stay?: boolean;
   logFn?: (msg: string, color?: string) => void;
 }
 
@@ -392,17 +394,26 @@ export async function runCore(
       }
 
       const snap = store.readSnapshot(runId);
-      if (!snap || snap.run_status !== "active") {
+      const workflowDone =
+        !snap ||
+        snap.run_status !== "active" ||
+        !fsm.states[snap.state] ||
+        Object.keys(fsm.states[snap.state].transitions).length === 0;
+
+      if (workflowDone) {
+        if (opts.stay) {
+          logFn(
+            `run finished: ${snap?.run_status ?? "unknown"} state=${snap?.state ?? "?"} — staying for input`,
+            c.green,
+          );
+          const userInput = await promptUser(`${c.green}> ${c.reset}`);
+          session.send(userInput);
+          continue;
+        }
         logFn(
           `run finished: ${snap?.run_status ?? "unknown"} state=${snap?.state ?? "?"}`,
           c.green,
         );
-        break;
-      }
-
-      const currentState = fsm.states[snap.state];
-      if (!currentState || Object.keys(currentState.transitions).length === 0) {
-        logFn(`run finished: terminal state=${snap.state}`, c.green);
         break;
       }
 
@@ -411,7 +422,7 @@ export async function runCore(
         c.magenta,
       );
       session.send(
-        `The workflow is not complete yet. Continue from the current state.\n\n${formatStateCard(stateCardFromFsm(snap.state, currentState))}`,
+        `The workflow is not complete yet. Continue from the current state.\n\n${formatStateCard(stateCardFromFsm(snap.state, fsm.states[snap.state] ?? { transitions: {} }))}`,
       );
     }
   } finally {
@@ -429,6 +440,7 @@ export async function run(args: RunArgs): Promise<void> {
       root: args.root,
       prompt: args.prompt,
       verbose: args.verbose,
+      stay: args.stay,
     });
   } catch (err: unknown) {
     handleError(err, args.json);

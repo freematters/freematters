@@ -70,6 +70,7 @@ program
   .option("--run-id <id>", "run identifier (auto-generated if omitted)")
   .option("--prompt <text>", "user prompt to append to the initial state card")
   .option("--verbose", "show tool calls and agent messages in output")
+  .option("--stay", "stay and accept user input after workflow completes")
   .action(async (_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     await runCmd({
@@ -79,6 +80,7 @@ program
       json: json ?? false,
       prompt: opts.prompt as string | undefined,
       verbose: (opts.verbose as boolean) ?? false,
+      stay: (opts.stay as boolean) ?? false,
     });
   });
 
