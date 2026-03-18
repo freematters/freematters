@@ -90,12 +90,21 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
       const msg = message as {
         type: "assistant";
         message: {
-          content: Array<{ type: string; text?: string }>;
+          content: Array<{
+            type: string;
+            text?: string;
+            name?: string;
+            input?: Record<string, unknown>;
+          }>;
         };
       };
       for (const block of msg.message.content) {
         if (block.type === "text" && block.text) {
           dualLogger.logVerifier(block.text);
+        } else if (block.type === "tool_use" && block.name) {
+          const inputStr = JSON.stringify(block.input ?? {});
+          const short = inputStr.length > 100 ? `${inputStr.slice(0, 100)}...` : inputStr;
+          dualLogger.logVerifier(`[tool] ${block.name}(${short})`);
         }
       }
     }

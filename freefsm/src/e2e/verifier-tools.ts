@@ -38,7 +38,14 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
       }
 
       try {
-        session = new AgentSession({ model: args.model });
+        session = new AgentSession({
+          model: args.model,
+          onToolUse: (name, input) => {
+            const inputStr = JSON.stringify(input);
+            const short = inputStr.length > 100 ? `${inputStr.slice(0, 100)}...` : inputStr;
+            logger?.logEmbedded(`[tool] ${name}(${short})`);
+          },
+        });
         await session.send(args.prompt);
 
         return {

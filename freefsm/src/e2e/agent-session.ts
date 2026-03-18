@@ -11,6 +11,8 @@ import type { SDKMessage, SDKSession } from "@anthropic-ai/claude-agent-sdk";
 export interface AgentSessionOptions {
   model?: string;
   disallowedTools?: string[];
+  /** Called for each tool use during a turn. */
+  onToolUse?: (name: string, input: Record<string, unknown>) => void;
 }
 
 export interface TurnResult {
@@ -19,8 +21,10 @@ export interface TurnResult {
 
 export class AgentSession {
   private session: SDKSession;
+  private onToolUse?: (name: string, input: Record<string, unknown>) => void;
 
   constructor(options: AgentSessionOptions = {}) {
+    this.onToolUse = options.onToolUse;
     this.session = unstable_v2_createSession({
       model: options.model ?? "claude-sonnet-4-6",
       permissionMode: "bypassPermissions",
@@ -52,12 +56,19 @@ export class AgentSession {
           const msg = message as {
             type: "assistant";
             message: {
-              content: Array<{ type: string; text?: string }>;
+              content: Array<{
+                type: string;
+                text?: string;
+                name?: string;
+                input?: Record<string, unknown>;
+              }>;
             };
           };
           for (const block of msg.message.content) {
             if (block.type === "text" && block.text) {
               turnOutput.push(block.text);
+            } else if (block.type === "tool_use" && block.name) {
+              this.onToolUse?.(block.name, block.input ?? {});
             }
           }
         }
