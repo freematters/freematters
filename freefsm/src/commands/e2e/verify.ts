@@ -8,6 +8,7 @@ export interface VerifyArgs {
   testDir: string;
   json: boolean;
   model?: string;
+  verbose?: boolean;
 }
 
 export async function verify(args: VerifyArgs): Promise<void> {
@@ -43,6 +44,7 @@ export async function verify(args: VerifyArgs): Promise<void> {
       planPath: args.planPath,
       testDir: args.testDir,
       model: args.model,
+      verbose: args.verbose,
     });
 
     if (args.json) {
@@ -51,8 +53,10 @@ export async function verify(args: VerifyArgs): Promise<void> {
           reportPath: result.reportPath,
         }),
       );
-    } else {
+    } else if (result.reportPath) {
       process.stdout.write(`Report: ${result.reportPath}\n`);
+    } else {
+      process.stdout.write("Verification complete (no report generated)\n");
     }
   } catch (err: unknown) {
     handleError(err, args.json);

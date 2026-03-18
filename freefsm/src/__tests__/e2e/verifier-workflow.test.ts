@@ -1,7 +1,6 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { describe, expect, test } from "vitest";
 
 const VERIFIER_FSM = resolve(
   __dirname,
@@ -15,9 +14,9 @@ describe("verifier.fsm.yaml", () => {
 
   test("contains embedded tool descriptions in guide", () => {
     const content = readFileSync(VERIFIER_FSM, "utf-8");
-    expect(content).toContain("start_embedded_run");
+    expect(content).toContain("run_agent");
     expect(content).toContain("wait");
-    expect(content).toContain("send_input");
+    expect(content).toContain("send");
   });
 
   test("has setup → execute → report → done flow", () => {
@@ -26,11 +25,5 @@ describe("verifier.fsm.yaml", () => {
     expect(content).toContain("setup complete: execute");
     expect(content).toContain("all steps executed: report");
     expect(content).toContain("report written: done");
-  });
-
-  test("does not reference old FSM tools (fsm_goto, fsm_current)", () => {
-    const content = readFileSync(VERIFIER_FSM, "utf-8");
-    expect(content).not.toContain("fsm_goto");
-    expect(content).not.toContain("fsm_current");
   });
 });

@@ -5,33 +5,29 @@
 
 version: 1
 guide: |
-  E2E test verifier workflow for freefsm. Drives an agent through structured
-  verification of a test plan using an embedded freefsm run.
+  E2E test verifier workflow. Drives verification of a test plan by controlling
+  an embedded Claude Code agent session.
 
   The test plan file path and test output directory are provided in the initial prompt.
-  The agent reads the test plan, starts an embedded freefsm run, interacts with it
-  via wait/send_input, and generates a report.
+  The agent reads the test plan, starts an embedded agent, interacts with it
+  via run_agent/wait/send, and generates a report.
 
   ## Available MCP Tools
 
   In addition to standard tools (Read, Write, Bash), you have:
 
-  ### start_embedded_run
-  Start an embedded freefsm run. Provide the FSM workflow path (from the test plan's
-  Setup section, after "Workflow:") and optionally a user prompt.
-  Returns `{ run_id, store_root }`.
+  ### run_agent
+  Start an embedded Claude Code agent session with a given prompt.
+  Returns `{ ok: true }` on success. Only one session can be active at a time.
 
   ### wait
-  Wait for the embedded agent to finish its current turn or exit. Returns one of:
-  - `{ type: "turn_complete", output }` — the agent finished a turn; `output` contains
-    all assistant text produced during that turn
-  - `{ type: "exited", code, output }` — the agent session has ended
-  - `{ type: "timeout" }` — the wait timed out
+  Wait for the embedded agent to finish its current turn.
+  Returns `{ output }` — the assistant text produced during that turn.
+  Use timeout parameter (ms) to avoid waiting forever (default 120s).
 
-  ### send_input
-  Send a message to the embedded agent as its next prompt. The agent will start
-  a new turn (query session) with this text as input. Use this to answer questions,
-  provide instructions, or guide the agent to the next step.
+  ### send
+  Send a follow-up message to the embedded agent to start a new turn.
+  Returns `{ ok: true }`. The agent will process the message on the next `wait()`.
 
   Rules:
   - Read the test plan file to understand what to test.
@@ -49,11 +45,11 @@ states:
 
       1. Read the test plan file (path provided in the initial prompt).
       2. Understand the background, steps, and expected outcomes.
-      3. Extract the workflow path from the Setup section (after "Workflow:").
-      4. Start the embedded run using `start_embedded_run` with the workflow path.
-      5. Verify the run started successfully.
+      3. Start the embedded agent using `run_agent` with the prompt from the
+         test plan's first step.
+      4. Verify the agent started successfully.
 
-      If the test plan or workflow path is invalid, report the error and proceed
+      If the test plan is invalid, report the error and proceed
       to the report state to write a FAIL report.
     transitions:
       setup complete: execute
@@ -64,15 +60,11 @@ states:
 
       Execute each test step from the plan by interacting with the embedded agent:
 
-      1. Call `wait()` to receive messages from the embedded agent.
-      2. When the agent sends a message (e.g., a question or status), decide how
-         to respond based on the test plan steps, then call `send_input()`.
-      3. Compare actual behavior against expected outcomes for each step.
+      1. Call `wait()` to receive the agent's output from its current turn.
+      2. Compare actual behavior against expected outcomes for each step.
+      3. When the plan requires sending input or instructions, use `send()`.
       4. Judge each step as PASS or FAIL with evidence.
-      5. Continue until the embedded agent exits or all steps are complete.
-
-      After the embedded run completes, read store files (`events.jsonl`,
-      `snapshot.json`) at the `store_root` to verify FSM state transitions.
+      5. Continue until all steps are complete or the agent session ends.
 
       Do NOT stop on failure — observe all steps even if one fails.
     transitions:

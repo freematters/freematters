@@ -15,10 +15,12 @@ import type { DualStreamLogger } from "./dual-stream-logger.js";
 
 export interface VerifierMcpServerOptions {
   logger?: DualStreamLogger;
+  verbose?: boolean;
 }
 
 export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
   const logger = options?.logger;
+  const verbose = options?.verbose ?? false;
   let session: AgentSession | undefined;
 
   const runAgent = tool(
@@ -42,10 +44,12 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
         session = new AgentSession({
           model: args.model,
           onToolUse: (name, input) => {
-            logger?.logEmbedded(`⚡ ${name}${formatToolArgs(name, input)}`);
+            if (verbose) {
+              logger?.logEmbedded(`⚡ ${name}${formatToolArgs(name, input)}`);
+            }
           },
         });
-        await session.send(args.prompt);
+        session.send(args.prompt);
 
         return {
           content: [
@@ -131,7 +135,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
 
       try {
         logger?.logInput(args.text);
-        await session.send(args.text);
+        session.send(args.text);
         return {
           content: [
             { type: "text" as const, text: JSON.stringify({ ok: true }) },
@@ -151,9 +155,17 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
     },
   );
 
-  return createSdkMcpServer({
+  const server = createSdkMcpServer({
     name: "freefsm-verifier",
     version: "1.0.0",
     tools: [runAgent, wait, send],
+  });
+
+  return Object.assign(server, {
+    tools: { runAgent, wait, send },
+    closeSession() {
+      session?.close();
+      session = undefined;
+    },
   });
 }

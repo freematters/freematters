@@ -1,17 +1,12 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock the Agent SDK before importing anything that uses it
-const mockQueryResults: Array<{ type: string; [key: string]: unknown }> = [];
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: vi.fn(() => {
-    return (async function* () {
-      for (const msg of mockQueryResults) {
-        yield msg;
-      }
-    })();
+    return (async function* () {})();
   }),
   createSdkMcpServer: vi.fn((...args: unknown[]) => {
     return { __mockArgs: args };
@@ -40,57 +35,12 @@ let tmp: string;
 
 beforeEach(() => {
   tmp = mkdtempSync(join(tmpdir(), "freefsm-verifier-tools-"));
-  mockQueryResults.length = 0;
   vi.clearAllMocks();
 });
 
 afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
-
-/**
- * Create a 2-state FSM YAML file (non-terminal initial state).
- * The agent will complete a turn and wait for verifier input.
- */
-function writeNonTerminalFsm(dir: string): string {
-  const fsmPath = join(dir, "test.fsm.yaml");
-  writeFileSync(
-    fsmPath,
-    `version: 1
-initial: start
-guide: "Test workflow"
-states:
-  start:
-    prompt: "Do something"
-    transitions:
-      next: done
-  done:
-    prompt: "All done"
-    transitions: {}
-`,
-  );
-  return fsmPath;
-}
-
-/**
- * Create a FSM with a terminal initial state (no transitions).
- * The agent will exit immediately after the first session.
- */
-function writeTerminalFsm(dir: string): string {
-  const fsmPath = join(dir, "terminal.fsm.yaml");
-  writeFileSync(
-    fsmPath,
-    `version: 1
-initial: done
-guide: "Terminal workflow"
-states:
-  done:
-    prompt: "All done"
-    transitions: {}
-`,
-  );
-  return fsmPath;
-}
 
 /**
  * Helper to get a tool handler by name from the mocked tool() calls.
@@ -119,215 +69,64 @@ describe("Verifier MCP Tools", () => {
 
     const toolCalls = vi.mocked(tool).mock.calls;
     const toolNames = toolCalls.map((c) => c[0]);
-    expect(toolNames).toContain("start_embedded_run");
+    expect(toolNames).toContain("run_agent");
     expect(toolNames).toContain("wait");
-    expect(toolNames).toContain("send_input");
+    expect(toolNames).toContain("send");
   });
 
-  test("start_embedded_run launches embedded run and returns { run_id, store_root }", async () => {
-    const fsmPath = writeTerminalFsm(tmp);
-
-    mockQueryResults.push({
-      type: "result",
-      subtype: "success",
-      result: "Done",
-      duration_ms: 100,
-      is_error: false,
-      num_turns: 1,
-    });
-
+  test("run_agent returns ok on success", async () => {
     createVerifierMcpServer();
-    const handler = getToolHandler("start_embedded_run");
+    const handler = getToolHandler("run_agent");
 
-    const result = await handler({ fsm_path: fsmPath, root: tmp });
+    const result = await handler({ prompt: "hello", model: undefined });
     const parsed = parseResult(result);
-    expect(parsed.run_id).toBeTruthy();
-    expect(typeof parsed.run_id).toBe("string");
-    expect(parsed.store_root).toBe(tmp);
+    expect(parsed.ok).toBe(true);
   });
 
-  test("wait returns { type: 'turn_complete', output } when agent finishes a turn", async () => {
-    const fsmPath = writeNonTerminalFsm(tmp);
-
-    mockQueryResults.push({
-      type: "assistant",
-      message: { content: [{ type: "text", text: "Hello from agent" }] },
-    });
-    mockQueryResults.push({
-      type: "result",
-      subtype: "success",
-      result: "Hello from agent",
-      duration_ms: 100,
-      is_error: false,
-      num_turns: 1,
-    });
-
+  test("run_agent errors on duplicate session", async () => {
     createVerifierMcpServer();
-    const startHandler = getToolHandler("start_embedded_run");
-    const waitHandler = getToolHandler("wait");
+    const handler = getToolHandler("run_agent");
 
-    await startHandler({ fsm_path: fsmPath, root: tmp });
-
-    // Give the event loop a tick for runCore to process the mock query
-    await new Promise((r) => setTimeout(r, 50));
-
-    const parsed = parseResult(await waitHandler({ timeout: 5000 }));
-    expect(parsed.type).toBe("turn_complete");
-    expect(parsed.output).toContain("Hello from agent");
+    await handler({ prompt: "first", model: undefined });
+    const dup = (await handler({ prompt: "second", model: undefined })) as ToolResult;
+    expect(dup.isError).toBe(true);
+    expect(dup.content[0].text).toContain("already active");
   });
 
-  test("wait returns turn_complete when terminal FSM run completes", async () => {
-    const fsmPath = writeTerminalFsm(tmp);
-
-    mockQueryResults.push({
-      type: "result",
-      subtype: "success",
-      result: "All done",
-      duration_ms: 100,
-      is_error: false,
-      num_turns: 1,
-    });
-
+  test("wait errors when no session active", async () => {
     createVerifierMcpServer();
-    const startHandler = getToolHandler("start_embedded_run");
-    const waitHandler = getToolHandler("wait");
+    const handler = getToolHandler("wait");
 
-    await startHandler({ fsm_path: fsmPath, root: tmp });
-
-    await new Promise((r) => setTimeout(r, 50));
-
-    const parsed = parseResult(await waitHandler({ timeout: 5000 }));
-    expect(parsed.type).toBe("turn_complete");
-    expect(typeof parsed.output).toBe("string");
+    const result = (await handler({ timeout: 1000 })) as ToolResult;
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("No agent session");
   });
 
-  test("wait returns timeout when no events", async () => {
-    const fsmPath = writeTerminalFsm(tmp);
-
-    mockQueryResults.push({
-      type: "result",
-      subtype: "success",
-      result: "Done",
-      duration_ms: 100,
-      is_error: false,
-      num_turns: 1,
-    });
-
+  test("send errors when no session active", async () => {
     createVerifierMcpServer();
-    const startHandler = getToolHandler("start_embedded_run");
-    const waitHandler = getToolHandler("wait");
+    const handler = getToolHandler("send");
 
-    await startHandler({ fsm_path: fsmPath, root: tmp });
-
-    // Drain the turn_complete first
-    await new Promise((r) => setTimeout(r, 50));
-    await waitHandler({ timeout: 5000 });
-
-    // Now the bus is empty — next wait should timeout
-    const parsed = parseResult(await waitHandler({ timeout: 50 }));
-    expect(parsed.type).toBe("timeout");
+    const result = (await handler({ text: "foo" })) as ToolResult;
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("No agent session");
   });
 
-  test("send_input posts message to embedded agent bus", async () => {
-    const fsmPath = writeNonTerminalFsm(tmp);
-
-    // The mock query will be consumed twice (once per session)
-    mockQueryResults.push(
-      {
-        type: "result",
-        subtype: "success",
-        result: "First turn",
-        duration_ms: 100,
-        is_error: false,
-        num_turns: 1,
-      },
-    );
-
+  test("send logs input via logger when provided", async () => {
     createVerifierMcpServer();
-    const startHandler = getToolHandler("start_embedded_run");
-    const waitHandler = getToolHandler("wait");
-    const sendInputHandler = getToolHandler("send_input");
-
-    await startHandler({ fsm_path: fsmPath, root: tmp });
-
-    // Wait for turn_complete (agent finished first session, waiting for prompt)
-    await new Promise((r) => setTimeout(r, 50));
-    const firstWait = parseResult(await waitHandler({ timeout: 5000 }));
-    expect(firstWait.type).toBe("turn_complete");
-
-    // Send input — this resolves the embedded agent's waitForPrompt()
-    const result = parseResult(await sendInputHandler({ text: "continue" }));
-    expect(result.ok).toBe(true);
-  });
-
-  test("send_input errors when no run is active", async () => {
-    createVerifierMcpServer();
-    const sendInputHandler = getToolHandler("send_input");
-
-    const result = await sendInputHandler({ text: "foo" });
-    const typed = result as ToolResult;
-    expect(typed.isError).toBe(true);
-    expect(typed.content[0].text).toContain("No embedded run is active");
-  });
-
-  test("wait logs embedded output via logger when provided", async () => {
-    const fsmPath = writeNonTerminalFsm(tmp);
-
-    mockQueryResults.push({
-      type: "assistant",
-      message: { content: [{ type: "text", text: "Hello from agent" }] },
-    });
-    mockQueryResults.push({
-      type: "result",
-      subtype: "success",
-      result: "Hello from agent",
-      duration_ms: 100,
-      is_error: false,
-      num_turns: 1,
-    });
-
-    const logger = new DualStreamLogger();
-    const logEmbeddedSpy = vi.spyOn(logger, "logEmbedded");
-
-    createVerifierMcpServer({ logger });
-    const startHandler = getToolHandler("start_embedded_run");
-    const waitHandler = getToolHandler("wait");
-
-    await startHandler({ fsm_path: fsmPath, root: tmp });
-
-    // Give the event loop a tick for runCore to process
-    await new Promise((r) => setTimeout(r, 50));
-
-    const parsed = parseResult(await waitHandler({ timeout: 5000 }));
-    expect(parsed.type).toBe("turn_complete");
-    expect(logEmbeddedSpy).toHaveBeenCalled();
-  });
-
-  test("send_input logs input via logger when provided", async () => {
-    const fsmPath = writeNonTerminalFsm(tmp);
-
-    mockQueryResults.push({
-      type: "result",
-      subtype: "success",
-      result: "Done",
-      duration_ms: 100,
-      is_error: false,
-      num_turns: 1,
-    });
+    const runHandler = getToolHandler("run_agent");
+    await runHandler({ prompt: "start", model: undefined });
 
     const logger = new DualStreamLogger();
     const logInputSpy = vi.spyOn(logger, "logInput");
 
+    // Create a new server with logger to test logging
+    vi.clearAllMocks();
     createVerifierMcpServer({ logger });
-    const startHandler = getToolHandler("start_embedded_run");
-    const sendInputHandler = getToolHandler("send_input");
+    const runHandler2 = getToolHandler("run_agent");
+    const sendHandler = getToolHandler("send");
 
-    await startHandler({ fsm_path: fsmPath, root: tmp });
-
-    // Wait for the run to be ready
-    await new Promise((r) => setTimeout(r, 50));
-
-    await sendInputHandler({ text: "42" });
+    await runHandler2({ prompt: "start", model: undefined });
+    await sendHandler({ text: "42" });
     expect(logInputSpy).toHaveBeenCalledWith("42");
   });
 });

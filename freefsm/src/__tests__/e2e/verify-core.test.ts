@@ -47,7 +47,6 @@ beforeEach(() => {
   );
   vi.clearAllMocks();
 
-  // Return fresh generator for each query() call (retry loop calls multiple times)
   vi.mocked(query).mockImplementation(() => {
     const gen = (async function* () {
       yield {
@@ -82,44 +81,42 @@ afterEach(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
 
-describe("verifyCore — runs verifier FSM via runCore", () => {
-  test("calls query with verifier FSM system prompt", async () => {
+describe("verifyCore", () => {
+  test("calls query with prompt containing plan path and test dir", async () => {
     const testDir = join(tmp, "out");
     await verifyCore({ planPath, testDir });
 
     expect(query).toHaveBeenCalled();
     const callArgs = vi.mocked(query).mock.calls[0][0];
-    // System prompt comes from verifier.fsm.yaml guide via runCore
-    const systemPrompt = callArgs.options?.systemPrompt as string;
-    expect(systemPrompt).toContain("start_embedded_run");
-    expect(systemPrompt).toContain("wait");
-    expect(systemPrompt).toContain("send_input");
+    const prompt = callArgs.prompt as string;
+    expect(prompt).toContain(planPath);
+    expect(prompt).toContain(testDir);
+    expect(prompt).toContain("test-report.md");
   });
 
-  test("initial message contains test plan path and test dir", async () => {
+  test("prompt includes freefsm:start verifier", async () => {
     const testDir = join(tmp, "out");
     await verifyCore({ planPath, testDir });
 
     const callArgs = vi.mocked(query).mock.calls[0][0];
     const prompt = callArgs.prompt as string;
-    expect(prompt).toContain(planPath);
-    expect(prompt).toContain(testDir);
+    expect(prompt).toContain("freefsm:start");
+    expect(prompt).toContain("verifier.fsm.yaml");
   });
 
-  test("mcpServers includes both freefsm (FSM tools) and freefsm-verifier (embedded tools)", async () => {
+  test("mcpServers includes freefsm-verifier", async () => {
     const testDir = join(tmp, "out");
     await verifyCore({ planPath, testDir });
 
     const callArgs = vi.mocked(query).mock.calls[0][0];
     const servers = callArgs.options?.mcpServers as Record<string, unknown>;
-    expect(servers).toHaveProperty("freefsm");
     expect(servers).toHaveProperty("freefsm-verifier");
   });
 
-  test("returns reportPath", async () => {
+  test("returns null reportPath when report not written", async () => {
     const testDir = join(tmp, "out");
     const result = await verifyCore({ planPath, testDir });
-    expect(result.reportPath).toBe(join(testDir, "test-report.md"));
+    expect(result.reportPath).toBeNull();
   });
 
   test("query bypasses permissions", async () => {

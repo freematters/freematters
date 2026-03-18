@@ -24,7 +24,7 @@ to the next state without receiving input.
 - Confirm the workflow file exists at `tests/qa.fsm.yaml` in the repo root
 
 ## Steps
-1. **Start embedded run**: Start the embedded freefsm run with `tests/qa.fsm.yaml`
+1. **Start embedded run**: Start the embedded freefsm run with `/freefsm:start tests/qa.fsm.yaml`
    - Expected: The embedded run starts successfully, returning a run_id and store_root
 
 2. **Wait for name prompt**: Wait for the embedded agent to request input
@@ -41,9 +41,6 @@ to the next state without receiving input.
 
 6. **Wait for completion**: Wait for the embedded agent to finish
    - Expected: The agent produces a summary that mentions "Alice" and "painting", transitions to `done`, and exits with code 0
-
-7. **Verify state transitions**: Read the store's `events.jsonl` at the store_root
-   - Expected: States visited in order are `ask-name` → `ask-hobby` → `summarize` → `done`; no state is skipped
 
 ## Expected Outcomes
 - The embedded agent correctly pauses at each `request_input` call and does not advance until input is provided

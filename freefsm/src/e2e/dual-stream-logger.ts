@@ -13,8 +13,10 @@ export class DualStreamLogger {
     const lines = text.split("\n");
     const formatted = lines
       .map(
-        (line) =>
-          `${INDENT}${colors.cyan}[embedded]${colors.reset} ${colors.cyan}${line}${colors.reset}`,
+        (line, i) =>
+          i === 0
+            ? `${INDENT}${colors.cyan}[embedded]${colors.reset} ${colors.cyan}${line}${colors.reset}`
+            : `${INDENT}            ${colors.cyan}${line}${colors.reset}`,
       )
       .join("\n");
     process.stderr.write(`${formatted}\n`);
