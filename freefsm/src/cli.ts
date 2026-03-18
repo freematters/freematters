@@ -70,6 +70,7 @@ program
   .argument("<fsm_path>", "path to FSM YAML file")
   .option("--run-id <id>", "run identifier (auto-generated if omitted)")
   .option("--prompt <text>", "user prompt to append to the initial state card")
+  .option("--verbose", "show tool calls and agent messages in output")
   .action(async (_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     await runCmd({
@@ -78,6 +79,7 @@ program
       root: resolveRoot(root),
       json: json ?? false,
       prompt: opts.prompt as string | undefined,
+      verbose: (opts.verbose as boolean) ?? false,
     });
   });
 
@@ -201,14 +203,13 @@ e2eCmd
 
 e2eCmd
   .command("gen")
-  .description("generate a test plan from a workflow or prompt")
-  .argument("<source>", "path to FSM YAML or free-text prompt")
-  .option("--output <file>", "output file path (default: stdout)")
-  .action(async (_source: string, opts: Record<string, unknown>, cmd: Command) => {
-    const { json } = getGlobalOpts(cmd);
+  .description("run a workflow via the agent (delegates to runCore)")
+  .argument("<source>", "path to FSM YAML workflow file")
+  .action(async (_source: string, _opts: Record<string, unknown>, cmd: Command) => {
+    const { root, json } = getGlobalOpts(cmd);
     await gen({
       source: resolve(_source),
-      output: opts.output ? resolve(opts.output as string) : undefined,
+      root: root ? resolveRoot(root) : undefined,
       json: json ?? false,
     });
   });
