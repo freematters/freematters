@@ -3,7 +3,7 @@
 ## Checklist
 - [x] Step 1: MessageBus
 - [x] Step 2: EmbeddedRun — adapt `run()` to embedded mode
-- [ ] Step 3: Verifier MCP tools + end-to-end wiring
+- [x] Step 3: Verifier MCP tools + end-to-end wiring
 - [ ] Step 4: DualStreamLogger
 - [ ] Step 5: Replace `freefsm e2e verify` command
 - [ ] Step 6: Integration test with real FSM workflow
