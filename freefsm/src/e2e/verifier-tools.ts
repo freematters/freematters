@@ -1,21 +1,16 @@
 /**
- * Verifier MCP tools — turn-based interaction with an embedded freefsm run.
+ * Verifier MCP tools — controls an embedded freefsm agent session.
  *
- * Communication:
- *   Embedded agent's session ends → turn_complete (with output) → verifier
- *   Verifier calls send_input(text) → becomes next session's prompt
+ * Tools:
+ *   runAgent(fsm_path) — starts a Claude Agent SDK session, bypasses permissions
+ *   wait(timeout)      — waits for the agent to complete its current turn
+ *   send(text)         — sends a message to resume the agent session
  */
 
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { AgentSession } from "./agent-session.js";
 import type { DualStreamLogger } from "./dual-stream-logger.js";
-import { EmbeddedRun } from "./embedded-run.js";
-import type { MessageBus } from "./message-bus.js";
-
-interface RunState {
-  run: EmbeddedRun;
-  bus: MessageBus;
-}
 
 export interface VerifierMcpServerOptions {
   logger?: DualStreamLogger;
@@ -23,11 +18,11 @@ export interface VerifierMcpServerOptions {
 
 export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
   const logger = options?.logger;
-  let activeRun: RunState | undefined;
+  let session: AgentSession | undefined;
 
-  const startEmbeddedRun = tool(
-    "start_embedded_run",
-    "Start an embedded freefsm run. Returns { run_id, store_root }.",
+  const runAgent = tool(
+    "run_agent",
+    "Start an embedded freefsm agent session. Returns { run_id, store_root }.",
     {
       fsm_path: z.string().describe("Path to the FSM YAML file"),
       prompt: z.string().optional().describe("Initial user prompt"),
@@ -35,44 +30,57 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
       model: z.string().optional().describe("Claude model override"),
     },
     async (args) => {
-      if (activeRun) {
+      if (session) {
         return {
           isError: true as const,
           content: [
             {
               type: "text" as const,
-              text: "An embedded run is already active.",
+              text: "An agent session is already active.",
             },
           ],
         };
       }
 
-      const run = new EmbeddedRun(args.fsm_path, {
-        root: args.root,
-        prompt: args.prompt,
-        model: args.model,
-      });
+      try {
+        session = new AgentSession({
+          fsmPath: args.fsm_path,
+          root: args.root,
+          prompt: args.prompt,
+          model: args.model,
+        });
 
-      await run.start();
-      activeRun = { run, bus: run.getBus() };
+        await session.start();
 
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: JSON.stringify({
-              run_id: run.getRunId(),
-              store_root: run.getStoreRoot(),
-            }),
-          },
-        ],
-      };
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify({
+                run_id: session.getRunId(),
+                store_root: session.getStoreRoot(),
+              }),
+            },
+          ],
+        };
+      } catch (err: unknown) {
+        session = undefined;
+        return {
+          isError: true as const,
+          content: [
+            {
+              type: "text" as const,
+              text: `Failed to start agent: ${err instanceof Error ? err.message : String(err)}`,
+            },
+          ],
+        };
+      }
     },
   );
 
   const wait = tool(
     "wait",
-    "Wait for the embedded agent to complete its current turn. Returns { type: 'turn_complete', output }.",
+    "Wait for the embedded agent to complete its current turn. Returns { output, done }.",
     {
       timeout: z
         .number()
@@ -81,28 +89,28 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
         .describe("Timeout in milliseconds (default 120000)"),
     },
     async (args) => {
-      if (!activeRun) {
+      if (!session) {
         return {
           isError: true as const,
           content: [
             {
               type: "text" as const,
-              text: "No embedded run is active. Call start_embedded_run first.",
+              text: "No agent session is active. Call run_agent first.",
             },
           ],
         };
       }
 
       try {
-        const msg = await activeRun.bus.waitForMessage(args.timeout);
-        if (msg.output) {
-          logger?.logEmbedded(msg.output);
+        const result = await session.wait(args.timeout);
+        if (result.output) {
+          logger?.logEmbedded(result.output);
         }
         return {
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify(msg),
+              text: JSON.stringify(result),
             },
           ],
         };
@@ -122,38 +130,50 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
     },
   );
 
-  const sendInput = tool(
-    "send_input",
-    "Send a message to the embedded agent as its next prompt.",
+  const send = tool(
+    "send",
+    "Send a message to the embedded agent to resume its session.",
     {
       text: z.string().describe("The message text to send"),
     },
     async (args) => {
-      if (!activeRun) {
+      if (!session) {
         return {
           isError: true as const,
           content: [
             {
               type: "text" as const,
-              text: "No embedded run is active.",
+              text: "No agent session is active.",
             },
           ],
         };
       }
 
-      logger?.logInput(args.text);
-      activeRun.bus.post(args.text);
-      return {
-        content: [
-          { type: "text" as const, text: JSON.stringify({ ok: true }) },
-        ],
-      };
+      try {
+        logger?.logInput(args.text);
+        await session.send(args.text);
+        return {
+          content: [
+            { type: "text" as const, text: JSON.stringify({ ok: true }) },
+          ],
+        };
+      } catch (err: unknown) {
+        return {
+          isError: true as const,
+          content: [
+            {
+              type: "text" as const,
+              text: err instanceof Error ? err.message : String(err),
+            },
+          ],
+        };
+      }
     },
   );
 
   return createSdkMcpServer({
     name: "freefsm-verifier",
     version: "1.0.0",
-    tools: [startEmbeddedRun, wait, sendInput],
+    tools: [runAgent, wait, send],
   });
 }

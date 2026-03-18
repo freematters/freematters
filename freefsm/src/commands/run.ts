@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import { createSdkMcpServer, query, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
 import { agentLog, colors as c, logSdkMessage } from "../agent-log.js";
-import type { MessageBus } from "../e2e/message-bus.js";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import { formatStateCard, handleError, stateCardFromFsm } from "../output.js";
@@ -18,20 +17,13 @@ export interface RunArgs {
   prompt?: string;
 }
 
-/**
- * Options for the shared runCore function.
- * When `bus` is provided, request_input uses the MessageBus instead of readline,
- * and result output goes to the bus instead of stdout.
- */
 export interface RunCoreOptions {
   fsmPath: string;
   runId?: string;
   root: string;
   prompt?: string;
   model?: string;
-  bus?: MessageBus;
   logFn?: (msg: string, color?: string) => void;
-  additionalMcpServers?: Record<string, unknown>;
 }
 
 export function generateRunId(fsmPath: string): string {
@@ -59,7 +51,6 @@ export function createFsmMcpServer(
   store: Store,
   runId: string,
   logFn: (msg: string, color?: string) => void = () => {},
-  bus?: MessageBus,
 ) {
   const fsmGoto = tool(
     "fsm_goto",
@@ -265,7 +256,7 @@ export async function runCore(
 
   logFn(`state=${fsm.initial} (initial)`, c.green);
 
-  const fsmServer = createFsmMcpServer(fsm, store, runId, logFn, opts.bus);
+  const fsmServer = createFsmMcpServer(fsm, store, runId, logFn);
 
   const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
   const stateCard = formatStateCard(card);
@@ -282,7 +273,7 @@ export async function runCore(
     systemPrompt,
     permissionMode: "bypassPermissions" as const,
     allowDangerouslySkipPermissions: true,
-    mcpServers: { freefsm: fsmServer, ...opts.additionalMcpServers },
+    mcpServers: { freefsm: fsmServer },
     ...(allowedTools !== undefined && { allowedTools }),
     ...(opts.model !== undefined && { model: opts.model }),
   };
@@ -299,21 +290,6 @@ export async function runCore(
     for await (const message of session) {
       logSdkMessage(message, { sessionNum: attempt });
 
-      // Buffer assistant text for the bus
-      if (opts.bus && message.type === "assistant") {
-        const msg = message as {
-          type: "assistant";
-          message: {
-            content: Array<{ type: string; text?: string }>;
-          };
-        };
-        for (const block of msg.message.content) {
-          if (block.type === "text" && block.text) {
-            opts.bus.appendOutput(block.text);
-          }
-        }
-      }
-
       if (message.type === "result") {
         const resultMsg = message as {
           type: "result";
@@ -323,9 +299,7 @@ export async function runCore(
         if (resultMsg.is_error) {
           isError = true;
         }
-        if (!opts.bus) {
-          process.stdout.write(`${resultMsg.result}\n`);
-        }
+        process.stdout.write(`${resultMsg.result}\n`);
       }
     }
 
@@ -361,25 +335,11 @@ export async function runCore(
       break;
     }
 
-    if (opts.bus) {
-      // Embedded mode: signal turn complete, wait for verifier's next prompt
-      opts.bus.completeTurn();
-      logFn(`turn complete, waiting for verifier prompt...`, c.magenta);
-      try {
-        prompt = await opts.bus.waitForPrompt(300000); // 5 min timeout
-        logFn(`received prompt from verifier`, c.magenta);
-      } catch {
-        logFn(`timeout waiting for verifier prompt, aborting`, c.red);
-        break;
-      }
-    } else {
-      // CLI mode: auto-retry with continuation prompt
-      logFn(
-        `session ended but workflow not complete, state=${snap.state} — retrying`,
-        c.magenta,
-      );
-      prompt = `The workflow is not complete yet. Continue executing the current state. If you need user input, use \`request_input\`. Do NOT stop until you reach a terminal state.\n\n${formatStateCard(stateCardFromFsm(snap.state, currentState))}`;
-    }
+    logFn(
+      `session ended but workflow not complete, state=${snap.state} — retrying`,
+      c.magenta,
+    );
+    prompt = `The workflow is not complete yet. Continue executing the current state. Do NOT stop until you reach a terminal state.\n\n${formatStateCard(stateCardFromFsm(snap.state, currentState))}`;
   }
 
   return { runId, isError };
