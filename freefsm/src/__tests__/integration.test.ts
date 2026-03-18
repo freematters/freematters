@@ -3,6 +3,8 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { handlePostToolUse, type HookInput } from "../hooks/post-tool-use.js";
+import { Store } from "../store.js";
 
 const CLI = resolve(__dirname, "../../dist/cli.js");
 
@@ -61,7 +63,7 @@ afterAll(() => {
 let runCounter = 0;
 function uniqueRunId(prefix = "run"): string {
   runCounter++;
-  return `${prefix}-${runCounter}`;
+  return `${prefix}-${runCounter}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function run(
@@ -108,22 +110,10 @@ function runJson(
   }
 }
 
-function runHook(
-  input: Record<string, unknown>,
-  root: string,
-): Record<string, unknown> | null {
-  const stdout = execFileSync("node", [CLI, "_hook", "post-tool-use"], {
-    input: JSON.stringify(input),
-    encoding: "utf-8",
-    env: { ...process.env, FREEFSM_ROOT: root },
-  });
-  if (!stdout.trim()) return null;
-  return JSON.parse(stdout);
-}
 
 // ─── CLI — start command ─────────────────────────────────────────
 
-describe("CLI — start command", () => {
+describe.concurrent("CLI — start command", () => {
   test("human-readable output includes state card", () => {
     const id = uniqueRunId("start-human");
     const { stdout, exitCode } = run(`start ${fsmMinimal} --run-id ${id}`);
@@ -172,7 +162,7 @@ describe("CLI — start command", () => {
 
 // ─── CLI — current command ───────────────────────────────────────
 
-describe("CLI — current command", () => {
+describe.concurrent("CLI — current command", () => {
   test("shows current state after start", () => {
     const id = uniqueRunId("current-human");
     run(`start ${fsmMulti} --run-id ${id}`);
@@ -212,7 +202,7 @@ describe("CLI — current command", () => {
 
 // ─── CLI — goto command ──────────────────────────────────────────
 
-describe("CLI — goto command", () => {
+describe.concurrent("CLI — goto command", () => {
   test("transitions to valid target state", () => {
     const id = uniqueRunId("goto-valid");
     run(`start ${fsmMulti} --run-id ${id}`);
@@ -276,7 +266,7 @@ describe("CLI — goto command", () => {
 
 // ─── CLI — finish command ────────────────────────────────────────
 
-describe("CLI — finish command", () => {
+describe.concurrent("CLI — finish command", () => {
   test("aborts active run, shows transition history", () => {
     const id = uniqueRunId("finish-human");
     run(`start ${fsmMulti} --run-id ${id}`);
@@ -319,7 +309,7 @@ describe("CLI — finish command", () => {
 
 // ─── CLI — full workflow e2e ─────────────────────────────────────
 
-describe("CLI — full workflow e2e", () => {
+describe.concurrent("CLI — full workflow e2e", () => {
   test("start → goto → goto → current → goto done (complete lifecycle)", () => {
     const id = uniqueRunId("e2e");
     const root = join(tmp, "e2e-root");
@@ -358,18 +348,41 @@ describe("CLI — full workflow e2e", () => {
   });
 });
 
-// ─── Hook — post-tool-use ────────────────────────────────────────
+// ─── Hook — post-tool-use (in-process, no child spawns) ─────────
 
-describe("Hook — post-tool-use", () => {
+function setupRun(root: string, runId: string, fsmPath: string): Store {
+  const store = new Store(root);
+  store.initRun(runId, fsmPath);
+  store.commit(
+    runId,
+    {
+      event: "start",
+      from_state: null,
+      to_state: "start",
+      on_label: null,
+      actor: "system",
+      reason: null,
+    },
+    { run_status: "active", state: "start" },
+  );
+  return store;
+}
+
+function hookInput(overrides: Partial<HookInput> = {}): HookInput {
+  return {
+    session_id: "hook-sess",
+    tool_name: "Read",
+    tool_input: {},
+    tool_response: {},
+    ...overrides,
+  };
+}
+
+describe.concurrent("Hook — post-tool-use", () => {
   test("no output when no active run", () => {
     const hookRoot = join(tmp, "hook-empty");
-    const result = runHook(
-      {
-        session_id: "sess-1",
-        tool_name: "Read",
-        tool_input: {},
-        tool_response: {},
-      },
+    const result = handlePostToolUse(
+      hookInput({ session_id: "sess-1" }),
       hookRoot,
     );
     expect(result).toBeNull();
@@ -379,19 +392,18 @@ describe("Hook — post-tool-use", () => {
     const id = uniqueRunId("hook-bind");
     const hookRoot = join(tmp, "hook-bind-root");
 
-    // First, actually start a run so storage exists
-    run(`start ${fsmMulti} --run-id ${id}`, { root: hookRoot });
+    // Set up run in-process
+    setupRun(hookRoot, id, fsmMulti);
 
     // Simulate hook seeing the start command
-    const result = runHook(
-      {
-        session_id: "hook-sess",
+    const result = handlePostToolUse(
+      hookInput({
         tool_name: "Bash",
         tool_input: {
           command: `freefsm start ${fsmMulti} --run-id ${id} --root ${hookRoot}`,
         },
         tool_response: `FSM started.\n\nYou are in **start** state.\nrun_id: ${id}`,
-      },
+      }),
       hookRoot,
     );
     // First call after bind — counter is 1, not divisible by 5
@@ -399,151 +411,93 @@ describe("Hook — post-tool-use", () => {
 
     // Now make 4 more calls to reach the 5th
     for (let i = 0; i < 4; i++) {
-      runHook(
-        {
-          session_id: "hook-sess",
-          tool_name: "Read",
-          tool_input: {},
-          tool_response: {},
-        },
-        hookRoot,
-      );
+      handlePostToolUse(hookInput(), hookRoot);
     }
 
-    // 6th call (but counter at 5 from the 4 above + 1 from bind) — should emit reminder
-    // Actually: bind sets counter to 0, then step 3 in handlePostToolUse increments.
-    // Call after bind: counter becomes 1 (no reminder).
-    // 4 more calls: counter becomes 2,3,4,5 — 5th call emits reminder.
-    // So the 4th call in the loop above should have been the 5th overall.
-    // Let's verify by making one more explicit call at counter=6 (no reminder)
-    // and then 4 more to reach 10 (reminder).
-    // Actually let me re-check: the bind call itself also goes through
-    // handlePostToolUse which increments counter to 1 after setting it to 0.
-    // So: bind=0→1, loop[0]=2, loop[1]=3, loop[2]=4, loop[3]=5 → reminder at loop[3].
-    // We already called those 4 in the loop. Let's just verify the next reminder at 10.
-    const callsToTen = 4; // counter is at 5, need 6,7,8,9 then 10
+    // Counter is at 5, need 6,7,8,9 then 10 for next reminder
+    const callsToTen = 4;
     for (let i = 0; i < callsToTen; i++) {
-      runHook(
-        {
-          session_id: "hook-sess",
-          tool_name: "Read",
-          tool_input: {},
-          tool_response: {},
-        },
-        hookRoot,
-      );
+      handlePostToolUse(hookInput(), hookRoot);
     }
-    const reminder = runHook(
-      {
-        session_id: "hook-sess",
-        tool_name: "Read",
-        tool_input: {},
-        tool_response: {},
-      },
-      hookRoot,
-    );
+    const reminder = handlePostToolUse(hookInput(), hookRoot);
     expect(reminder).not.toBeNull();
-    const ctx = (reminder as Record<string, unknown>).hookSpecificOutput as Record<
-      string,
-      unknown
-    >;
-    expect(ctx.hookEventName).toBe("PostToolUse");
-    expect(ctx.additionalContext as string).toContain("[FSM Reminder]");
-    expect(ctx.additionalContext as string).toContain("State: start");
+    expect(reminder).toContain("[FSM Reminder]");
+    expect(reminder).toContain("State: start");
   });
 
   test("emits reminder every 5th call", () => {
     const id = uniqueRunId("hook-counter");
     const hookRoot = join(tmp, "hook-counter-root");
 
-    run(`start ${fsmMulti} --run-id ${id}`, { root: hookRoot });
+    setupRun(hookRoot, id, fsmMulti);
 
     // Bind session via simulated start detection
-    runHook(
-      {
+    handlePostToolUse(
+      hookInput({
         session_id: "counter-sess",
         tool_name: "Bash",
         tool_input: {
           command: `freefsm start ${fsmMulti} --run-id ${id} --root ${hookRoot}`,
         },
         tool_response: `run_id: ${id}`,
-      },
+      }),
       hookRoot,
     );
 
     // Calls 2-4: no reminder
     for (let i = 0; i < 3; i++) {
-      const r = runHook(
-        {
-          session_id: "counter-sess",
-          tool_name: "Read",
-          tool_input: {},
-          tool_response: {},
-        },
+      const r = handlePostToolUse(
+        hookInput({ session_id: "counter-sess" }),
         hookRoot,
       );
       expect(r).toBeNull();
     }
 
     // Call 5: reminder
-    const r5 = runHook(
-      {
-        session_id: "counter-sess",
-        tool_name: "Read",
-        tool_input: {},
-        tool_response: {},
-      },
+    const r5 = handlePostToolUse(
+      hookInput({ session_id: "counter-sess" }),
       hookRoot,
     );
     expect(r5).not.toBeNull();
-    const ctx = (r5 as Record<string, unknown>).hookSpecificOutput as Record<
-      string,
-      unknown
-    >;
-    expect(ctx.additionalContext as string).toContain("[FSM Reminder]");
-    expect(ctx.additionalContext as string).toContain("Begin work.");
+    expect(r5).toContain("[FSM Reminder]");
+    expect(r5).toContain("Begin work.");
   });
 
   test("unbinds session on freefsm finish detection", () => {
     const id = uniqueRunId("hook-finish");
     const hookRoot = join(tmp, "hook-finish-root");
 
-    run(`start ${fsmMulti} --run-id ${id}`, { root: hookRoot });
+    setupRun(hookRoot, id, fsmMulti);
 
     // Bind
-    runHook(
-      {
+    handlePostToolUse(
+      hookInput({
         session_id: "finish-sess",
         tool_name: "Bash",
         tool_input: {
           command: `freefsm start ${fsmMulti} --run-id ${id} --root ${hookRoot}`,
         },
         tool_response: `run_id: ${id}`,
-      },
+      }),
       hookRoot,
     );
 
     // Simulate finish detection
-    runHook(
-      {
+    handlePostToolUse(
+      hookInput({
         session_id: "finish-sess",
         tool_name: "Bash",
         tool_input: {
           command: `freefsm finish --run-id ${id} --root ${hookRoot}`,
         },
         tool_response: "Run aborted.",
-      },
+      }),
       hookRoot,
     );
 
     // Subsequent calls should return null (no binding)
-    const result = runHook(
-      {
-        session_id: "finish-sess",
-        tool_name: "Read",
-        tool_input: {},
-        tool_response: {},
-      },
+    const result = handlePostToolUse(
+      hookInput({ session_id: "finish-sess" }),
       hookRoot,
     );
     expect(result).toBeNull();
@@ -553,42 +507,37 @@ describe("Hook — post-tool-use", () => {
     const id = uniqueRunId("hook-goto-done");
     const hookRoot = join(tmp, "hook-goto-done-root");
 
-    run(`start ${fsmMinimal} --run-id ${id}`, { root: hookRoot });
+    setupRun(hookRoot, id, fsmMinimal);
 
     // Bind
-    runHook(
-      {
+    handlePostToolUse(
+      hookInput({
         session_id: "goto-done-sess",
         tool_name: "Bash",
         tool_input: {
           command: `freefsm start ${fsmMinimal} --run-id ${id} --root ${hookRoot}`,
         },
         tool_response: `run_id: ${id}`,
-      },
+      }),
       hookRoot,
     );
 
     // Simulate goto done detection
-    runHook(
-      {
+    handlePostToolUse(
+      hookInput({
         session_id: "goto-done-sess",
         tool_name: "Bash",
         tool_input: {
           command: `freefsm goto done --run-id ${id} --on next --root ${hookRoot}`,
         },
         tool_response: "Transitioned to done.",
-      },
+      }),
       hookRoot,
     );
 
     // Subsequent calls should return null (no binding)
-    const result = runHook(
-      {
-        session_id: "goto-done-sess",
-        tool_name: "Read",
-        tool_input: {},
-        tool_response: {},
-      },
+    const result = handlePostToolUse(
+      hookInput({ session_id: "goto-done-sess" }),
       hookRoot,
     );
     expect(result).toBeNull();

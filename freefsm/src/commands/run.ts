@@ -276,7 +276,6 @@ export async function runCore(
   };
 
   let isError = false;
-  const MAX_SESSIONS = 10;
   let attempt = 0;
   let prompt = initialMessage;
   for (;;) {
@@ -312,23 +311,6 @@ export async function runCore(
     const currentState = fsm.states[snap.state];
     if (!currentState || Object.keys(currentState.transitions).length === 0) {
       logFn(`run finished: terminal state=${snap.state}`, c.green);
-      break;
-    }
-
-    if (attempt >= MAX_SESSIONS) {
-      logFn(`max sessions (${MAX_SESSIONS}) reached, aborting run`, c.red);
-      store.commit(
-        runId,
-        {
-          event: "finish",
-          from_state: snap.state,
-          to_state: snap.state,
-          on_label: null,
-          actor: "system",
-          reason: "max_sessions_exceeded",
-        },
-        { run_status: "aborted", state: snap.state },
-      );
       break;
     }
 
