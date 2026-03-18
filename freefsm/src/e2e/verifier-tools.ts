@@ -9,6 +9,7 @@
 
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import { formatToolArgs } from "../agent-log.js";
 import { AgentSession } from "./agent-session.js";
 import type { DualStreamLogger } from "./dual-stream-logger.js";
 
@@ -41,9 +42,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
         session = new AgentSession({
           model: args.model,
           onToolUse: (name, input) => {
-            const inputStr = JSON.stringify(input);
-            const short = inputStr.length > 100 ? `${inputStr.slice(0, 100)}...` : inputStr;
-            logger?.logEmbedded(`[tool] ${name}(${short})`);
+            logger?.logEmbedded(`⚡ ${name}${formatToolArgs(name, input)}`);
           },
         });
         await session.send(args.prompt);

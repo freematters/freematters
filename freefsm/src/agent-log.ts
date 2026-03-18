@@ -25,7 +25,7 @@ function truncate(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max)}...` : s;
 }
 
-function formatToolArgs(
+export function formatToolArgs(
   name: string,
   input: Record<string, unknown> | undefined,
 ): string {

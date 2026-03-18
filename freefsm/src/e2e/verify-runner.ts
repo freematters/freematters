@@ -1,6 +1,7 @@
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { query } from "@anthropic-ai/claude-agent-sdk";
+import { formatToolArgs } from "../agent-log.js";
 import { loadFsm } from "../fsm.js";
 import { formatStateCard, stateCardFromFsm } from "../output.js";
 import { Store } from "../store.js";
@@ -102,9 +103,7 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
         if (block.type === "text" && block.text) {
           dualLogger.logVerifier(block.text);
         } else if (block.type === "tool_use" && block.name) {
-          const inputStr = JSON.stringify(block.input ?? {});
-          const short = inputStr.length > 100 ? `${inputStr.slice(0, 100)}...` : inputStr;
-          dualLogger.logVerifier(`[tool] ${block.name}(${short})`);
+          dualLogger.logVerifier(`⚡ ${block.name}${formatToolArgs(block.name, block.input)}`);
         }
       }
     }
