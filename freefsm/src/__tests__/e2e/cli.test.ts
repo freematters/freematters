@@ -21,9 +21,9 @@ function run(
   return runCli(args, { ...opts, env: { FREEFSM_ROOT: undefined } });
 }
 
-describe("freefsm e2e verify — CLI arg validation", () => {
+describe("freefsm verify — CLI arg validation", () => {
   test("exits with error when no args provided", () => {
-    const { exitCode, stderr } = run("e2e verify", { expectFail: true });
+    const { exitCode, stderr } = run("verify", { expectFail: true });
     expect(exitCode).not.toBe(0);
   });
 
@@ -34,17 +34,16 @@ describe("freefsm e2e verify — CLI arg validation", () => {
       "# Test: dummy\n## Setup\n- x\n## Steps\n1. **s**: a\n   - Expected: b\n## Expected Outcomes\n- c\n",
       "utf-8",
     );
-    const { exitCode } = run(`e2e verify ${planPath}`, { expectFail: true });
+    const { exitCode } = run(`verify ${planPath}`, { expectFail: true });
     expect(exitCode).not.toBe(0);
   });
 
   test("exits with error when plan file does not exist", () => {
     const planPath = join(tmp, "nonexistent-plan.md");
     const testDir = join(tmp, "noplan-out");
-    const { exitCode, stdout } = run(
-      `e2e verify ${planPath} --test-dir ${testDir} -j`,
-      { expectFail: true },
-    );
+    const { exitCode, stdout } = run(`verify ${planPath} --test-dir ${testDir} -j`, {
+      expectFail: true,
+    });
     expect(exitCode).toBe(2);
     const parsed = JSON.parse(stdout);
     expect(parsed.ok).toBe(false);
