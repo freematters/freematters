@@ -33,6 +33,8 @@ export interface RunCoreOptions {
   bus?: MessageBus;
   logFn?: (msg: string, color?: string) => void;
   additionalMcpServers?: Record<string, unknown>;
+  /** When true, tool_use calls are included in bus output. Default: false (only assistant text). */
+  verbose?: boolean;
 }
 
 export function generateRunId(fsmPath: string): string {
@@ -371,7 +373,7 @@ export async function runCore(
         for (const block of msg.message.content) {
           if (block.type === "text" && block.text) {
             opts.bus.appendOutput(block.text);
-          } else if (block.type === "tool_use" && block.name) {
+          } else if (block.type === "tool_use" && block.name && opts.verbose) {
             opts.bus.appendOutput(
               `[tool_use] ${block.name}(${JSON.stringify(block.input ?? {})})`,
             );
