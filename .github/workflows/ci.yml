@@ -38,6 +38,26 @@ jobs:
       - run: npm run build
       - run: npm test
 
+  claude:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: freefsm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: freefsm/package-lock.json
+      - name: Install Claude Code
+        run: curl -fsSL https://claude.ai/install.sh | bash
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:claude
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
   integration:
     runs-on: ubuntu-latest
     defaults:

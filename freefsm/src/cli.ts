@@ -69,6 +69,7 @@ program
   .description("launch an Agent SDK session to execute a workflow autonomously")
   .argument("<fsm_path>", "path to FSM YAML file")
   .option("--run-id <id>", "run identifier (auto-generated if omitted)")
+  .option("--prompt <text>", "user prompt to append to the initial state card")
   .action(async (_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     await runCmd({
@@ -76,6 +77,7 @@ program
       runId: opts.runId as string | undefined,
       root: resolveRoot(root),
       json: json ?? false,
+      prompt: opts.prompt as string | undefined,
     });
   });
 
@@ -184,22 +186,16 @@ e2eCmd
   .description("execute a test plan and produce a report")
   .argument("<plan>", "path to test plan markdown file")
   .requiredOption("--test-dir <path>", "output directory for artifacts")
-  .option("--parse-only", "parse the test plan without executing the agent")
   .option("--model <model>", "Claude model to use")
-  .option(
-    "--dangerously-bypass-permissions",
-    "bypass all permission checks (use with caution)",
-  )
+  .option("--verbose", "show tool calls in output")
   .action(async (planPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { json } = getGlobalOpts(cmd);
     await verify({
       planPath: resolve(planPath),
       testDir: resolve(opts.testDir as string),
       json: json ?? false,
-      parseOnly: (opts.parseOnly as boolean) ?? false,
       model: opts.model as string | undefined,
-      dangerouslyBypassPermissions:
-        (opts.dangerouslyBypassPermissions as boolean) ?? false,
+      verbose: (opts.verbose as boolean) ?? false,
     });
   });
 

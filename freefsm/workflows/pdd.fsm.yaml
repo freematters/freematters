@@ -5,18 +5,16 @@
 #   create-structure
 #       |           \
 #   requirements ← → research
-#       |               |
-#       +-------+-------+
-#               |
-#          checkpoint
-#         /    |     \
-#   requirements  research  design
-#                           |     \
-#                          plan    requirements (gaps)
-#                         /    \
-#               e2e-test-design  design (revision)
-#                  /      \
-#               done      skip → done
+#       |
+#     design ← → requirements (gaps)
+#       |
+#      plan ← → design (revision)
+#     /    \
+#   e2e     skip
+#     \    /
+#     done
+#
+#   Fast forward: requirements → design → plan → done (skip e2e, no intermediate approvals)
 
 version: 1
 guide: |
@@ -106,12 +104,14 @@ states:
 
       When you believe you have enough clarity on goals, constraints, and verification criteria,
       present a brief summary of what you've captured and ask the user:
-      - "Requirements complete, ready to review progress?" → checkpoint
+      - "Requirements complete, proceed to design" → design
+      - "Fast forward" — generate design, plan, and summary in one shot (skips e2e, no intermediate approvals) → design
       - "I need to research something first" → research
 
       You MUST NOT move on until the user explicitly confirms requirements are complete.
     transitions:
-      requirements complete: checkpoint
+      proceed to design: design
+      fast forward: design
       need research: research
 
   research:
@@ -145,34 +145,12 @@ states:
         available information, and ask the user for additional context. Do not block progress.
 
       When research is sufficient, ask the user:
-      - "Research sufficient, let's review progress" → checkpoint
+      - "Research sufficient, back to requirements" → requirements
       - "New questions came up, let's clarify requirements" → requirements
 
       You MUST NOT proceed until the user confirms research is sufficient.
     transitions:
-      research sufficient: checkpoint
-      new questions arose: requirements
-
-  checkpoint:
-    prompt: |
-      ## Iteration Checkpoint
-
-      Read all existing artifacts and produce a structured summary:
-      1. Read `./specs/<slug>/requirements.md` — list key decisions made and open questions remaining
-      2. Read all files in `./specs/<slug>/research/` — summarize findings per topic
-      3. Identify any gaps, contradictions, or areas where requirements and research don't align
-
-      Present this summary to the user. Then ask them to choose:
-      - **Proceed to design** — requirements and research are sufficient
-      - **Back to requirements** — need to clarify more
-      - **More research** — need to investigate additional topics
-
-      You MUST NOT proceed to design without explicit user approval.
-      You MUST support iterating between requirements and research as many times as needed.
-    transitions:
-      proceed to design: design
       back to requirements: requirements
-      more research: research
 
   design:
     prompt: |
@@ -189,17 +167,13 @@ states:
       4. **Components & Interfaces** — each component's responsibility, API surface,
          and how components interact
       5. **Data Models** — key data structures, schemas, state, and their relationships
-      6. **Error Handling** — failure modes, recovery strategies, and degradation behavior
-      7. **Acceptance Criteria** — Given/When/Then format, specific enough for machine verification
-      8. **Testing Strategy** — what to test, how to test, and coverage expectations
-      9. **Appendices** — technology choices with rationale, research findings summary,
+      6. **Testing Strategy** — what to test, how to test, and coverage expectations
+      7. **Appendices** — technology choices with rationale, research findings summary,
          alternative approaches considered and why they were rejected
 
       Constraints:
       - You MUST consolidate all requirements from requirements.md into section 2.
         The design document replaces requirements.md as the authoritative spec.
-      - You MUST include an appendix summarizing research findings, technology choices,
-        and alternatives considered.
       - You MUST include Mermaid diagrams for architecture and data flow.
       - You MUST iterate on feedback until the user explicitly approves the complete design.
 
@@ -208,7 +182,10 @@ states:
         focus on core functionality first, and suggest phased implementation.
         Return to requirements to re-scope if needed.
 
-      You MUST NOT proceed to planning until the user explicitly approves the design.
+      **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT wait for user
+      approval. Complete the design document, then immediately transition to plan.
+
+      **Normal mode**: You MUST NOT proceed to planning until the user explicitly approves the design.
       If significant gaps are found, offer to return to requirements or research.
     todos:
       - Write Overview and Detailed Requirements sections
@@ -272,7 +249,10 @@ states:
       - You MUST include at least one step for integration testing and cleanup.
       - You MUST present the plan to the user and iterate on feedback until approved.
 
-      You MUST NOT proceed until the user explicitly approves the implementation plan.
+      **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT wait for user
+      approval. Complete the plan, then immediately transition to e2e-test-design (which will auto-skip).
+
+      **Normal mode**: You MUST NOT proceed until the user explicitly approves the implementation plan.
     todos:
       - Draft implementation steps with TDD ordering
       - Verify each step produces demoable functionality
@@ -294,6 +274,9 @@ states:
       >
       > 1. Yes — design E2E tests
       > 2. Skip — proceed without E2E test design
+
+      **Fast forward mode**: If the user chose "fast forward" at requirements, skip e2e test design
+      and transition to done immediately.
 
       If the user chooses to skip, transition to done immediately.
 

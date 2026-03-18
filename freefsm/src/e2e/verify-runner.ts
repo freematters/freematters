@@ -1,381 +1,92 @@
-import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createSdkMcpServer, query, tool } from "@anthropic-ai/claude-agent-sdk";
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { z } from "zod";
-import { type Fsm, loadFsm } from "../fsm.js";
-import { formatStateCard, stateCardFromFsm } from "../output.js";
-import { type RunStatus, Store } from "../store.js";
-import type { TestPlan } from "./parser.js";
-import {
-  generateJsonReport,
-  generateReport,
-  readTranscript,
-} from "./report-generator.js";
-import type { JsonReport } from "./report-generator.js";
-import { TranscriptLogger } from "./transcript-logger.js";
+import { query } from "@anthropic-ai/claude-agent-sdk";
+import { formatToolArgs } from "../agent-log.js";
+import { DualStreamLogger } from "./dual-stream-logger.js";
+import { createVerifierMcpServer } from "./verifier-tools.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const VERIFIER_FSM = resolve(__dirname, "../../workflows/verifier.fsm.yaml");
 
 export interface VerifyCoreArgs {
-  plan: TestPlan;
+  planPath: string;
   testDir: string;
   model?: string;
-  dangerouslyBypassPermissions?: boolean;
+  verbose?: boolean;
 }
 
 export interface VerifyCoreResult {
-  reportPath: string;
-  jsonReport: JsonReport;
-}
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const WORKFLOWS_DIR = join(__dirname, "../../workflows");
-const PROMPTS_DIR = join(__dirname, "../../prompts");
-
-/**
- * Build a test plan context string to include in the initial message
- * so the agent knows what test plan it is verifying.
- */
-export function buildTestPlanContext(plan: TestPlan): string {
-  const lines: string[] = [];
-
-  lines.push(`# Test Plan: ${plan.name}`);
-  lines.push("");
-
-  if (plan.setup.length > 0) {
-    lines.push("## Setup");
-    for (const item of plan.setup) {
-      lines.push(`- ${item}`);
-    }
-    lines.push("");
-  }
-
-  lines.push("## Steps");
-  for (let i = 0; i < plan.steps.length; i++) {
-    const step = plan.steps[i];
-    lines.push(`${i + 1}. **${step.name}**: ${step.action}`);
-    if (step.expected) {
-      lines.push(`   - Expected: ${step.expected}`);
-    }
-  }
-  lines.push("");
-
-  lines.push("## Expected Outcomes");
-  for (const outcome of plan.expectedOutcomes) {
-    lines.push(`- ${outcome}`);
-  }
-  lines.push("");
-
-  if (plan.cleanup.length > 0) {
-    lines.push("## Cleanup");
-    for (const item of plan.cleanup) {
-      lines.push(`- ${item}`);
-    }
-    lines.push("");
-  }
-
-  return lines.join("\n");
+  reportPath: string | null;
 }
 
 /**
- * Map verifier FSM state names to step numbers for transcript logging.
- * setup=0, execute-steps=1, evaluate=2, report=3, done=4.
+ * Core verification: runs the verifier agent via Agent SDK.
  *
- * COUPLING: These keys must match the state names defined in
- * workflows/verifier.fsm.yaml. If states are renamed there, update
- * this map accordingly — a missing key silently produces `undefined`.
- */
-const VERIFIER_STATE_STEP: Record<string, number> = {
-  setup: 0,
-  "execute-steps": 1,
-  evaluate: 2,
-  report: 3,
-  done: 4,
-};
-
-function loadPrompt(name: string): string {
-  return readFileSync(join(PROMPTS_DIR, `${name}.md`), "utf-8");
-}
-
-function buildFsmSystemPrompt(fsm: Fsm): string {
-  const fsmName = fsm.guide ? fsm.guide.split(/[.\n]/)[0] : "workflow";
-  const template = loadPrompt("run-system");
-  return template
-    .replace("{{FSM_NAME}}", fsmName)
-    .replace("{{FSM_GUIDE}}", fsm.guide ?? "No guide provided.");
-}
-
-function createVerifierMcpServer(
-  fsm: Fsm,
-  store: Store,
-  runId: string,
-  logger: TranscriptLogger,
-) {
-  const fsmGoto = tool(
-    "fsm_goto",
-    "Transition FSM to a new state",
-    {
-      target: z.string().describe("Target state name"),
-      on: z.string().describe("Transition label"),
-    },
-    async (args) => {
-      try {
-        if (!(args.target in fsm.states)) {
-          return {
-            isError: true as const,
-            content: [
-              {
-                type: "text" as const,
-                text: `Error: target state "${args.target}" does not exist in FSM`,
-              },
-            ],
-          };
-        }
-
-        return store.withLock(runId, () => {
-          const snapshot = store.readSnapshot(runId);
-          if (!snapshot) {
-            return {
-              isError: true as const,
-              content: [{ type: "text" as const, text: "Error: run has no snapshot" }],
-            };
-          }
-
-          if (snapshot.run_status !== "active") {
-            return {
-              isError: true as const,
-              content: [
-                {
-                  type: "text" as const,
-                  text: `Error: run is ${snapshot.run_status}, not active`,
-                },
-              ],
-            };
-          }
-
-          const currentState = fsm.states[snapshot.state];
-          const expectedTarget = currentState.transitions[args.on];
-
-          if (expectedTarget !== args.target) {
-            const entries = Object.entries(currentState.transitions);
-            const labels = entries.map(([l, t]) => `  ${l} → ${t}`).join("\n");
-            return {
-              isError: true as const,
-              content: [
-                {
-                  type: "text" as const,
-                  text: `Error: no transition "${args.on}" → "${args.target}" from state "${snapshot.state}"\nAvailable transitions:\n${labels}`,
-                },
-              ],
-            };
-          }
-
-          const targetState = fsm.states[args.target];
-          const isTerminal = Object.keys(targetState.transitions).length === 0;
-          const newStatus: RunStatus = isTerminal ? "completed" : "active";
-
-          store.commit(
-            runId,
-            {
-              event: "goto",
-              from_state: snapshot.state,
-              to_state: args.target,
-              on_label: args.on,
-              actor: "agent",
-              reason: isTerminal ? "done_auto" : null,
-            },
-            { run_status: newStatus, state: args.target },
-            { lockHeld: true },
-          );
-
-          // Update transcript logger step based on FSM state transition
-          const stepNum = VERIFIER_STATE_STEP[args.target];
-          if (stepNum !== undefined) {
-            logger.setStep(stepNum);
-          }
-
-          const card = stateCardFromFsm(args.target, targetState);
-          let text = formatStateCard(card);
-          if (isTerminal) {
-            text += "\n\nThis is a terminal state. The workflow is complete.";
-          }
-
-          return {
-            content: [{ type: "text" as const, text }],
-          };
-        });
-      } catch (err: unknown) {
-        return {
-          isError: true as const,
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${err instanceof Error ? err.message : String(err)}`,
-            },
-          ],
-        };
-      }
-    },
-  );
-
-  const fsmCurrent = tool("fsm_current", "Get current FSM state card", {}, async () => {
-    try {
-      const snapshot = store.readSnapshot(runId);
-      if (!snapshot) {
-        return {
-          isError: true as const,
-          content: [{ type: "text" as const, text: "Error: run has no snapshot" }],
-        };
-      }
-
-      const fsmState = fsm.states[snapshot.state];
-      const card = stateCardFromFsm(snapshot.state, fsmState);
-      return {
-        content: [{ type: "text" as const, text: formatStateCard(card) }],
-      };
-    } catch (err: unknown) {
-      return {
-        isError: true as const,
-        content: [
-          {
-            type: "text" as const,
-            text: `Error: ${err instanceof Error ? err.message : String(err)}`,
-          },
-        ],
-      };
-    }
-  });
-
-  return createSdkMcpServer({
-    name: "freefsm",
-    version: "1.0.0",
-    tools: [fsmGoto, fsmCurrent],
-  });
-}
-
-/**
- * Retry configuration for agent API calls.
- */
-const MAX_RETRIES = 3;
-const INITIAL_BACKOFF_MS = 1000;
-
-/**
- * Core verification loop: loads the verifier.fsm.yaml workflow, initializes
- * an FSM run, launches an Agent SDK session with FSM MCP tools, streams
- * messages through TranscriptLogger, generates a report, and returns results.
+ * The verifier agent uses `/freefsm:start verifier` to drive itself through
+ * the verifier.fsm.yaml workflow. It receives MCP tools for embedded agent
+ * control (run_agent, wait, send).
  */
 export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult> {
-  const { plan, testDir } = args;
-
-  // Load the verifier FSM workflow
-  const verifierFsmPath = join(WORKFLOWS_DIR, "verifier.fsm.yaml");
-  const fsm = loadFsm(verifierFsmPath);
-
-  // Initialize FSM store and run
-  const fsmRoot = join(testDir, ".freefsm");
-  const store = new Store(fsmRoot);
-  const runId = `verifier-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  store.initRun(runId, verifierFsmPath);
-
-  // Commit start event
-  store.commit(
-    runId,
-    {
-      event: "start",
-      from_state: null,
-      to_state: fsm.initial,
-      on_label: null,
-      actor: "system",
-      reason: null,
-    },
-    { run_status: "active", state: fsm.initial },
-  );
-
-  const logger = new TranscriptLogger(testDir);
+  const { planPath, testDir } = args;
   const reportPath = join(testDir, "test-report.md");
-  let finalEntries: import("./transcript-logger.js").TranscriptEntry[] = [];
+
+  const dualLogger = new DualStreamLogger();
+  const verifierServer = createVerifierMcpServer({
+    logger: dualLogger,
+    verbose: args.verbose,
+  });
+
+  const prompt = [
+    `Run the e2e verifier workflow with: /freefsm:start ${VERIFIER_FSM}`,
+    "",
+    `Test plan file: ${resolve(planPath)}`,
+    `Test output directory: ${resolve(testDir)}`,
+    `Test report file: ${reportPath}`,
+  ].join("\n");
+
+  const session = query({
+    prompt,
+    options: {
+      permissionMode: "bypassPermissions",
+      allowDangerouslySkipPermissions: true,
+      settingSources: ["user", "project", "local"],
+      mcpServers: {
+        "freefsm-verifier": verifierServer,
+      },
+      ...(args.model !== undefined && { model: args.model }),
+    },
+  });
 
   try {
-    // Create FSM MCP server for state management (with logger for step tracking)
-    const fsmServer = createVerifierMcpServer(fsm, store, runId, logger);
-
-    // Build system prompt from FSM template (includes fsm_goto/fsm_current instructions)
-    const systemPrompt = buildFsmSystemPrompt(fsm);
-
-    // Build initial message: state card + test plan context
-    const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
-    const stateCardText = formatStateCard(card);
-    const testPlanContext = buildTestPlanContext(plan);
-    const initialMessage = `${stateCardText}\n\n---\n\n${testPlanContext}`;
-
-    // Build query options — only bypass permissions when explicitly requested
-    const queryOptions: Parameters<typeof query>[0]["options"] = {
-      systemPrompt,
-      mcpServers: { freefsm: fsmServer },
-    };
-
-    if (args.dangerouslyBypassPermissions) {
-      queryOptions.permissionMode = "bypassPermissions";
-      queryOptions.allowDangerouslySkipPermissions = true;
-    }
-
-    if (args.model) {
-      queryOptions.model = args.model;
-    }
-
-    // Retry loop for agent API setup failures (3 attempts, exponential backoff)
-    // Only retries the query() call, not stream processing errors
-    const session = await (async () => {
-      let lastSetupError: unknown;
-      for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-          return query({
-            prompt: initialMessage,
-            options: queryOptions,
-          });
-        } catch (err: unknown) {
-          lastSetupError = err;
-          const errMsg = err instanceof Error ? err.message : String(err);
-          logger.logTranscript({
-            type: "error",
-            step: 0,
-            content: `Agent API attempt ${attempt}/${MAX_RETRIES} failed: ${errMsg}`,
-          });
-
-          if (attempt < MAX_RETRIES) {
-            const backoffMs = INITIAL_BACKOFF_MS * 2 ** (attempt - 1);
-            await new Promise((resolve) => setTimeout(resolve, backoffMs));
-          }
-        }
-      }
-      throw lastSetupError ?? new Error("Failed to create agent session");
-    })();
-
-    // Stream processing errors propagate immediately (no retry)
     for await (const message of session) {
-      logger.processMessage(message);
-
-      if (message.type === "result") {
-        const resultMsg = message as SDKMessage & {
-          type: "result";
-          result?: string;
+      if (message.type === "assistant") {
+        const msg = message as {
+          type: "assistant";
+          message: {
+            content: Array<{
+              type: string;
+              text?: string;
+              name?: string;
+              input?: Record<string, unknown>;
+            }>;
+          };
         };
-        if (resultMsg.result) {
-          process.stdout.write(`${resultMsg.result}\n`);
+        for (const block of msg.message.content) {
+          if (block.type === "text" && block.text) {
+            dualLogger.logVerifier(block.text);
+          } else if (block.type === "tool_use" && block.name && args.verbose) {
+            dualLogger.logVerifier(
+              `⚡ ${block.name}${formatToolArgs(block.name, block.input)}`,
+            );
+          }
         }
       }
     }
   } finally {
-    await logger.close();
-
-    // Generate reports in finally block so partial reports are written even on errors
-    // Read transcript once and pass to both report functions
-    finalEntries = readTranscript(testDir);
-    const reportContent = generateReport(plan, testDir, finalEntries);
-    writeFileSync(reportPath, reportContent, "utf-8");
+    verifierServer.closeSession();
+    session.close();
   }
 
-  const jsonReport = generateJsonReport(plan, testDir, finalEntries);
-
-  return { reportPath, jsonReport };
+  return { reportPath: existsSync(reportPath) ? reportPath : null };
 }

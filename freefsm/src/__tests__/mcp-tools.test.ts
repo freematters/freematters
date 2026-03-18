@@ -10,9 +10,9 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   tool: vi.fn(),
 }));
 
-import { createSdkMcpServer, query, tool } from "@anthropic-ai/claude-agent-sdk";
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { run } from "../commands/run.js";
+import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
+import { createFsmMcpServer } from "../commands/run.js";
+import { loadFsm } from "../fsm.js";
 import { Store } from "../store.js";
 
 const MINIMAL_FSM = `
@@ -79,87 +79,57 @@ beforeEach(() => {
 
   // createSdkMcpServer returns a mock server config
   const mockCreateServer = vi.mocked(createSdkMcpServer);
-  mockCreateServer.mockImplementation(((opts: { tools?: unknown[] }) => {
-    // Tools are already captured via tool() mock above
+  mockCreateServer.mockImplementation(((opts: { name?: string }) => {
     return { type: "sdk", name: opts?.name ?? "freefsm", instance: {} };
   }) as typeof createSdkMcpServer);
-
-  // Default query mock — returns immediately
-  const mockQuery = vi.mocked(query);
-  async function* generator(): AsyncGenerator<SDKMessage, void> {
-    yield {
-      type: "result",
-      subtype: "success",
-      duration_ms: 100,
-      duration_api_ms: 50,
-      is_error: false,
-      num_turns: 1,
-      result: "Done",
-      stop_reason: null,
-      total_cost_usd: 0.01,
-      usage: {
-        input_tokens: 10,
-        output_tokens: 5,
-        cache_creation_input_tokens: 0,
-        cache_read_input_tokens: 0,
-        server_tool_use_input_tokens: 0,
-      },
-      modelUsage: {},
-      permission_denials: [],
-    } as unknown as SDKMessage;
-  }
-  const gen = generator();
-  Object.assign(gen, {
-    interrupt: vi.fn(),
-    setPermissionMode: vi.fn(),
-    setModel: vi.fn(),
-    setMaxThinkingTokens: vi.fn(),
-    streamInput: vi.fn(),
-    stopTask: vi.fn(),
-    close: vi.fn(),
-    rewindFiles: vi.fn(),
-  });
-  mockQuery.mockReturnValue(gen as ReturnType<typeof query>);
 });
 
-// Helper: launch run to register MCP tools, then return tool handlers
-async function launchAndGetHandlers(): Promise<{
+// Helper: directly create MCP tools (bypasses run() and its retry loop)
+function setupHandlers(): {
   handlers: typeof toolHandlers;
   runId: string;
   store: Store;
-}> {
+} {
   const runId = "test-run";
-  await run({ fsmPath, runId, root, json: false });
-  return { handlers: toolHandlers, runId, store: new Store(root) };
+  const store = new Store(root);
+  const fsm = loadFsm(fsmPath);
+
+  store.initRun(runId, fsmPath);
+  store.commit(
+    runId,
+    {
+      event: "start",
+      from_state: null,
+      to_state: fsm.initial,
+      on_label: null,
+      actor: "system",
+      reason: null,
+    },
+    { run_status: "active", state: fsm.initial },
+  );
+
+  createFsmMcpServer(fsm, store, runId);
+  return { handlers: toolHandlers, runId, store };
 }
 
 // ─── MCP tool registration ──────────────────────────────────────
 
 describe("MCP tool registration", () => {
-  test("registers fsm_goto and fsm_current tools", async () => {
-    await launchAndGetHandlers();
+  test("registers fsm_goto and fsm_current tools", () => {
+    setupHandlers();
 
     const names = toolDefinitions.map((t) => t.name);
     expect(names).toContain("fsm_goto");
     expect(names).toContain("fsm_current");
   });
 
-  test("passes MCP server to query via mcpServers option", async () => {
-    await launchAndGetHandlers();
+  test("createSdkMcpServer is called with tool definitions", () => {
+    setupHandlers();
 
-    const mockQuery = vi.mocked(query);
-    const callArgs = mockQuery.mock.calls[0][0];
-    expect(callArgs.options?.mcpServers).toBeDefined();
-    expect(callArgs.options?.mcpServers).toHaveProperty("freefsm");
-  });
-
-  test("does not restrict allowedTools when FSM has no allowed_tools", async () => {
-    await launchAndGetHandlers();
-
-    const mockQuery = vi.mocked(query);
-    const callArgs = mockQuery.mock.calls[0][0];
-    // When FSM has no allowed_tools, allowedTools should be undefined (no restriction)
-    expect(callArgs.options?.allowedTools).toBeUndefined();
+    const mockCreateServer = vi.mocked(createSdkMcpServer);
+    expect(mockCreateServer).toHaveBeenCalledTimes(1);
+    const opts = mockCreateServer.mock.calls[0][0] as { tools?: unknown[] };
+    expect(opts.tools).toHaveLength(2);
   });
 });
 
@@ -167,7 +137,7 @@ describe("MCP tool registration", () => {
 
 describe("fsm_goto handler", () => {
   test("validates transition and commits event via Store", async () => {
-    const { handlers, runId, store } = await launchAndGetHandlers();
+    const { handlers, runId, store } = setupHandlers();
 
     // Current state is "start", valid transition: next → middle
     await handlers.fsm_goto({ target: "middle", on: "next" }, {});
@@ -187,7 +157,7 @@ describe("fsm_goto handler", () => {
   });
 
   test("returns new state card on success", async () => {
-    const { handlers } = await launchAndGetHandlers();
+    const { handlers } = setupHandlers();
 
     const result = (await handlers.fsm_goto({ target: "middle", on: "next" }, {})) as {
       content: Array<{ type: string; text: string }>;
@@ -201,7 +171,7 @@ describe("fsm_goto handler", () => {
   });
 
   test("returns error text (not throw) on invalid transition", async () => {
-    const { handlers } = await launchAndGetHandlers();
+    const { handlers } = setupHandlers();
 
     // Try an invalid transition from "start"
     const result = (await handlers.fsm_goto({ target: "done", on: "invalid" }, {})) as {
@@ -217,7 +187,7 @@ describe("fsm_goto handler", () => {
   });
 
   test("returns error on nonexistent target state", async () => {
-    const { handlers } = await launchAndGetHandlers();
+    const { handlers } = setupHandlers();
 
     const result = (await handlers.fsm_goto(
       { target: "nonexistent", on: "next" },
@@ -236,7 +206,7 @@ describe("fsm_goto handler", () => {
 
 describe("fsm_current handler", () => {
   test("returns current state card", async () => {
-    const { handlers } = await launchAndGetHandlers();
+    const { handlers } = setupHandlers();
 
     const result = (await handlers.fsm_current({}, {})) as {
       content: Array<{ type: string; text: string }>;
@@ -251,7 +221,7 @@ describe("fsm_current handler", () => {
   });
 
   test("returns updated state card after goto", async () => {
-    const { handlers } = await launchAndGetHandlers();
+    const { handlers } = setupHandlers();
 
     // Transition to middle
     await handlers.fsm_goto({ target: "middle", on: "next" }, {});
@@ -270,7 +240,7 @@ describe("fsm_current handler", () => {
 
 describe("terminal state detection", () => {
   test("fsm_goto to terminal state includes workflow complete note", async () => {
-    const { handlers } = await launchAndGetHandlers();
+    const { handlers } = setupHandlers();
 
     // Go start → middle → done
     await handlers.fsm_goto({ target: "middle", on: "next" }, {});
@@ -283,7 +253,7 @@ describe("terminal state detection", () => {
   });
 
   test("fsm_goto to terminal state sets run_status to completed", async () => {
-    const { handlers, runId, store } = await launchAndGetHandlers();
+    const { handlers, runId, store } = setupHandlers();
 
     await handlers.fsm_goto({ target: "middle", on: "next" }, {});
     await handlers.fsm_goto({ target: "done", on: "finish" }, {});
@@ -294,7 +264,7 @@ describe("terminal state detection", () => {
   });
 
   test("fsm_goto returns error when run is not active (completed)", async () => {
-    const { handlers } = await launchAndGetHandlers();
+    const { handlers } = setupHandlers();
 
     // Transition to terminal state
     await handlers.fsm_goto({ target: "middle", on: "next" }, {});

@@ -1,5 +1,4 @@
-import { constants, accessSync, mkdirSync, readFileSync } from "node:fs";
-import { parseTestPlan } from "../../e2e/parser.js";
+import { constants, accessSync, existsSync, mkdirSync } from "node:fs";
 import { verifyCore } from "../../e2e/verify-runner.js";
 import { CliError } from "../../errors.js";
 import { handleError, jsonSuccess, printJson } from "../../output.js";
@@ -8,27 +7,15 @@ export interface VerifyArgs {
   planPath: string;
   testDir: string;
   json: boolean;
-  parseOnly?: boolean;
-  dangerouslyBypassPermissions?: boolean;
   model?: string;
+  verbose?: boolean;
 }
 
 export async function verify(args: VerifyArgs): Promise<void> {
   try {
-    // Read the test plan file
-    let planContent: string;
-    try {
-      planContent = readFileSync(args.planPath, "utf-8");
-    } catch {
+    // Verify the test plan file exists
+    if (!existsSync(args.planPath)) {
       throw new CliError("ARGS_INVALID", `Cannot read test plan: ${args.planPath}`, {
-        context: { fsmPath: args.planPath },
-      });
-    }
-
-    // Parse the test plan
-    const result = parseTestPlan(planContent);
-    if (!result.ok) {
-      throw new CliError("ARGS_INVALID", `Invalid test plan: ${result.error}`, {
         context: { fsmPath: args.planPath },
       });
     }
@@ -47,66 +34,29 @@ export async function verify(args: VerifyArgs): Promise<void> {
       );
     }
 
-    const { plan } = result;
-
-    if (args.parseOnly) {
-      // In parse-only mode, output the parsed plan summary and return
-      if (args.json) {
-        printJson(
-          jsonSuccess("Test plan parsed", {
-            name: plan.name,
-            setup: plan.setup.length,
-            steps: plan.steps.length,
-            expectedOutcomes: plan.expectedOutcomes.length,
-            cleanup: plan.cleanup.length,
-          }),
-        );
-      } else {
-        process.stdout.write(`Test plan: ${plan.name}\n`);
-        process.stdout.write(`  Setup: ${plan.setup.length} items\n`);
-        process.stdout.write(`  Steps: ${plan.steps.length}\n`);
-        process.stdout.write(`  Expected outcomes: ${plan.expectedOutcomes.length}\n`);
-        process.stdout.write(`  Cleanup: ${plan.cleanup.length} items\n`);
-        process.stdout.write(`  Output: ${args.testDir}\n`);
-      }
-      return;
-    }
-
-    // Print human-readable summary before running (not in JSON mode to avoid double output)
     if (!args.json) {
-      process.stdout.write(`Test plan: ${plan.name}\n`);
-      process.stdout.write(`  Setup: ${plan.setup.length} items\n`);
-      process.stdout.write(`  Steps: ${plan.steps.length}\n`);
-      process.stdout.write(`  Expected outcomes: ${plan.expectedOutcomes.length}\n`);
-      process.stdout.write(`  Cleanup: ${plan.cleanup.length} items\n`);
-      process.stdout.write(`  Output: ${args.testDir}\n`);
+      process.stdout.write(`Test plan: ${args.planPath}\n`);
+      process.stdout.write(`Output: ${args.testDir}\n`);
     }
 
-    // Execute the verification loop
-    const verifyResult = await verifyCore({
-      plan,
+    // Execute the verification via freefsm run with verifier.fsm.yaml
+    const result = await verifyCore({
+      planPath: args.planPath,
       testDir: args.testDir,
       model: args.model,
-      dangerouslyBypassPermissions: args.dangerouslyBypassPermissions,
+      verbose: args.verbose,
     });
 
     if (args.json) {
       printJson(
         jsonSuccess("Verification complete", {
-          verdict: verifyResult.jsonReport.verdict,
-          steps_passed: verifyResult.jsonReport.steps_passed,
-          steps_failed: verifyResult.jsonReport.steps_failed,
-          reportPath: verifyResult.reportPath,
+          reportPath: result.reportPath,
         }),
       );
+    } else if (result.reportPath) {
+      process.stdout.write(`Report: ${result.reportPath}\n`);
     } else {
-      const { jsonReport, reportPath } = verifyResult;
-      process.stdout.write(
-        `\nVerdict: ${jsonReport.verdict} ` +
-          `(${jsonReport.steps_passed} passed, ` +
-          `${jsonReport.steps_failed} failed)\n`,
-      );
-      process.stdout.write(`Report: ${reportPath}\n`);
+      process.stdout.write("Verification complete (no report generated)\n");
     }
   } catch (err: unknown) {
     handleError(err, args.json);

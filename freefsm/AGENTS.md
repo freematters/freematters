@@ -19,7 +19,7 @@ Read the design docs before making any changes.
 freefsm CLI (human-readable default, -j JSON)
     ├── commands/ (start, current, goto, finish)
     ├── commands/e2e/ (gen, verify)
-    ├── e2e/ (parser, transcript-logger, verify-runner, report-generator, path-enumerator)
+    ├── e2e/ (agent-session, multi-turn-session, verifier-tools, dual-stream-logger, verify-runner, parser, path-enumerator)
     ├── hooks/ (PostToolUse reminder)
     ├── fsm.ts (schema loader + validation)
     ├── store.ts (events + snapshots + file lock + sessions)
@@ -51,14 +51,15 @@ Design principles:
 | `skills/start/SKILL.md` | /fsm:start — initialize a workflow run |
 | `skills/current/SKILL.md` | /fsm:current — query current state |
 | `skills/finish/SKILL.md` | /fsm:finish — abort an active run |
-| `src/e2e/parser.ts` | Test plan markdown parser (Setup, Steps, Expected Outcomes, Cleanup) |
-| `src/e2e/verify-runner.ts` | FSM-driven agent verification loop with transcript capture |
-| `src/e2e/transcript-logger.ts` | Timestamped transcript + API JSONL logging |
-| `src/e2e/report-generator.ts` | Generate test-report.md with per-step verdicts |
+| `src/e2e/multi-turn-session.ts` | V1 query() wrapper for multi-turn agent sessions |
+| `src/e2e/agent-session.ts` | High-level agent control with send/wait API |
+| `src/e2e/verifier-tools.ts` | MCP tools (run_agent, wait, send) for verifier agent |
+| `src/e2e/dual-stream-logger.ts` | Color-coded stderr logger for embedded/verifier/input streams |
+| `src/e2e/verify-runner.ts` | Verifier agent runner via Agent SDK |
+| `src/e2e/parser.ts` | Test plan markdown parser |
 | `src/e2e/path-enumerator.ts` | DFS path enumeration on FSM transitions |
 | `src/commands/e2e/verify.ts` | `freefsm e2e verify` command |
 | `src/commands/e2e/gen.ts` | `freefsm e2e gen` command |
-| `workflows/verifier.fsm.yaml` | FSM workflow for structured e2e verification |
 
 ## CLI Commands
 
@@ -68,7 +69,7 @@ freefsm current --run-id <id> [-j]
 freefsm goto <target> --run-id <id> --on <label> [-j]
 freefsm finish --run-id <id> [-j]
 freefsm e2e gen <workflow.yaml> [--output <file>] [-j]
-freefsm e2e verify <plan.md> --test-dir <path> [--parse-only] [--model <model>] [--dangerously-bypass-permissions] [-j]
+freefsm e2e verify <plan.md> --test-dir <path> [--model <model>] [--verbose] [-j]
 ```
 
 Global: `--root <path>` overrides storage root (default `~/.freefsm/`, env `FREEFSM_ROOT`).
@@ -101,7 +102,6 @@ Write path (§5.5): acquire lock → read snapshot → validate → append event
 npm run build        # Compile TypeScript
 npm test             # Vitest (200 tests)
 npm run check        # Biome format + lint
-npm run test:e2e:parse  # Validate e2e test plans (parse-only, no API)
 ```
 
 ## E2E Testing
@@ -112,15 +112,12 @@ Agent-driven e2e testing framework. Test plans are structured markdown executed 
 # Generate a test plan from a workflow YAML
 freefsm e2e gen workflows/verifier.fsm.yaml --output test-plan.md
 
-# Validate a test plan parses correctly (no API needed)
-freefsm e2e verify test-plan.md --test-dir ./out --parse-only
-
-# Execute a test plan with a live agent (requires API access)
-freefsm e2e verify test-plan.md --test-dir ./out --dangerously-bypass-permissions
+# Execute a test plan with a live agent
+freefsm e2e verify test-plan.md --test-dir ./out
 ```
 
-Test plan format: `## Setup`, `## Steps`, `## Expected Outcomes`, `## Cleanup`.
-Output: `transcript.jsonl`, `api.jsonl`, `test-report.md` in `--test-dir`.
+Test plans are raw markdown read by the verifier agent.
+Output: `test-report.md` in `--test-dir`.
 Dogfood test plans live in `e2e/`.
 
 ## Implementation Status

@@ -125,16 +125,31 @@ states:
     prompt: |
       ## Implement, Validate & Commit Next Step
 
+      ### 0. Choose execution mode (first entry only)
+
+      On the **first** entry into this state (no steps committed yet), ask the user:
+
+      > How should I implement the steps?
+      > 1. **One at a time** — dispatch a sub-agent per step, commit after each (default)
+      > 2. **All in one agent** — dispatch a single sub-agent to implement ALL remaining steps
+
+      Remember the choice as `exec_mode` ("per-step" or "batch").
+      On subsequent entries (looping back), skip this prompt and reuse the saved choice.
+
+      ---
+
       ### 1. Select
 
       Read `./specs/<slug>/plan.md`, find the first unchecked step (`- [ ]`).
-      If all steps are checked, transition to done.
+      If all steps are checked, transition to e2e-test (or done if no e2e).
 
       Present to the user: step number, title, and objective.
 
-      ### 2. Execute (TDD + Validate via Sub-Agent)
+      ### 2. Execute
 
-      Dispatch a sub-agent to implement AND validate the step:
+      #### Mode A: Per-step (exec_mode = "per-step")
+
+      Dispatch a sub-agent to implement AND validate the **current step only**:
 
       > Implement Step N of ./specs/<slug>/plan.md using strict TDD (RED → GREEN → REFACTOR).
       > Read ./specs/<slug>/design.md for component interfaces and data models.
@@ -159,6 +174,37 @@ states:
       >
       > Do NOT modify plan.md — the orchestrator handles plan.md updates.
 
+      #### Mode B: Batch (exec_mode = "batch")
+
+      Dispatch a **single** sub-agent to implement ALL remaining unchecked steps:
+
+      > Implement ALL remaining unchecked steps of ./specs/<slug>/plan.md using strict TDD
+      > (RED → GREEN → REFACTOR) for each step.
+      > Read ./specs/<slug>/design.md for component interfaces and data models.
+      > Read the last 300 lines of ./specs/<slug>/progress.md for context on recent steps (if it exists).
+      > Before coding, explore existing code for patterns, conventions, and style to follow.
+      >
+      > For EACH unchecked step, in order:
+      > 1. Write failing tests (RED)
+      > 2. Write minimum implementation to pass (GREEN)
+      > 3. Refactor — clean up, run linter/formatter
+      > 4. Run full test suite (not just new tests) — check for regressions
+      > 5. Execute the step's Demo criteria from plan.md — verify expected output
+      > 6. Update ./specs/<slug>/progress.md — append a summary:
+      >    ## Step N: <title>
+      >    - **Files changed**: <list of key files added/modified>
+      >    - **What was built**: <1-2 sentence summary>
+      >    - **Tests**: <number of tests added, all passing/failing>
+      >    - **Notes**: <any gotchas, workarounds, or deviations from spec>
+      > 7. Stage all relevant files and create a git commit: `feat(scope): step N - <step title>`
+      > 8. If the spec is ambiguous or has minor issues, use your best judgment.
+      >    Note any spec deviations in progress.md under **Notes**.
+      >
+      > After ALL steps are done, report: total steps completed, tests passed/failed,
+      > any spec deviations, any steps that could not be completed.
+      >
+      > Do NOT modify plan.md — the orchestrator handles plan.md updates.
+
       The sub-agent reads the spec files itself — do NOT paste their content.
 
       If sub-agents are not available in your runtime, do the work directly.
@@ -168,6 +214,8 @@ states:
 
       The sub-agent has already tested and validated. Proceed directly to commit.
 
+      #### Per-step mode
+
       1. Update `./specs/<slug>/plan.md` — change `- [ ] Step N` to `- [x] Step N`
       2. Stage all relevant files (new and modified, including progress.md and plan.md)
       3. Create a git commit: `feat(scope): step N - <step title>`
@@ -176,9 +224,20 @@ states:
       - Commit message
       - Progress: "Step N/M complete"
 
+      #### Batch mode
+
+      The sub-agent already committed each step individually. Now:
+
+      1. Update `./specs/<slug>/plan.md` — change ALL completed `- [ ]` steps to `- [x]`
+      2. Stage and commit plan.md: `chore: mark completed steps in plan.md`
+
+      Present to the user:
+      - Steps completed
+      - Progress: "N/M steps complete"
+
       #### Issue mode additional steps
 
-      If `source_mode == "issue"`, also:
+      If `source_mode == "issue"`, also (for each newly completed step):
 
       4. Push to remote:
          ```bash
@@ -200,12 +259,14 @@ states:
          - **Tests**: <count> added, all passing
          ```
 
-      Then loop back to step 1 for the next unchecked step.
+      Then loop back to step 1 for the next unchecked step (per-step mode),
+      or transition to e2e-test/done (batch mode, since all steps are done).
 
       ### Constraints
       - You MUST NOT write implementation before tests exist
       - You MUST reference design.md — do not invent interfaces
-      - Implement ONLY the current step — no future steps
+      - Per-step mode: implement ONLY the current step — no future steps
+      - Batch mode: implement ALL remaining steps in order, committing each individually
       - You MUST dispatch a sub-agent, even if the task seems simple.
         The orchestrator's job is to manage workflow state, not to write code itself.
     transitions:
