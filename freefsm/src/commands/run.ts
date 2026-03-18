@@ -331,6 +331,7 @@ export async function runCore(
 
   let isError = false;
   let attempt = 0;
+  const pendingTasks = new Set<string>();
   session.send(initialMessage);
 
   try {
@@ -358,7 +359,36 @@ export async function runCore(
             isError = true;
           }
           process.stdout.write(`${renderMarkdown(resultMsg.result)}\n`);
+        } else if (message.type === "system") {
+          const sysMsg = message as {
+            type: "system";
+            subtype?: string;
+            task_id?: string;
+            description?: string;
+            status?: string;
+            summary?: string;
+          };
+          if (sysMsg.subtype === "task_started" && sysMsg.task_id) {
+            pendingTasks.add(sysMsg.task_id);
+            logFn(`task started: ${sysMsg.description ?? sysMsg.task_id}`, c.cyan);
+          } else if (sysMsg.subtype === "task_notification" && sysMsg.task_id) {
+            pendingTasks.delete(sysMsg.task_id);
+            logFn(
+              `task ${sysMsg.status}: ${sysMsg.summary ?? sysMsg.task_id}`,
+              sysMsg.status === "completed" ? c.green : c.red,
+            );
+          }
         }
+      }
+
+      // If background tasks are still running, continue streaming —
+      // the SDK will yield task notifications and wake the model.
+      if (pendingTasks.size > 0) {
+        logFn(
+          `waiting for ${pendingTasks.size} background task(s) to complete`,
+          c.cyan,
+        );
+        continue;
       }
 
       const snap = store.readSnapshot(runId);
