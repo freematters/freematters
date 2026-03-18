@@ -41,7 +41,7 @@ export class EmbeddedRun {
     const logFn = this.options.logFn ?? (() => {});
 
     // Run the agent loop in the background — don't await it.
-    // When it finishes, mark the bus as exited.
+    // When it finishes, flush any remaining output as a final turn_complete.
     runCore({
       fsmPath: this.fsmPath,
       runId: this.runId,
@@ -51,13 +51,13 @@ export class EmbeddedRun {
       bus: this.bus,
       logFn,
     })
-      .then((result) => {
-        this.bus.markExited(result.isError ? 1 : 0);
+      .then(() => {
+        this.bus.completeTurn();
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
         this.bus.appendOutput(`[embedded error] ${msg}`);
-        this.bus.markExited(1);
+        this.bus.completeTurn();
       });
   }
 

@@ -2,117 +2,89 @@ import { describe, expect, test } from "vitest";
 import { MessageBus } from "../../e2e/message-bus.js";
 
 describe("MessageBus", () => {
-  describe("appendOutput + enqueueTurnComplete", () => {
-    test("accumulated output is included in turn_complete event", async () => {
+  describe("completeTurn + waitForMessage", () => {
+    test("turn_complete event is received via waitForMessage", async () => {
       const bus = new MessageBus();
       bus.appendOutput("hello");
-      bus.appendOutput("world");
-      bus.enqueueTurnComplete();
+      bus.completeTurn();
 
-      const event = await bus.waitForEvent(1000);
-      expect(event.type).toBe("turn_complete");
-      if (event.type === "turn_complete") {
-        expect(event.output).toBe("hello\nworld");
-      }
+      const msg = await bus.waitForMessage(1000);
+      expect(msg).toEqual({ type: "turn_complete", output: "hello" });
     });
 
-    test("waitForEvent blocks until turn_complete is enqueued", async () => {
+    test("waitForMessage blocks until completeTurn is called", async () => {
       const bus = new MessageBus();
       setTimeout(() => {
         bus.appendOutput("delayed");
-        bus.enqueueTurnComplete();
+        bus.completeTurn();
       }, 10);
 
-      const event = await bus.waitForEvent(5000);
-      expect(event.type).toBe("turn_complete");
-      if (event.type === "turn_complete") {
-        expect(event.output).toContain("delayed");
-      }
+      const msg = await bus.waitForMessage(5000);
+      expect(msg).toEqual({ type: "turn_complete", output: "delayed" });
+    });
+
+    test("multiple turns are queued and consumed in order", async () => {
+      const bus = new MessageBus();
+      bus.appendOutput("first");
+      bus.completeTurn();
+      bus.appendOutput("second");
+      bus.completeTurn();
+
+      const msg1 = await bus.waitForMessage(1000);
+      const msg2 = await bus.waitForMessage(1000);
+      expect(msg1).toEqual({ type: "turn_complete", output: "first" });
+      expect(msg2).toEqual({ type: "turn_complete", output: "second" });
+    });
+
+    test("multiple appendOutput calls are joined with newline on completeTurn", async () => {
+      const bus = new MessageBus();
+      bus.appendOutput("line1");
+      bus.appendOutput("line2");
+      bus.completeTurn();
+
+      const msg = await bus.waitForMessage(1000);
+      expect(msg).toEqual({ type: "turn_complete", output: "line1\nline2" });
     });
   });
 
-  describe("enqueueInputRequest blocks until resolveInput", () => {
-    test("enqueueInputRequest returns input text after resolveInput", async () => {
+  describe("post + waitForPrompt", () => {
+    test("posted message is received via waitForPrompt", async () => {
       const bus = new MessageBus();
-      const inputPromise = bus.enqueueInputRequest("What?");
+      bus.post("input text");
 
-      setTimeout(() => bus.resolveInput("Answer"), 10);
+      const prompt = await bus.waitForPrompt(1000);
+      expect(prompt).toBe("input text");
+    });
 
-      const result = await inputPromise;
-      expect(result).toBe("Answer");
+    test("waitForPrompt blocks until post is called", async () => {
+      const bus = new MessageBus();
+      setTimeout(() => bus.post("delayed input"), 10);
+
+      const prompt = await bus.waitForPrompt(5000);
+      expect(prompt).toBe("delayed input");
+    });
+
+    test("multiple posts before waitForPrompt are consumed in order", async () => {
+      const bus = new MessageBus();
+      bus.post("a");
+      bus.post("b");
+
+      const first = await bus.waitForPrompt(1000);
+      const second = await bus.waitForPrompt(1000);
+      expect(first).toBe("a");
+      expect(second).toBe("b");
     });
   });
 
-  describe("waitForEvent returns input_request with accumulated output", () => {
-    test("accumulated output is included in input_request event", async () => {
+  describe("timeouts", () => {
+    test("waitForMessage rejects on timeout", async () => {
       const bus = new MessageBus();
-      bus.appendOutput("Setting up...");
-      bus.appendOutput("Ready.");
-
-      bus.enqueueInputRequest("Enter name:");
-
-      const event = await bus.waitForEvent(1000);
-      expect(event.type).toBe("input_request");
-      if (event.type === "input_request") {
-        expect(event.prompt).toBe("Enter name:");
-        expect(event.output).toBe("Setting up...\nReady.");
-      }
-
-      bus.resolveInput("test");
+      await expect(bus.waitForMessage(50)).rejects.toThrow("timeout");
     });
-  });
 
-  describe("waitForEvent returns exited with accumulated output", () => {
-    test("markExited pushes exited event with accumulated output", async () => {
+    test("waitForPrompt rejects on timeout", async () => {
       const bus = new MessageBus();
-      bus.appendOutput("line 1");
-      bus.appendOutput("line 2");
-      bus.markExited(0);
-
-      const event = await bus.waitForEvent(1000);
-      expect(event.type).toBe("exited");
-      if (event.type === "exited") {
-        expect(event.code).toBe(0);
-        expect(event.output).toBe("line 1\nline 2");
-      }
-    });
-  });
-
-  describe("waitForEvent timeout", () => {
-    test("rejects with timeout error when no event arrives", async () => {
-      const bus = new MessageBus();
-      await expect(bus.waitForEvent(50)).rejects.toThrow("timeout");
-    });
-  });
-
-  describe("resolveInput errors when no request pending", () => {
-    test("throws when no input request is pending", () => {
-      const bus = new MessageBus();
-      expect(() => bus.resolveInput("text")).toThrow("No input request pending");
-    });
-  });
-
-  describe("accumulated output drains between events", () => {
-    test("output accumulates separately for each event", async () => {
-      const bus = new MessageBus();
-      bus.appendOutput("A");
-      bus.appendOutput("B");
-      bus.enqueueTurnComplete();
-
-      bus.appendOutput("C");
-      bus.markExited(0);
-
-      const event1 = await bus.waitForEvent(1000);
-      expect(event1.type).toBe("turn_complete");
-      if (event1.type === "turn_complete") {
-        expect(event1.output).toBe("A\nB");
-      }
-
-      const event2 = await bus.waitForEvent(1000);
-      expect(event2.type).toBe("exited");
-      if (event2.type === "exited") {
-        expect(event2.output).toBe("C");
-      }
+      await expect(bus.waitForPrompt(50)).rejects.toThrow("timeout");
     });
   });
 });

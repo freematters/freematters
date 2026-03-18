@@ -187,7 +187,6 @@ e2eCmd
   .argument("<plan>", "path to test plan markdown file")
   .requiredOption("--test-dir <path>", "output directory for artifacts")
   .option("--model <model>", "Claude model to use")
-  .option("--verbose", "show tool calls in embedded agent output")
   .action(async (planPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { json } = getGlobalOpts(cmd);
     await verify({
@@ -195,7 +194,6 @@ e2eCmd
       testDir: resolve(opts.testDir as string),
       json: json ?? false,
       model: opts.model as string | undefined,
-      verbose: (opts.verbose as boolean) ?? false,
     });
   });
 

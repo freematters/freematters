@@ -1,6 +1,9 @@
 /**
- * Verifier MCP tools — MCP server exposing start_embedded_run, wait, and send_input
- * for the verifier agent to interact with an embedded freefsm run.
+ * Verifier MCP tools — turn-based interaction with an embedded freefsm run.
+ *
+ * Communication:
+ *   Embedded agent's session ends → turn_complete (with output) → verifier
+ *   Verifier calls send_input(text) → becomes next session's prompt
  */
 
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
@@ -18,14 +21,6 @@ export interface VerifierMcpServerOptions {
   logger?: DualStreamLogger;
 }
 
-/**
- * Create a verifier MCP server with tools for controlling an embedded freefsm run.
- *
- * The returned MCP server exposes three tools:
- * - start_embedded_run: launches an embedded freefsm run
- * - wait: waits for the next event from the embedded agent
- * - send_input: sends input to a pending request_input call
- */
 export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
   const logger = options?.logger;
   let activeRun: RunState | undefined;
@@ -46,7 +41,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
           content: [
             {
               type: "text" as const,
-              text: "An embedded run is already active. Wait for it to exit before starting another.",
+              text: "An embedded run is already active.",
             },
           ],
         };
@@ -59,11 +54,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
       });
 
       await run.start();
-
-      activeRun = {
-        run,
-        bus: run.getBus(),
-      };
+      activeRun = { run, bus: run.getBus() };
 
       return {
         content: [
@@ -81,13 +72,13 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
 
   const wait = tool(
     "wait",
-    "Wait for the embedded agent to complete a turn, request input, or exit. Returns status: turn_complete, awaiting_input, exited, or timeout.",
+    "Wait for the embedded agent to complete its current turn. Returns { type: 'turn_complete', output }.",
     {
       timeout: z
         .number()
         .optional()
-        .default(60000)
-        .describe("Timeout in milliseconds (default 60000)"),
+        .default(120000)
+        .describe("Timeout in milliseconds (default 120000)"),
     },
     async (args) => {
       if (!activeRun) {
@@ -103,65 +94,25 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
       }
 
       try {
-        const event = await activeRun.bus.waitForEvent(args.timeout);
-
-        switch (event.type) {
-          case "input_request":
-            if (event.output) {
-              logger?.logEmbedded(event.output);
-            }
-            logger?.logEmbedded(`[request_input] ${event.prompt}`);
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: JSON.stringify({
-                    status: "awaiting_input",
-                    prompt: event.prompt,
-                    output: event.output,
-                  }),
-                },
-              ],
-            };
-          case "turn_complete":
-            if (event.output) {
-              logger?.logEmbedded(event.output);
-            }
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: JSON.stringify({
-                    status: "turn_complete",
-                    output: event.output,
-                  }),
-                },
-              ],
-            };
-          case "exited":
-            if (event.output) {
-              logger?.logEmbedded(event.output);
-            }
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: JSON.stringify({
-                    status: "exited",
-                    code: event.code,
-                    output: event.output,
-                  }),
-                },
-              ],
-            };
+        const msg = await activeRun.bus.waitForMessage(args.timeout);
+        if (msg.output) {
+          logger?.logEmbedded(msg.output);
         }
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: JSON.stringify(msg),
+            },
+          ],
+        };
       } catch (err: unknown) {
         if (err instanceof Error && err.message === "timeout") {
           return {
             content: [
               {
                 type: "text" as const,
-                text: JSON.stringify({ status: "timeout" }),
+                text: JSON.stringify({ type: "timeout" }),
               },
             ],
           };
@@ -173,9 +124,9 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
 
   const sendInput = tool(
     "send_input",
-    "Send input text to the embedded agent. Fails if no request_input is pending.",
+    "Send a message to the embedded agent as its next prompt.",
     {
-      text: z.string().describe("The input text to send"),
+      text: z.string().describe("The message text to send"),
     },
     async (args) => {
       if (!activeRun) {
@@ -184,34 +135,19 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
           content: [
             {
               type: "text" as const,
-              text: "No embedded run is active. Call start_embedded_run first.",
+              text: "No embedded run is active.",
             },
           ],
         };
       }
 
-      try {
-        logger?.logInput(args.text);
-        activeRun.bus.resolveInput(args.text);
-        return {
-          content: [
-            {
-              type: "text" as const,
-              text: JSON.stringify({ ok: true }),
-            },
-          ],
-        };
-      } catch (err: unknown) {
-        return {
-          isError: true as const,
-          content: [
-            {
-              type: "text" as const,
-              text: err instanceof Error ? err.message : String(err),
-            },
-          ],
-        };
-      }
+      logger?.logInput(args.text);
+      activeRun.bus.post(args.text);
+      return {
+        content: [
+          { type: "text" as const, text: JSON.stringify({ ok: true }) },
+        ],
+      };
     },
   );
 

@@ -22,19 +22,16 @@ guide: |
   Returns `{ run_id, store_root }`.
 
   ### wait
-  Wait for the next event from the embedded agent. Returns one of:
-  - `{ status: "output", text }` — the embedded agent produced text output
-    (assistant text, tool_use calls are also surfaced as output)
-  - `{ status: "turn_complete", output }` — the embedded agent finished its turn
-    (all pending work done, accumulated output since last event included)
-  - `{ status: "awaiting_input", prompt, output }` — the embedded agent is requesting
-    user input via `request_input`
-  - `{ status: "exited", code, output }` — the embedded agent session has ended
-  - `{ status: "timeout" }` — the wait timed out
+  Wait for the embedded agent to finish its current turn or exit. Returns one of:
+  - `{ type: "turn_complete", output }` — the agent finished a turn; `output` contains
+    all assistant text produced during that turn
+  - `{ type: "exited", code, output }` — the agent session has ended
+  - `{ type: "timeout" }` — the wait timed out
 
   ### send_input
-  Send input text to the embedded agent when it is awaiting input (after receiving an
-  `awaiting_input` status from `wait`). Fails if no input request is pending.
+  Send a message to the embedded agent as its next prompt. The agent will start
+  a new turn (query session) with this text as input. Use this to answer questions,
+  provide instructions, or guide the agent to the next step.
 
   Rules:
   - Read the test plan file to understand what to test.
@@ -67,9 +64,9 @@ states:
 
       Execute each test step from the plan by interacting with the embedded agent:
 
-      1. Call `wait()` to observe the embedded agent's behavior.
-      2. When you receive `awaiting_input`, decide what input to provide based on
-         the test plan steps, then call `send_input()`.
+      1. Call `wait()` to receive messages from the embedded agent.
+      2. When the agent sends a message (e.g., a question or status), decide how
+         to respond based on the test plan steps, then call `send_input()`.
       3. Compare actual behavior against expected outcomes for each step.
       4. Judge each step as PASS or FAIL with evidence.
       5. Continue until the embedded agent exits or all steps are complete.

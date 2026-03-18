@@ -33,8 +33,6 @@ export interface RunCoreOptions {
   bus?: MessageBus;
   logFn?: (msg: string, color?: string) => void;
   additionalMcpServers?: Record<string, unknown>;
-  /** When true, tool_use calls are included in bus output. Default: false (only assistant text). */
-  verbose?: boolean;
 }
 
 export function generateRunId(fsmPath: string): string {
@@ -209,7 +207,22 @@ export function createFsmMcpServer(
     }
   });
 
-  const requestInput = tool(
+  // In CLI mode, add request_input tool for stdin interaction
+  const tools = bus
+    ? [fsmGoto, fsmCurrent]
+    : [fsmGoto, fsmCurrent, createRequestInputTool(logFn)];
+
+  return createSdkMcpServer({
+    name: "freefsm",
+    version: "1.0.0",
+    tools,
+  });
+}
+
+function createRequestInputTool(
+  logFn: (msg: string, color?: string) => void,
+) {
+  return tool(
     "request_input",
     "Ask the human for input via stdin",
     {
@@ -217,16 +230,6 @@ export function createFsmMcpServer(
     },
     async (args) => {
       logFn(`request_input: ${args.prompt}`, c.magenta);
-
-      if (bus) {
-        // Embedded mode: use MessageBus instead of readline
-        const input = await bus.enqueueInputRequest(args.prompt);
-        return {
-          content: [{ type: "text" as const, text: input }],
-        };
-      }
-
-      // CLI mode: use readline on stdin
       process.stderr.write(`${args.prompt}\n`);
 
       return new Promise<{
@@ -249,7 +252,6 @@ export function createFsmMcpServer(
 
         rl.once("close", () => {
           if (resolved) return;
-          // close fired before line — stdin hit EOF
           resolve({
             content: [
               {
@@ -262,18 +264,17 @@ export function createFsmMcpServer(
       });
     },
   );
-
-  return createSdkMcpServer({
-    name: "freefsm",
-    version: "1.0.0",
-    tools: [fsmGoto, fsmCurrent, requestInput],
-  });
 }
 
-const MCP_TOOL_NAMES = [
+const MCP_TOOL_NAMES_CLI = [
   "mcp__freefsm__fsm_goto",
   "mcp__freefsm__fsm_current",
   "mcp__freefsm__request_input",
+];
+
+const MCP_TOOL_NAMES_EMBEDDED = [
+  "mcp__freefsm__fsm_goto",
+  "mcp__freefsm__fsm_current",
 ];
 
 const log = agentLog;
@@ -333,7 +334,7 @@ export async function runCore(
   const systemPrompt = buildSystemPrompt(fsm);
 
   const allowedTools = fsm.allowed_tools
-    ? [...MCP_TOOL_NAMES, ...fsm.allowed_tools]
+    ? [...(opts.bus ? MCP_TOOL_NAMES_EMBEDDED : MCP_TOOL_NAMES_CLI), ...fsm.allowed_tools]
     : undefined;
 
   const queryOpts = {
@@ -357,26 +358,17 @@ export async function runCore(
     for await (const message of session) {
       logSdkMessage(message, { sessionNum: attempt });
 
+      // Buffer assistant text for the bus
       if (opts.bus && message.type === "assistant") {
-        // Embedded mode: route assistant text and tool use to bus
         const msg = message as {
           type: "assistant";
           message: {
-            content: Array<{
-              type: string;
-              text?: string;
-              name?: string;
-              input?: Record<string, unknown>;
-            }>;
+            content: Array<{ type: string; text?: string }>;
           };
         };
         for (const block of msg.message.content) {
           if (block.type === "text" && block.text) {
             opts.bus.appendOutput(block.text);
-          } else if (block.type === "tool_use" && block.name && opts.verbose) {
-            opts.bus.appendOutput(
-              `[tool_use] ${block.name}(${JSON.stringify(block.input ?? {})})`,
-            );
           }
         }
       }
@@ -391,11 +383,8 @@ export async function runCore(
           isError = true;
         }
         if (opts.bus) {
-          // Embedded mode: route result to bus, then signal turn complete
           opts.bus.appendOutput(resultMsg.result);
-          opts.bus.enqueueTurnComplete();
         } else {
-          // CLI mode: write to stdout
           process.stdout.write(`${resultMsg.result}\n`);
         }
       }
@@ -433,11 +422,25 @@ export async function runCore(
       break;
     }
 
-    logFn(
-      `session ended but workflow not complete, state=${snap.state} — retrying`,
-      c.magenta,
-    );
-    prompt = `The workflow is not complete yet. Continue executing the current state. If you need user input, use \`request_input\`. Do NOT stop until you reach a terminal state.\n\n${formatStateCard(stateCardFromFsm(snap.state, currentState))}`;
+    if (opts.bus) {
+      // Embedded mode: signal turn complete, wait for verifier's next prompt
+      opts.bus.completeTurn();
+      logFn(`turn complete, waiting for verifier prompt...`, c.magenta);
+      try {
+        prompt = await opts.bus.waitForPrompt(300000); // 5 min timeout
+        logFn(`received prompt from verifier`, c.magenta);
+      } catch {
+        logFn(`timeout waiting for verifier prompt, aborting`, c.red);
+        break;
+      }
+    } else {
+      // CLI mode: auto-retry with continuation prompt
+      logFn(
+        `session ended but workflow not complete, state=${snap.state} — retrying`,
+        c.magenta,
+      );
+      prompt = `The workflow is not complete yet. Continue executing the current state. If you need user input, use \`request_input\`. Do NOT stop until you reach a terminal state.\n\n${formatStateCard(stateCardFromFsm(snap.state, currentState))}`;
+    }
   }
 
   return { runId, isError };

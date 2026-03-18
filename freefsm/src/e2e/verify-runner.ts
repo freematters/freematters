@@ -11,7 +11,6 @@ export interface VerifyCoreArgs {
   planPath: string;
   testDir: string;
   model?: string;
-  verbose?: boolean;
 }
 
 export interface VerifyCoreResult {
@@ -42,7 +41,6 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
     root: join(testDir, ".freefsm"),
     prompt,
     model: args.model,
-    verbose: args.verbose,
     additionalMcpServers: { "freefsm-verifier": verifierServer },
   });
 

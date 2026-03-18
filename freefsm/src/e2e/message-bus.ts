@@ -1,82 +1,75 @@
 /**
- * MessageBus — communication channel between the embedded agent and verifier.
+ * MessageBus — turn-based communication between embedded agent and verifier.
  *
- * The embedded agent appends output and signals turn boundaries.
- * The verifier waits for events (turn_complete, input_request, exited)
- * and resolves input requests.
- *
- * Individual output (assistant text, tool calls) is buffered and only
- * delivered as part of turn_complete, input_request, or exited events.
+ * Flow:
+ *   1. Embedded agent's query() session runs, produces assistant output
+ *   2. Session ends → completeTurn() flushes buffered output as turn_complete
+ *   3. Verifier receives turn_complete via waitForMessage()
+ *   4. Verifier sends a response via post() → embedded agent's next session uses it as prompt
+ *   5. Repeat until verifier decides it's done (based on test plan, not agent lifecycle)
  */
 
-export type BusEvent =
-  | { type: "turn_complete"; output: string }
-  | { type: "input_request"; prompt: string; output: string }
-  | { type: "exited"; code: number; output: string };
+export interface TurnComplete {
+  type: "turn_complete";
+  output: string;
+}
 
 export class MessageBus {
-  private eventQueue: BusEvent[] = [];
-  private pendingWaiter:
-    | { resolve: (event: BusEvent) => void; reject: (err: Error) => void }
+  // Outbound: embedded → verifier
+  private outboundQueue: TurnComplete[] = [];
+  private outboundWaiter:
+    | { resolve: (msg: TurnComplete) => void; reject: (err: Error) => void }
     | undefined;
-  private pendingInputResolver: ((text: string) => void) | undefined;
-  private accumulatedOutput: string[] = [];
 
-  /**
-   * Append output text to the buffer. No event is pushed —
-   * the text will be included in the next turn_complete, input_request,
-   * or exited event.
-   */
+  // Inbound: verifier → embedded (next prompt)
+  private inboundQueue: string[] = [];
+  private inboundWaiter:
+    | { resolve: (text: string) => void; reject: (err: Error) => void }
+    | undefined;
+
+  // Buffer for assistant output within a turn
+  private turnOutput: string[] = [];
+
+  // ── Embedded agent side ──
+
+  /** Append output text to the current turn's buffer. */
   appendOutput(text: string): void {
-    this.accumulatedOutput.push(text);
+    this.turnOutput.push(text);
+  }
+
+  /** Flush buffered output as a turn_complete event. */
+  completeTurn(): void {
+    const output = this.turnOutput.join("\n");
+    this.turnOutput = [];
+    const msg: TurnComplete = { type: "turn_complete", output };
+    if (this.outboundWaiter) {
+      const waiter = this.outboundWaiter;
+      this.outboundWaiter = undefined;
+      waiter.resolve(msg);
+    } else {
+      this.outboundQueue.push(msg);
+    }
   }
 
   /**
-   * Signal that the embedded agent finished a turn.
-   * Pushes a turn_complete event with all accumulated output.
+   * Wait for the verifier to send the next prompt.
+   * Called by runCore's retry loop. Rejects on timeout.
    */
-  enqueueTurnComplete(): void {
-    const output = this.drainAccumulatedOutput();
-    this.pushEvent({ type: "turn_complete", output });
-  }
-
-  /**
-   * Enqueue an input request from the embedded agent.
-   * Returns a Promise that resolves when the verifier calls resolveInput().
-   * Pushes an input_request event with all accumulated output.
-   */
-  enqueueInputRequest(prompt: string): Promise<string> {
-    const output = this.drainAccumulatedOutput();
-    this.pushEvent({ type: "input_request", prompt, output });
-
-    return new Promise<string>((resolve) => {
-      this.pendingInputResolver = resolve;
-    });
-  }
-
-  /**
-   * Wait for the next event from the embedded agent.
-   * Blocks (with timeout) until an event is available.
-   * Rejects with an error if the timeout expires.
-   */
-  waitForEvent(timeout: number): Promise<BusEvent> {
-    // If there's already an event in the queue, return it immediately
-    const next = this.eventQueue.shift();
-    if (next) {
-      return Promise.resolve(next);
+  waitForPrompt(timeout: number): Promise<string> {
+    if (this.inboundQueue.length > 0) {
+      return Promise.resolve(this.inboundQueue.shift()!);
     }
 
-    // Otherwise, wait for the next event
-    return new Promise<BusEvent>((resolve, reject) => {
+    return new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.pendingWaiter = undefined;
+        this.inboundWaiter = undefined;
         reject(new Error("timeout"));
       }, timeout);
 
-      this.pendingWaiter = {
-        resolve: (event: BusEvent) => {
+      this.inboundWaiter = {
+        resolve: (text: string) => {
           clearTimeout(timer);
-          resolve(event);
+          resolve(text);
         },
         reject: (err: Error) => {
           clearTimeout(timer);
@@ -86,41 +79,42 @@ export class MessageBus {
     });
   }
 
-  /**
-   * Resolve a pending input request with the given text.
-   * Throws if no input request is pending.
-   */
-  resolveInput(text: string): void {
-    if (!this.pendingInputResolver) {
-      throw new Error("No input request pending");
+  // ── Verifier side ──
+
+  /** Wait for the next turn_complete. Rejects on timeout. */
+  waitForMessage(timeout: number): Promise<TurnComplete> {
+    const next = this.outboundQueue.shift();
+    if (next) {
+      return Promise.resolve(next);
     }
-    const resolver = this.pendingInputResolver;
-    this.pendingInputResolver = undefined;
-    resolver(text);
+
+    return new Promise<TurnComplete>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.outboundWaiter = undefined;
+        reject(new Error("timeout"));
+      }, timeout);
+
+      this.outboundWaiter = {
+        resolve: (msg: TurnComplete) => {
+          clearTimeout(timer);
+          resolve(msg);
+        },
+        reject: (err: Error) => {
+          clearTimeout(timer);
+          reject(err);
+        },
+      };
+    });
   }
 
-  /**
-   * Mark the embedded agent as exited.
-   * Pushes an exited event with all accumulated output.
-   */
-  markExited(code: number): void {
-    const output = this.drainAccumulatedOutput();
-    this.pushEvent({ type: "exited", code, output });
-  }
-
-  private pushEvent(event: BusEvent): void {
-    if (this.pendingWaiter) {
-      const waiter = this.pendingWaiter;
-      this.pendingWaiter = undefined;
-      waiter.resolve(event);
+  /** Send a message to the embedded agent as its next prompt. */
+  post(text: string): void {
+    if (this.inboundWaiter) {
+      const waiter = this.inboundWaiter;
+      this.inboundWaiter = undefined;
+      waiter.resolve(text);
     } else {
-      this.eventQueue.push(event);
+      this.inboundQueue.push(text);
     }
-  }
-
-  private drainAccumulatedOutput(): string {
-    const output = this.accumulatedOutput.join("\n");
-    this.accumulatedOutput = [];
-    return output;
   }
 }
