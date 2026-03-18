@@ -1,23 +1,21 @@
 /**
- * AgentSession — wraps a Claude Agent SDK query() session for turn-based control.
+ * AgentSession — wraps the Claude Agent SDK V2 session for multi-turn control.
  *
- * Provides runAgent/wait/send for the verifier to control an embedded agent
- * within a single continuous session (no session restarts).
+ * Uses unstable_v2_createSession which provides:
+ *   send(message) — send a user message
+ *   stream()      — get an async generator of messages for the current turn
+ *   close()       — end the session
  */
 
-import { query } from "@anthropic-ai/claude-agent-sdk";
-import type { SDKMessage, McpServerConfig } from "@anthropic-ai/claude-agent-sdk";
-import { loadFsm } from "../fsm.js";
-import { formatStateCard, stateCardFromFsm } from "../output.js";
-import { Store } from "../store.js";
-import { createFsmMcpServer } from "../commands/run.js";
+import {
+  unstable_v2_createSession,
+} from "@anthropic-ai/claude-agent-sdk";
+import type { SDKMessage, SDKSession } from "@anthropic-ai/claude-agent-sdk";
 
 export interface AgentSessionOptions {
-  fsmPath: string;
-  root?: string;
   prompt?: string;
   model?: string;
-  additionalMcpServers?: Record<string, McpServerConfig>;
+  disallowedTools?: string[];
 }
 
 export interface TurnResult {
@@ -26,210 +24,99 @@ export interface TurnResult {
 }
 
 /**
- * Manages a single Claude Agent SDK session for an embedded freefsm run.
+ * Manages a Claude Agent SDK V2 session for an embedded agent.
  *
- * The session stays alive across multiple turns. The verifier controls
+ * The session persists across multiple turns. The verifier controls
  * the pace by calling wait() and send().
  */
 export class AgentSession {
-  private session: ReturnType<typeof query> | undefined;
-  private sessionId: string | undefined;
-  private runId: string;
-  private storeRoot: string;
-  private pendingWait:
-    | { resolve: (result: TurnResult) => void; reject: (err: Error) => void }
-    | undefined;
-  private turnOutput: string[] = [];
-  private sessionDone = false;
+  private session: SDKSession;
+  private currentStream: AsyncGenerator<SDKMessage, void> | undefined;
 
-  constructor(
-    private options: AgentSessionOptions,
-  ) {
-    const name = options.fsmPath
-      .replace(/^.*\//, "")
-      .replace(/\.(fsm\.)?ya?ml$/i, "");
-    this.runId = `${name}-${Date.now()}`;
-    this.storeRoot = options.root ?? process.cwd();
-  }
-
-  getRunId(): string {
-    return this.runId;
-  }
-
-  getStoreRoot(): string {
-    return this.storeRoot;
-  }
-
-  /**
-   * Start the agent session. Initializes the FSM store, creates the MCP server,
-   * and launches the query() session. Begins consuming messages in the background.
-   */
-  async start(): Promise<void> {
-    const fsm = loadFsm(this.options.fsmPath);
-
-    const store = new Store(this.storeRoot);
-    store.initRun(this.runId, this.options.fsmPath);
-    store.commit(
-      this.runId,
-      {
-        event: "start",
-        from_state: null,
-        to_state: fsm.initial,
-        on_label: null,
-        actor: "system",
-        reason: null,
-      },
-      { run_status: "active", state: fsm.initial },
-    );
-
-    const fsmServer = createFsmMcpServer(fsm, store, this.runId);
-
-    const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
-    const stateCard = formatStateCard(card);
-    const initialMessage = this.options.prompt
-      ? `${stateCard}\n\n## User Prompt\n\n${this.options.prompt}`
-      : stateCard;
-
-    // Build system prompt from FSM guide
-    const fsmName = fsm.guide ? fsm.guide.split(/[.\n]/)[0] : "workflow";
-    const systemPrompt = `You are running the "${fsmName}" workflow.\n\n## FSM Guide\n\n${fsm.guide ?? "No guide provided."}`;
-
-    const mcpServers: Record<string, McpServerConfig> = {
-      freefsm: fsmServer,
-      ...this.options.additionalMcpServers,
-    };
-
-    this.session = query({
-      prompt: initialMessage,
-      options: {
-        systemPrompt,
-        permissionMode: "bypassPermissions",
-        allowDangerouslySkipPermissions: true,
-        mcpServers,
-        ...(this.options.model !== undefined && { model: this.options.model }),
-      },
-    });
-
-    // Start consuming in the background
-    this.consumeLoop();
-  }
-
-  /**
-   * Wait for the current turn to complete (next result message).
-   * Returns the accumulated assistant text and whether the session is done.
-   */
-  wait(timeout: number): Promise<TurnResult> {
-    // If session already done, return immediately
-    if (this.sessionDone) {
-      const output = this.turnOutput.join("\n");
-      this.turnOutput = [];
-      return Promise.resolve({ output, done: true });
-    }
-
-    return new Promise<TurnResult>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pendingWait = undefined;
-        reject(new Error("timeout"));
-      }, timeout);
-
-      this.pendingWait = {
-        resolve: (result: TurnResult) => {
-          clearTimeout(timer);
-          resolve(result);
-        },
-        reject: (err: Error) => {
-          clearTimeout(timer);
-          reject(err);
-        },
-      };
+  constructor(options: AgentSessionOptions) {
+    this.session = unstable_v2_createSession({
+      model: options.model ?? "claude-sonnet-4-6",
+      permissionMode: "bypassPermissions",
+      disallowedTools: options.disallowedTools ?? [
+        "AskUserQuestion",
+        "ExitPlanMode",
+        "EnterPlanMode",
+      ],
     });
   }
 
   /**
-   * Send a message to resume the agent session.
-   * The agent will process this as a new user message within the same session.
+   * Send a message and start a new turn.
+   * Call wait() after this to get the agent's response.
    */
   async send(text: string): Promise<void> {
-    if (!this.session || this.sessionDone) {
-      throw new Error("Session is not active");
-    }
-
-    const userMessage = {
-      type: "user" as const,
-      message: {
-        role: "user" as const,
-        content: text,
-      },
-      parent_tool_use_id: null,
-      session_id: this.sessionId ?? "default",
-    };
-
-    await this.session.streamInput(
-      (async function* () {
-        yield userMessage;
-      })(),
-    );
+    await this.session.send(text);
   }
 
   /**
-   * Background loop that consumes the async generator.
-   * Buffers assistant text and signals turn completion on result messages.
+   * Wait for the current turn to complete.
+   * Consumes the stream until a result message or the generator finishes.
+   * Returns accumulated assistant text.
    */
-  private async consumeLoop(): Promise<void> {
-    if (!this.session) return;
+  async wait(timeout: number): Promise<TurnResult> {
+    const stream = this.session.stream();
+    this.currentStream = stream;
+
+    const turnOutput: string[] = [];
+    let done = false;
+
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error("timeout")), timeout);
+    });
 
     try {
-      // Use manual next() to avoid break/return which would close the generator
-      while (true) {
-        const { value, done } = await this.session.next();
-        if (done) {
-          this.sessionDone = true;
-          this.signalTurnComplete(true);
-          break;
-        }
-
-        const message = value as SDKMessage;
-
-        // Capture session_id from first message
-        if (!this.sessionId && "session_id" in message) {
-          this.sessionId = (message as { session_id: string }).session_id;
-        }
-
-        // Buffer assistant text
-        if (message.type === "assistant") {
-          const msg = message as {
-            type: "assistant";
-            message: {
-              content: Array<{ type: string; text?: string }>;
+      const consumePromise = (async () => {
+        for await (const message of stream) {
+          // Buffer assistant text
+          if (message.type === "assistant") {
+            const msg = message as {
+              type: "assistant";
+              message: {
+                content: Array<{ type: string; text?: string }>;
+              };
             };
-          };
-          for (const block of msg.message.content) {
-            if (block.type === "text" && block.text) {
-              this.turnOutput.push(block.text);
+            for (const block of msg.message.content) {
+              if (block.type === "text" && block.text) {
+                turnOutput.push(block.text);
+              }
             }
           }
-        }
 
-        // Result message = turn complete
-        if (message.type === "result") {
-          this.signalTurnComplete(false);
+          // Result = turn complete
+          if (message.type === "result") {
+            const resultMsg = message as {
+              type: "result";
+              subtype: string;
+            };
+            // The stream will end after result, but we don't need to break
+            // The for-await will naturally complete
+          }
         }
-      }
+      })();
+
+      await Promise.race([consumePromise, timeoutPromise]);
     } catch (err: unknown) {
-      this.sessionDone = true;
-      const msg = err instanceof Error ? err.message : String(err);
-      this.turnOutput.push(`[agent error] ${msg}`);
-      this.signalTurnComplete(true);
+      if (err instanceof Error && err.message === "timeout") {
+        return { output: turnOutput.join("\n"), done: false };
+      }
+      throw err;
     }
+
+    return { output: turnOutput.join("\n"), done };
   }
 
-  private signalTurnComplete(done: boolean): void {
-    if (this.pendingWait) {
-      const output = this.turnOutput.join("\n");
-      this.turnOutput = [];
-      const waiter = this.pendingWait;
-      this.pendingWait = undefined;
-      waiter.resolve({ output, done });
-    }
+  /** Get the session ID. */
+  getSessionId(): string {
+    return this.session.sessionId;
+  }
+
+  /** Close the session. */
+  close(): void {
+    this.session.close();
   }
 }
