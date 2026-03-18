@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // Mock the Agent SDK
@@ -23,28 +23,27 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 }));
 
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import type { TestPlan } from "../../e2e/parser.js";
-import type { TranscriptEntry } from "../../e2e/transcript-logger.js";
 import { verifyCore } from "../../e2e/verify-runner.js";
 
-const SAMPLE_PLAN: TestPlan = {
-  name: "FSM workflow test",
-  setup: ["Install dependencies"],
-  steps: [
-    {
-      name: "Start workflow",
-      action: "Run `freefsm start workflow.yaml`",
-      expected: "Run initializes",
-    },
-    {
-      name: "Check state",
-      action: "Run `freefsm current`",
-      expected: "Shows current state",
-    },
-  ],
-  expectedOutcomes: ["Workflow completes successfully"],
-  cleanup: ["Remove temp files"],
-};
+const SAMPLE_PLAN_MD = `# Test: FSM workflow test
+
+Verify that the workflow completes.
+
+## Setup
+- Workflow: tests/qa.fsm.yaml
+
+## Steps
+1. **Start workflow**: Start the embedded run
+   - Expected: Run initializes
+2. **Check state**: Wait for output
+   - Expected: Shows current state
+
+## Expected Outcomes
+- Workflow completes successfully
+
+## Cleanup
+- Remove temp files
+`;
 
 let tmp: string;
 
@@ -59,11 +58,11 @@ afterEach(() => {
 });
 
 describe("verifyCore — embedded verifier integration", () => {
-  test("query is called with verifier system prompt describing embedded tools", async () => {
+  test("passes raw markdown and system prompt describes embedded tools", async () => {
     mockMessages.push({
       type: "result",
       subtype: "success",
-      result: "Done",
+      result: "PASS",
       duration_ms: 500,
       duration_api_ms: 400,
       is_error: false,
@@ -76,20 +75,23 @@ describe("verifyCore — embedded verifier integration", () => {
       session_id: "sess-1",
     });
 
-    await verifyCore({ plan: SAMPLE_PLAN, testDir: tmp });
+    await verifyCore({ planMarkdown: SAMPLE_PLAN_MD, testDir: tmp });
 
     const mockQuery = vi.mocked(query);
     expect(mockQuery).toHaveBeenCalledOnce();
     const callArgs = mockQuery.mock.calls[0][0];
 
-    // System prompt should describe the new embedded verifier tools
+    // Raw markdown passed as prompt
+    expect(callArgs.prompt).toBe(SAMPLE_PLAN_MD);
+
+    // System prompt describes embedded tools
     const systemPrompt = callArgs.options?.systemPrompt as string;
     expect(systemPrompt).toContain("start_embedded_run");
     expect(systemPrompt).toContain("wait");
     expect(systemPrompt).toContain("send_input");
   });
 
-  test("query is called with mcpServers including freefsm-verifier", async () => {
+  test("mcpServers includes freefsm-verifier", async () => {
     mockMessages.push({
       type: "result",
       subtype: "success",
@@ -106,57 +108,17 @@ describe("verifyCore — embedded verifier integration", () => {
       session_id: "sess-1",
     });
 
-    await verifyCore({ plan: SAMPLE_PLAN, testDir: tmp });
+    await verifyCore({ planMarkdown: SAMPLE_PLAN_MD, testDir: tmp });
 
-    const mockQuery = vi.mocked(query);
-    const callArgs = mockQuery.mock.calls[0][0];
-
-    expect(callArgs.options?.mcpServers).toBeDefined();
+    const callArgs = vi.mocked(query).mock.calls[0][0];
     expect(callArgs.options?.mcpServers).toHaveProperty("freefsm-verifier");
   });
 
-  test("initial message contains test plan context", async () => {
+  test("captures summary from result and writes test-report.md", async () => {
     mockMessages.push({
       type: "result",
       subtype: "success",
-      result: "Done",
-      duration_ms: 500,
-      duration_api_ms: 400,
-      is_error: false,
-      num_turns: 1,
-      total_cost_usd: 0.002,
-      usage: { input_tokens: 30, output_tokens: 15, server_tool_use_input_tokens: 0 },
-      modelUsage: {},
-      permission_denials: [],
-      uuid: "msg-1",
-      session_id: "sess-1",
-    });
-
-    await verifyCore({ plan: SAMPLE_PLAN, testDir: tmp });
-
-    const mockQuery = vi.mocked(query);
-    const callArgs = mockQuery.mock.calls[0][0];
-
-    const prompt = callArgs.prompt as string;
-    expect(prompt).toContain("FSM workflow test");
-    expect(prompt).toContain("Start workflow");
-    expect(prompt).toContain("Check state");
-  });
-
-  test("transcript and report files are generated", async () => {
-    mockMessages.push({
-      type: "assistant",
-      message: {
-        content: [{ type: "text", text: "Executing setup..." }],
-      },
-      uuid: "msg-1",
-      session_id: "sess-1",
-      parent_tool_use_id: null,
-    });
-    mockMessages.push({
-      type: "result",
-      subtype: "success",
-      result: "All done",
+      result: "PASS: All steps completed",
       duration_ms: 3000,
       duration_api_ms: 2000,
       is_error: false,
@@ -165,23 +127,20 @@ describe("verifyCore — embedded verifier integration", () => {
       usage: { input_tokens: 100, output_tokens: 50, server_tool_use_input_tokens: 0 },
       modelUsage: {},
       permission_denials: [],
-      uuid: "msg-2",
+      uuid: "msg-1",
       session_id: "sess-1",
     });
 
-    const result = await verifyCore({ plan: SAMPLE_PLAN, testDir: tmp });
+    const result = await verifyCore({ planMarkdown: SAMPLE_PLAN_MD, testDir: tmp });
 
-    expect(existsSync(join(tmp, "transcript.jsonl"))).toBe(true);
-    expect(existsSync(join(tmp, "api.jsonl"))).toBe(true);
+    expect(result.summary).toBe("PASS: All steps completed");
     expect(existsSync(join(tmp, "test-report.md"))).toBe(true);
-
     const report = readFileSync(join(tmp, "test-report.md"), "utf-8");
-    expect(report).toContain("# Test Report: FSM workflow test");
-    expect(result.jsonReport).toBeDefined();
+    expect(report).toContain("PASS");
     expect(result.reportPath).toBe(join(tmp, "test-report.md"));
   });
 
-  test("no FSM store is created (verifier no longer uses its own FSM)", async () => {
+  test("no FSM store is created (verifier does not use its own FSM)", async () => {
     mockMessages.push({
       type: "result",
       subtype: "success",
@@ -198,9 +157,8 @@ describe("verifyCore — embedded verifier integration", () => {
       session_id: "sess-1",
     });
 
-    await verifyCore({ plan: SAMPLE_PLAN, testDir: tmp });
+    await verifyCore({ planMarkdown: SAMPLE_PLAN_MD, testDir: tmp });
 
-    // The old implementation created a .freefsm store in testDir
     expect(existsSync(join(tmp, ".freefsm"))).toBe(false);
   });
 });

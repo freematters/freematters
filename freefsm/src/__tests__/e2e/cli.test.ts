@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
@@ -38,68 +38,11 @@ describe("freefsm e2e verify — CLI arg validation", () => {
     expect(exitCode).not.toBe(0);
   });
 
-  test("parses plan and prints JSON with --test-dir and -j", () => {
-    const planPath = join(tmp, "valid-plan.md");
-    writeFileSync(
-      planPath,
-      `# Test: CLI integration
-
-## Setup
-- Prepare env
-
-## Steps
-1. **Run thing**: Execute command
-   - Expected: It works
-
-## Expected Outcomes
-- Command succeeds
-
-## Cleanup
-- Remove files
-`,
-      "utf-8",
-    );
-    const testDir = join(tmp, "out-test");
-    const { stdout, exitCode } = run(
-      `e2e verify ${planPath} --test-dir ${testDir} --parse-only -j`,
-    );
-    expect(exitCode).toBe(0);
-
-    const parsed = JSON.parse(stdout);
-    expect(parsed.ok).toBe(true);
-    expect(parsed.data.name).toBe("CLI integration");
-    expect(parsed.data.steps).toBe(1);
-    expect(existsSync(testDir)).toBe(true);
-  });
-
-  test("creates --test-dir if it does not exist", () => {
-    const planPath = join(tmp, "dir-creation-plan.md");
-    writeFileSync(
-      planPath,
-      `# Test: Dir creation
-
-## Setup
-- x
-
-## Steps
-1. **Step**: do
-   - Expected: done
-
-## Expected Outcomes
-- ok
-`,
-      "utf-8",
-    );
-    const testDir = join(tmp, `new-dir-${Date.now()}`);
-    run(`e2e verify ${planPath} --test-dir ${testDir} --parse-only -j`);
-    expect(existsSync(testDir)).toBe(true);
-  });
-
-  test("exits with error on invalid plan content", () => {
-    const planPath = join(tmp, "bad-plan.md");
-    writeFileSync(planPath, "# Not a valid plan\nJust some text.\n", "utf-8");
-    const testDir = join(tmp, "bad-out");
-    const { exitCode, stderr, stdout } = run(
+  test("exits with error on empty plan file", () => {
+    const planPath = join(tmp, "empty-plan.md");
+    writeFileSync(planPath, "", "utf-8");
+    const testDir = join(tmp, "empty-out");
+    const { exitCode, stdout } = run(
       `e2e verify ${planPath} --test-dir ${testDir} -j`,
       { expectFail: true },
     );
