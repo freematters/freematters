@@ -1,15 +1,18 @@
 /**
- * AgentSession — wraps a Claude Agent SDK V2 session for multi-turn control.
+ * AgentSession — wraps a Claude Agent SDK v1 query() for multi-turn control.
  *
- * Starts a generic Claude Code session (not FSM-specific).
- * The verifier controls the agent via send() and wait().
+ * Uses an AsyncIterable as the prompt source, allowing us to push
+ * follow-up messages into the same session without restarting.
  *
- * Key: stream() is started immediately after send() to avoid missing messages.
- * wait() just waits for the stream consumption to finish.
+ * Flow:
+ *   1. send(text) pushes a user message into the input queue
+ *   2. query() consumes it and produces assistant messages
+ *   3. wait() blocks until a result message (turn complete)
+ *   4. send(text) pushes another message → next turn
  */
 
-import { unstable_v2_createSession } from "@anthropic-ai/claude-agent-sdk";
-import type { SDKSession } from "@anthropic-ai/claude-agent-sdk";
+import { query } from "@anthropic-ai/claude-agent-sdk";
+import type { SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 
 export interface AgentSessionOptions {
   model?: string;
@@ -22,104 +25,189 @@ export interface TurnResult {
   output: string;
 }
 
+/**
+ * A controllable async iterable that allows pushing messages on demand.
+ * The query() session consumes from this — it stays alive as long as
+ * we don't call end().
+ */
+class InputQueue {
+  private queue: SDKUserMessage[] = [];
+  private waiter: ((msg: SDKUserMessage) => void) | undefined;
+  private done = false;
+
+  push(msg: SDKUserMessage): void {
+    if (this.waiter) {
+      const w = this.waiter;
+      this.waiter = undefined;
+      w(msg);
+    } else {
+      this.queue.push(msg);
+    }
+  }
+
+  end(): void {
+    this.done = true;
+    // If someone is waiting, they'll get undefined on next check
+  }
+
+  async *[Symbol.asyncIterator](): AsyncGenerator<SDKUserMessage, void> {
+    while (!this.done) {
+      if (this.queue.length > 0) {
+        yield this.queue.shift()!;
+      } else {
+        const msg = await new Promise<SDKUserMessage>((resolve) => {
+          this.waiter = resolve;
+        });
+        yield msg;
+      }
+    }
+  }
+}
+
 export class AgentSession {
-  private session: SDKSession;
+  private inputQueue: InputQueue;
   private onToolUse?: (name: string, input: Record<string, unknown>) => void;
-  // The promise for the current turn's stream consumption
-  private turnPromise: Promise<TurnResult> | undefined;
+  private sessionObj: ReturnType<typeof query> | undefined;
+  private options: AgentSessionOptions;
+
+  // Turn synchronization
+  private turnOutput: string[] = [];
+  private turnResolve: ((result: TurnResult) => void) | undefined;
+  private consumeDone = false;
 
   constructor(options: AgentSessionOptions = {}) {
+    this.options = options;
     this.onToolUse = options.onToolUse;
-    this.session = unstable_v2_createSession({
-      model: options.model ?? "claude-sonnet-4-6",
-      permissionMode: "bypassPermissions",
-      dangerouslySkipPermissions: true,
-      settingSources: ["user", "project", "local"],
-      disallowedTools: options.disallowedTools ?? [
-        "AskUserQuestion",
-        "ExitPlanMode",
-        "EnterPlanMode",
-      ],
-    } as Parameters<typeof unstable_v2_createSession>[0]);
+    this.inputQueue = new InputQueue();
   }
 
   /**
-   * Send a message and immediately start consuming the response stream.
-   * Call wait() to get the result once the turn completes.
+   * Send a message to the agent. On first call, starts the query() session.
+   * On subsequent calls, pushes a follow-up message into the same session.
    */
   async send(text: string): Promise<void> {
-    await this.session.send(text);
-    // Start consuming the stream immediately so we don't miss messages
-    this.turnPromise = this.consumeStream();
+    const userMsg: SDKUserMessage = {
+      type: "user",
+      message: {
+        role: "user",
+        content: text,
+      },
+      parent_tool_use_id: null,
+      session_id: "embedded",
+    };
+
+    // Reset turn output for the new turn
+    this.turnOutput = [];
+
+    this.inputQueue.push(userMsg);
+
+    if (!this.sessionObj) {
+      // First send — start the query session
+      this.sessionObj = query({
+        prompt: this.inputQueue,
+        options: {
+          permissionMode: "bypassPermissions",
+          allowDangerouslySkipPermissions: true,
+          ...(this.options.model !== undefined && { model: this.options.model }),
+        },
+      });
+
+      // Start consuming in the background
+      this.consumeLoop();
+    }
   }
 
   /**
-   * Wait for the current turn to complete. Returns accumulated assistant text.
-   * Applies a timeout — if exceeded, returns whatever output was captured so far.
+   * Wait for the current turn to complete (next result message).
+   * Returns accumulated assistant text from this turn.
    */
-  async wait(timeout: number): Promise<TurnResult> {
-    if (!this.turnPromise) {
-      return { output: "" };
+  wait(timeout: number): Promise<TurnResult> {
+    if (this.consumeDone) {
+      const output = this.turnOutput.join("\n");
+      this.turnOutput = [];
+      return Promise.resolve({ output });
     }
 
-    const timeoutPromise = new Promise<TurnResult>((resolve) => {
-      setTimeout(() => resolve({ output: "[timeout]" }), timeout);
-    });
+    return new Promise<TurnResult>((resolve) => {
+      const timer = setTimeout(() => {
+        this.turnResolve = undefined;
+        const output = this.turnOutput.join("\n");
+        this.turnOutput = [];
+        resolve({ output: output || "[timeout]" });
+      }, timeout);
 
-    return Promise.race([this.turnPromise, timeoutPromise]);
+      this.turnResolve = (result: TurnResult) => {
+        clearTimeout(timer);
+        resolve(result);
+      };
+    });
   }
 
   close(): void {
-    this.session.close();
+    this.inputQueue.end();
+    this.sessionObj?.close();
   }
 
   /**
-   * Consume the stream for the current turn.
-   * Buffers assistant text and calls onToolUse for tool calls.
+   * Background loop consuming the query() async generator.
+   * Buffers assistant text per turn, signals turn completion on result messages.
    */
-  private async consumeStream(): Promise<TurnResult> {
-    const stream = this.session.stream();
-    const turnOutput: string[] = [];
-    let isError = false;
+  private async consumeLoop(): Promise<void> {
+    if (!this.sessionObj) return;
 
-    for await (const message of stream) {
-      if (message.type === "assistant") {
-        const msg = message as {
-          type: "assistant";
-          message: {
-            content: Array<{
-              type: string;
-              text?: string;
-              name?: string;
-              input?: Record<string, unknown>;
-            }>;
+    try {
+      for await (const message of this.sessionObj) {
+        if (message.type === "assistant") {
+          const msg = message as {
+            type: "assistant";
+            message: {
+              content: Array<{
+                type: string;
+                text?: string;
+                name?: string;
+                input?: Record<string, unknown>;
+              }>;
+            };
           };
-        };
-        for (const block of msg.message.content) {
-          if (block.type === "text" && block.text) {
-            turnOutput.push(block.text);
-          } else if (block.type === "tool_use" && block.name) {
-            this.onToolUse?.(block.name, block.input ?? {});
+          for (const block of msg.message.content) {
+            if (block.type === "text" && block.text) {
+              this.turnOutput.push(block.text);
+            } else if (block.type === "tool_use" && block.name) {
+              this.onToolUse?.(block.name, block.input ?? {});
+            }
           }
-        }
-      } else if (message.type === "result") {
-        const resultMsg = message as {
-          type: "result";
-          result?: string;
-          is_error?: boolean;
-          subtype?: string;
-        };
-        if (resultMsg.is_error) {
-          isError = true;
-          if (resultMsg.result) {
-            turnOutput.push(`[error] ${resultMsg.result}`);
+        } else if (message.type === "result") {
+          const resultMsg = message as {
+            type: "result";
+            result?: string;
+            is_error?: boolean;
+          };
+          if (resultMsg.is_error && resultMsg.result) {
+            this.turnOutput.push(`[error] ${resultMsg.result}`);
           }
-        } else if (resultMsg.result) {
-          turnOutput.push(resultMsg.result);
+          // Signal turn complete
+          if (this.turnResolve) {
+            const output = this.turnOutput.join("\n");
+            this.turnOutput = [];
+            const resolver = this.turnResolve;
+            this.turnResolve = undefined;
+            resolver({ output });
+          }
         }
       }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.turnOutput.push(`[session error] ${msg}`);
     }
 
-    return { output: turnOutput.join("\n") };
+    this.consumeDone = true;
+    // If someone is waiting, resolve with whatever we have
+    if (this.turnResolve) {
+      const output = this.turnOutput.join("\n");
+      this.turnOutput = [];
+      const resolver = this.turnResolve;
+      this.turnResolve = undefined;
+      resolver({ output });
+    }
   }
 }
