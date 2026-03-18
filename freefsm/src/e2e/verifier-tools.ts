@@ -5,12 +5,17 @@
 
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
+import type { DualStreamLogger } from "./dual-stream-logger.js";
 import { EmbeddedRun } from "./embedded-run.js";
 import type { MessageBus } from "./message-bus.js";
 
 interface RunState {
   run: EmbeddedRun;
   bus: MessageBus;
+}
+
+export interface VerifierMcpServerOptions {
+  logger?: DualStreamLogger;
 }
 
 /**
@@ -21,7 +26,8 @@ interface RunState {
  * - wait: waits for the next event from the embedded agent
  * - send_input: sends input to a pending request_input call
  */
-export function createVerifierMcpServer() {
+export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
+  const logger = options?.logger;
   let activeRun: RunState | undefined;
 
   const startEmbeddedRun = tool(
@@ -89,6 +95,7 @@ export function createVerifierMcpServer() {
 
         switch (event.type) {
           case "output":
+            logger?.logEmbedded(event.text);
             return {
               content: [
                 {
@@ -98,6 +105,10 @@ export function createVerifierMcpServer() {
               ],
             };
           case "input_request":
+            if (event.output) {
+              logger?.logEmbedded(event.output);
+            }
+            logger?.logEmbedded(`[request_input] ${event.prompt}`);
             return {
               content: [
                 {
@@ -111,6 +122,9 @@ export function createVerifierMcpServer() {
               ],
             };
           case "exited":
+            if (event.output) {
+              logger?.logEmbedded(event.output);
+            }
             return {
               content: [
                 {
@@ -160,6 +174,7 @@ export function createVerifierMcpServer() {
       }
 
       try {
+        logger?.logInput(args.text);
         activeRun.bus.resolveInput(args.text);
         return {
           content: [

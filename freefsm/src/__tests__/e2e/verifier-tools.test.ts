@@ -33,6 +33,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
 
 // Import after mocking
 import { tool } from "@anthropic-ai/claude-agent-sdk";
+import { DualStreamLogger } from "../../e2e/dual-stream-logger.js";
 import { createVerifierMcpServer } from "../../e2e/verifier-tools.js";
 
 let tmp: string;
@@ -319,6 +320,123 @@ describe("Verifier MCP Tools", () => {
     // The request_input handler should have resolved with the input
     const inputResult = await inputPromise;
     expect(inputResult.content[0].text).toBe("42");
+  });
+
+  test("wait logs embedded output via logger when provided", async () => {
+    const fsmPath = writeTrivialFsm(tmp);
+
+    mockQueryResults.push({
+      type: "result",
+      subtype: "success",
+      result: "Hello from agent",
+      duration_ms: 100,
+      is_error: false,
+      num_turns: 1,
+    });
+
+    const logger = new DualStreamLogger();
+    const logEmbeddedSpy = vi.spyOn(logger, "logEmbedded");
+
+    createVerifierMcpServer({ logger });
+    const startHandler = getToolHandler("start_embedded_run");
+    const waitHandler = getToolHandler("wait");
+
+    await startHandler({ fsm_path: fsmPath, root: tmp });
+
+    const result = (await waitHandler({ timeout: 5000 })) as {
+      content: Array<{ type: string; text: string }>;
+    };
+
+    const parsed = JSON.parse(result.content[0].text);
+    expect(parsed.status).toBe("output");
+    expect(logEmbeddedSpy).toHaveBeenCalledWith("Hello from agent");
+  });
+
+  test("wait logs input request via logger when provided", async () => {
+    const fsmPath = writeTrivialFsm(tmp);
+
+    mockQueryResults.push({
+      type: "result",
+      subtype: "success",
+      result: "Done",
+      duration_ms: 100,
+      is_error: false,
+      num_turns: 1,
+    });
+
+    const logger = new DualStreamLogger();
+    const logEmbeddedSpy = vi.spyOn(logger, "logEmbedded");
+
+    createVerifierMcpServer({ logger });
+    const startHandler = getToolHandler("start_embedded_run");
+    const waitHandler = getToolHandler("wait");
+
+    await startHandler({ fsm_path: fsmPath, root: tmp });
+
+    // Get request_input handler from embedded run tools
+    const embeddedToolCalls = vi.mocked(tool).mock.calls;
+    const requestInputCall = embeddedToolCalls.find((c) => c[0] === "request_input");
+    const requestInputHandler = requestInputCall?.[3] as (args: {
+      prompt: string;
+    }) => Promise<unknown>;
+
+    // Call request_input in background
+    const inputPromise = requestInputHandler({ prompt: "Enter name:" });
+
+    // Drain output events until we hit awaiting_input
+    let parsed: { status: string; prompt?: string };
+    do {
+      const result = (await waitHandler({ timeout: 5000 })) as {
+        content: Array<{ type: string; text: string }>;
+      };
+      parsed = JSON.parse(result.content[0].text);
+    } while (parsed.status === "output");
+
+    expect(parsed.status).toBe("awaiting_input");
+    expect(logEmbeddedSpy).toHaveBeenCalledWith("[request_input] Enter name:");
+
+    // Clean up
+    const sendInputHandler = getToolHandler("send_input");
+    await sendInputHandler({ text: "Alice" });
+    await inputPromise;
+  });
+
+  test("send_input logs input via logger when provided", async () => {
+    const fsmPath = writeTrivialFsm(tmp);
+
+    mockQueryResults.push({
+      type: "result",
+      subtype: "success",
+      result: "Done",
+      duration_ms: 100,
+      is_error: false,
+      num_turns: 1,
+    });
+
+    const logger = new DualStreamLogger();
+    const logInputSpy = vi.spyOn(logger, "logInput");
+
+    createVerifierMcpServer({ logger });
+    const startHandler = getToolHandler("start_embedded_run");
+    const sendInputHandler = getToolHandler("send_input");
+
+    await startHandler({ fsm_path: fsmPath, root: tmp });
+
+    // Get request_input handler
+    const embeddedToolCalls = vi.mocked(tool).mock.calls;
+    const requestInputCall = embeddedToolCalls.find((c) => c[0] === "request_input");
+    const requestInputHandler = requestInputCall?.[3] as (args: {
+      prompt: string;
+    }) => Promise<unknown>;
+
+    // Trigger a pending input request
+    const inputPromise = requestInputHandler({ prompt: "Enter value:" });
+    await new Promise((r) => setTimeout(r, 10));
+
+    await sendInputHandler({ text: "42" });
+    expect(logInputSpy).toHaveBeenCalledWith("42");
+
+    await inputPromise;
   });
 
   test("send_input errors when no request is pending", async () => {
