@@ -431,7 +431,6 @@ describe("run command — allowed_tools", () => {
     // MCP tools are always present
     expect(allowedTools).toContain("mcp__freefsm__fsm_goto");
     expect(allowedTools).toContain("mcp__freefsm__fsm_current");
-    expect(allowedTools).toContain("mcp__freefsm__request_input");
 
     // User-specified tools are present
     expect(allowedTools).toContain("Read");

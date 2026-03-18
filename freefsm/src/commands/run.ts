@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { createSdkMcpServer, query, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
@@ -207,72 +206,14 @@ export function createFsmMcpServer(
     }
   });
 
-  // In CLI mode, add request_input tool for stdin interaction
-  const tools = bus
-    ? [fsmGoto, fsmCurrent]
-    : [fsmGoto, fsmCurrent, createRequestInputTool(logFn)];
-
   return createSdkMcpServer({
     name: "freefsm",
     version: "1.0.0",
-    tools,
+    tools: [fsmGoto, fsmCurrent],
   });
 }
 
-function createRequestInputTool(
-  logFn: (msg: string, color?: string) => void,
-) {
-  return tool(
-    "request_input",
-    "Ask the human for input via stdin",
-    {
-      prompt: z.string().describe("The question to ask the human"),
-    },
-    async (args) => {
-      logFn(`request_input: ${args.prompt}`, c.magenta);
-      process.stderr.write(`${args.prompt}\n`);
-
-      return new Promise<{
-        content: Array<{ type: "text"; text: string }>;
-      }>((resolve) => {
-        const rl = createInterface({
-          input: process.stdin,
-          terminal: false,
-        });
-
-        let resolved = false;
-
-        rl.once("line", (line) => {
-          resolved = true;
-          rl.close();
-          resolve({
-            content: [{ type: "text" as const, text: line }],
-          });
-        });
-
-        rl.once("close", () => {
-          if (resolved) return;
-          resolve({
-            content: [
-              {
-                type: "text" as const,
-                text: "EOF: stdin closed, no input available",
-              },
-            ],
-          });
-        });
-      });
-    },
-  );
-}
-
-const MCP_TOOL_NAMES_CLI = [
-  "mcp__freefsm__fsm_goto",
-  "mcp__freefsm__fsm_current",
-  "mcp__freefsm__request_input",
-];
-
-const MCP_TOOL_NAMES_EMBEDDED = [
+const MCP_TOOL_NAMES = [
   "mcp__freefsm__fsm_goto",
   "mcp__freefsm__fsm_current",
 ];
@@ -334,7 +275,7 @@ export async function runCore(
   const systemPrompt = buildSystemPrompt(fsm);
 
   const allowedTools = fsm.allowed_tools
-    ? [...(opts.bus ? MCP_TOOL_NAMES_EMBEDDED : MCP_TOOL_NAMES_CLI), ...fsm.allowed_tools]
+    ? [...MCP_TOOL_NAMES, ...fsm.allowed_tools]
     : undefined;
 
   const queryOpts = {
@@ -382,9 +323,7 @@ export async function runCore(
         if (resultMsg.is_error) {
           isError = true;
         }
-        if (opts.bus) {
-          opts.bus.appendOutput(resultMsg.result);
-        } else {
+        if (!opts.bus) {
           process.stdout.write(`${resultMsg.result}\n`);
         }
       }

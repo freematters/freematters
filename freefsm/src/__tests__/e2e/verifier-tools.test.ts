@@ -150,6 +150,10 @@ describe("Verifier MCP Tools", () => {
     const fsmPath = writeNonTerminalFsm(tmp);
 
     mockQueryResults.push({
+      type: "assistant",
+      message: { content: [{ type: "text", text: "Hello from agent" }] },
+    });
+    mockQueryResults.push({
       type: "result",
       subtype: "success",
       result: "Hello from agent",
@@ -269,6 +273,10 @@ describe("Verifier MCP Tools", () => {
   test("wait logs embedded output via logger when provided", async () => {
     const fsmPath = writeNonTerminalFsm(tmp);
 
+    mockQueryResults.push({
+      type: "assistant",
+      message: { content: [{ type: "text", text: "Hello from agent" }] },
+    });
     mockQueryResults.push({
       type: "result",
       subtype: "success",

@@ -115,13 +115,12 @@ function setupHandlers(): {
 // ─── MCP tool registration ──────────────────────────────────────
 
 describe("MCP tool registration", () => {
-  test("registers fsm_goto, fsm_current, and request_input tools", () => {
+  test("registers fsm_goto and fsm_current tools", () => {
     setupHandlers();
 
     const names = toolDefinitions.map((t) => t.name);
     expect(names).toContain("fsm_goto");
     expect(names).toContain("fsm_current");
-    expect(names).toContain("request_input");
   });
 
   test("createSdkMcpServer is called with tool definitions", () => {
@@ -130,7 +129,7 @@ describe("MCP tool registration", () => {
     const mockCreateServer = vi.mocked(createSdkMcpServer);
     expect(mockCreateServer).toHaveBeenCalledTimes(1);
     const opts = mockCreateServer.mock.calls[0][0] as { tools?: unknown[] };
-    expect(opts.tools).toHaveLength(3);
+    expect(opts.tools).toHaveLength(2);
   });
 });
 

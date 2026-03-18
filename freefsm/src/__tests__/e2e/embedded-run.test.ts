@@ -87,8 +87,12 @@ describe("EmbeddedRun", () => {
     expect(run.getStoreRoot()).toBe(tmp);
   });
 
-  test("turn_complete contains agent result text", async () => {
+  test("turn_complete contains agent assistant text", async () => {
     const fsmPath = writeTerminalFsm(tmp);
+    mockQueryResults.push({
+      type: "assistant",
+      message: { content: [{ type: "text", text: "Final answer" }] },
+    });
     mockQueryResults.push({
       type: "result",
       subtype: "success",
