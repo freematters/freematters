@@ -32,6 +32,7 @@ export interface RunCoreOptions {
   model?: string;
   bus?: MessageBus;
   logFn?: (msg: string, color?: string) => void;
+  additionalMcpServers?: Record<string, unknown>;
 }
 
 export function generateRunId(fsmPath: string): string {
@@ -337,7 +338,7 @@ export async function runCore(
     systemPrompt,
     permissionMode: "bypassPermissions" as const,
     allowDangerouslySkipPermissions: true,
-    mcpServers: { freefsm: fsmServer },
+    mcpServers: { freefsm: fsmServer, ...opts.additionalMcpServers },
     ...(allowedTools !== undefined && { allowedTools }),
     ...(opts.model !== undefined && { model: opts.model }),
   };
@@ -353,6 +354,31 @@ export async function runCore(
     const session = query({ prompt, options: queryOpts });
     for await (const message of session) {
       logSdkMessage(message, { sessionNum: attempt });
+
+      if (opts.bus && message.type === "assistant") {
+        // Embedded mode: route assistant text and tool use to bus
+        const msg = message as {
+          type: "assistant";
+          message: {
+            content: Array<{
+              type: string;
+              text?: string;
+              name?: string;
+              input?: Record<string, unknown>;
+            }>;
+          };
+        };
+        for (const block of msg.message.content) {
+          if (block.type === "text" && block.text) {
+            opts.bus.enqueueOutput(block.text);
+          } else if (block.type === "tool_use" && block.name) {
+            opts.bus.enqueueOutput(
+              `[tool_use] ${block.name}(${JSON.stringify(block.input ?? {})})`,
+            );
+          }
+        }
+      }
+
       if (message.type === "result") {
         const resultMsg = message as {
           type: "result";

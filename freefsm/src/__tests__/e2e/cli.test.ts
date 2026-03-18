@@ -38,10 +38,9 @@ describe("freefsm e2e verify — CLI arg validation", () => {
     expect(exitCode).not.toBe(0);
   });
 
-  test("exits with error on empty plan file", () => {
-    const planPath = join(tmp, "empty-plan.md");
-    writeFileSync(planPath, "", "utf-8");
-    const testDir = join(tmp, "empty-out");
+  test("exits with error when plan file does not exist", () => {
+    const planPath = join(tmp, "nonexistent-plan.md");
+    const testDir = join(tmp, "noplan-out");
     const { exitCode, stdout } = run(
       `e2e verify ${planPath} --test-dir ${testDir} -j`,
       { expectFail: true },

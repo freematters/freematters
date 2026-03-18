@@ -1,4 +1,4 @@
-import { constants, accessSync, mkdirSync, readFileSync } from "node:fs";
+import { constants, accessSync, existsSync, mkdirSync } from "node:fs";
 import { verifyCore } from "../../e2e/verify-runner.js";
 import { CliError } from "../../errors.js";
 import { handleError, jsonSuccess, printJson } from "../../output.js";
@@ -12,18 +12,9 @@ export interface VerifyArgs {
 
 export async function verify(args: VerifyArgs): Promise<void> {
   try {
-    // Read the test plan file (raw markdown)
-    let planMarkdown: string;
-    try {
-      planMarkdown = readFileSync(args.planPath, "utf-8");
-    } catch {
+    // Verify the test plan file exists
+    if (!existsSync(args.planPath)) {
       throw new CliError("ARGS_INVALID", `Cannot read test plan: ${args.planPath}`, {
-        context: { fsmPath: args.planPath },
-      });
-    }
-
-    if (!planMarkdown.trim()) {
-      throw new CliError("ARGS_INVALID", "Test plan file is empty", {
         context: { fsmPath: args.planPath },
       });
     }
@@ -47,9 +38,9 @@ export async function verify(args: VerifyArgs): Promise<void> {
       process.stdout.write(`Output: ${args.testDir}\n`);
     }
 
-    // Execute the verification loop
+    // Execute the verification via freefsm run with verifier.fsm.yaml
     const result = await verifyCore({
-      planMarkdown,
+      planPath: args.planPath,
       testDir: args.testDir,
       model: args.model,
     });
@@ -58,11 +49,9 @@ export async function verify(args: VerifyArgs): Promise<void> {
       printJson(
         jsonSuccess("Verification complete", {
           reportPath: result.reportPath,
-          summary: result.summary,
         }),
       );
     } else {
-      process.stdout.write(`\n${result.summary}\n`);
       process.stdout.write(`Report: ${result.reportPath}\n`);
     }
   } catch (err: unknown) {
