@@ -52,7 +52,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
           content: [
             {
               type: "text" as const,
-              text: JSON.stringify({ ok: true, session_id: session.getSessionId() }),
+              text: JSON.stringify({ ok: true }),
             },
           ],
         };
