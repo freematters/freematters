@@ -2,7 +2,6 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { logSdkMessage } from "../agent-log.js";
 import { DualStreamLogger } from "./dual-stream-logger.js";
 import type { TestPlan } from "./parser.js";
 import {
@@ -164,9 +163,8 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
 
     for await (const message of session) {
       logger.processMessage(message);
-      logSdkMessage(message);
 
-      // Log verifier's assistant text via DualStreamLogger
+      // Log verifier's assistant text via DualStreamLogger (no tool output)
       if (message.type === "assistant") {
         const msg = message as {
           type: "assistant";
