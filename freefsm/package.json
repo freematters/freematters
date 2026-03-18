@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:claude": "vitest run --config vitest.claude.config.ts",
     "test:watch": "vitest",
     "fmt": "biome format --write .",
     "lint": "biome lint .",
