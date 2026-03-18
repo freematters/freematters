@@ -32,14 +32,15 @@ export class AgentSession {
     this.onToolUse = options.onToolUse;
     this.session = unstable_v2_createSession({
       model: options.model ?? "claude-sonnet-4-6",
-      permissionMode: "acceptEdits",
-      allowedTools: ["Bash", "Read", "Write", "Edit", "Glob", "Grep", "Agent", "Skill", "NotebookEdit"],
+      permissionMode: "bypassPermissions",
+      dangerouslySkipPermissions: true,
+      settingSources: ["user", "project", "local"],
       disallowedTools: options.disallowedTools ?? [
         "AskUserQuestion",
         "ExitPlanMode",
         "EnterPlanMode",
       ],
-    });
+    } as Parameters<typeof unstable_v2_createSession>[0]);
   }
 
   /**
