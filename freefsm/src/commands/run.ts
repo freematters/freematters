@@ -53,7 +53,7 @@ function buildSystemPrompt(fsm: Fsm): string {
     .replace("{{FSM_GUIDE}}", fsm.guide ?? "No guide provided.");
 }
 
-function createFsmMcpServer(
+export function createFsmMcpServer(
   fsm: Fsm,
   store: Store,
   runId: string,
