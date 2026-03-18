@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { handlePostToolUse, type HookInput } from "../hooks/post-tool-use.js";
+import { type HookInput, handlePostToolUse } from "../hooks/post-tool-use.js";
 import { Store } from "../store.js";
 
 const CLI = resolve(__dirname, "../../dist/cli.js");
@@ -109,7 +109,6 @@ function runJson(
     throw err;
   }
 }
-
 
 // ─── CLI — start command ─────────────────────────────────────────
 
@@ -381,10 +380,7 @@ function hookInput(overrides: Partial<HookInput> = {}): HookInput {
 describe.concurrent("Hook — post-tool-use", () => {
   test("no output when no active run", () => {
     const hookRoot = join(tmp, "hook-empty");
-    const result = handlePostToolUse(
-      hookInput({ session_id: "sess-1" }),
-      hookRoot,
-    );
+    const result = handlePostToolUse(hookInput({ session_id: "sess-1" }), hookRoot);
     expect(result).toBeNull();
   });
 
@@ -446,18 +442,12 @@ describe.concurrent("Hook — post-tool-use", () => {
 
     // Calls 2-4: no reminder
     for (let i = 0; i < 3; i++) {
-      const r = handlePostToolUse(
-        hookInput({ session_id: "counter-sess" }),
-        hookRoot,
-      );
+      const r = handlePostToolUse(hookInput({ session_id: "counter-sess" }), hookRoot);
       expect(r).toBeNull();
     }
 
     // Call 5: reminder
-    const r5 = handlePostToolUse(
-      hookInput({ session_id: "counter-sess" }),
-      hookRoot,
-    );
+    const r5 = handlePostToolUse(hookInput({ session_id: "counter-sess" }), hookRoot);
     expect(r5).not.toBeNull();
     expect(r5).toContain("[FSM Reminder]");
     expect(r5).toContain("Begin work.");

@@ -91,7 +91,14 @@ function mockQueryResult(messages: SDKMessage[]): void {
         if (snap?.run_status === "active") {
           store.commit(
             runs[0],
-            { event: "goto", from_state: snap.state, to_state: "done", on_label: "next", actor: "agent", reason: null },
+            {
+              event: "goto",
+              from_state: snap.state,
+              to_state: "done",
+              on_label: "next",
+              actor: "agent",
+              reason: null,
+            },
             { run_status: "completed", state: "done" },
           );
         }
