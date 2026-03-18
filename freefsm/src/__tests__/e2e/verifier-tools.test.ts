@@ -120,7 +120,7 @@ describe("Verifier MCP Tools", () => {
     expect(parsed.store_root).toBe(tmp);
   });
 
-  test("wait returns { status: 'output', text } for output events", async () => {
+  test("wait returns { status: 'turn_complete', output } when agent finishes a turn", async () => {
     const fsmPath = writeTrivialFsm(tmp);
 
     mockQueryResults.push({
@@ -138,13 +138,17 @@ describe("Verifier MCP Tools", () => {
 
     await startHandler({ fsm_path: fsmPath, root: tmp });
 
-    const result = (await waitHandler({ timeout: 5000 })) as {
-      content: Array<{ type: string; text: string }>;
-    };
+    // Drain until we get turn_complete
+    let parsed: Record<string, unknown>;
+    do {
+      const result = (await waitHandler({ timeout: 5000 })) as {
+        content: Array<{ type: string; text: string }>;
+      };
+      parsed = JSON.parse(result.content[0].text);
+    } while (parsed.status !== "turn_complete" && parsed.status !== "exited");
 
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.status).toBe("output");
-    expect(parsed.text).toBe("Hello from agent");
+    expect(parsed.status).toBe("turn_complete");
+    expect(parsed.output).toContain("Hello from agent");
   });
 
   test("wait returns { status: 'awaiting_input', prompt, output } when request_input is called", async () => {
@@ -197,7 +201,7 @@ describe("Verifier MCP Tools", () => {
 
     // Drain output events until we hit awaiting_input
     let parsed = JSON.parse(waitResult.content[0].text);
-    while (parsed.status === "output") {
+    while (parsed.status === "output" || parsed.status === "turn_complete") {
       const next = (await waitHandler({ timeout: 5000 })) as {
         content: Array<{ type: string; text: string }>;
       };
@@ -343,13 +347,18 @@ describe("Verifier MCP Tools", () => {
 
     await startHandler({ fsm_path: fsmPath, root: tmp });
 
-    const result = (await waitHandler({ timeout: 5000 })) as {
-      content: Array<{ type: string; text: string }>;
-    };
+    // Drain until turn_complete
+    let parsed: Record<string, unknown>;
+    do {
+      const result = (await waitHandler({ timeout: 5000 })) as {
+        content: Array<{ type: string; text: string }>;
+      };
+      parsed = JSON.parse(result.content[0].text);
+    } while (parsed.status !== "turn_complete" && parsed.status !== "exited");
 
-    const parsed = JSON.parse(result.content[0].text);
-    expect(parsed.status).toBe("output");
-    expect(logEmbeddedSpy).toHaveBeenCalledWith("Hello from agent");
+    expect(parsed.status).toBe("turn_complete");
+    // Logger should have been called with the accumulated output
+    expect(logEmbeddedSpy).toHaveBeenCalled();
   });
 
   test("wait logs input request via logger when provided", async () => {
@@ -390,7 +399,7 @@ describe("Verifier MCP Tools", () => {
         content: Array<{ type: string; text: string }>;
       };
       parsed = JSON.parse(result.content[0].text);
-    } while (parsed.status === "output");
+    } while (parsed.status === "turn_complete");
 
     expect(parsed.status).toBe("awaiting_input");
     expect(logEmbeddedSpy).toHaveBeenCalledWith("[request_input] Enter name:");

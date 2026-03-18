@@ -1,12 +1,16 @@
 /**
  * MessageBus — communication channel between the embedded agent and verifier.
  *
- * The embedded agent enqueues output and input requests.
- * The verifier waits for events and resolves input requests.
+ * The embedded agent appends output and signals turn boundaries.
+ * The verifier waits for events (turn_complete, input_request, exited)
+ * and resolves input requests.
+ *
+ * Individual output (assistant text, tool calls) is buffered and only
+ * delivered as part of turn_complete, input_request, or exited events.
  */
 
 export type BusEvent =
-  | { type: "output"; text: string }
+  | { type: "turn_complete"; output: string }
   | { type: "input_request"; prompt: string; output: string }
   | { type: "exited"; code: number; output: string };
 
@@ -19,19 +23,27 @@ export class MessageBus {
   private accumulatedOutput: string[] = [];
 
   /**
-   * Enqueue an output event from the embedded agent.
-   * Output text is also accumulated for inclusion in subsequent
-   * input_request and exited events.
+   * Append output text to the buffer. No event is pushed —
+   * the text will be included in the next turn_complete, input_request,
+   * or exited event.
    */
-  enqueueOutput(text: string): void {
+  appendOutput(text: string): void {
     this.accumulatedOutput.push(text);
-    this.pushEvent({ type: "output", text });
+  }
+
+  /**
+   * Signal that the embedded agent finished a turn.
+   * Pushes a turn_complete event with all accumulated output.
+   */
+  enqueueTurnComplete(): void {
+    const output = this.drainAccumulatedOutput();
+    this.pushEvent({ type: "turn_complete", output });
   }
 
   /**
    * Enqueue an input request from the embedded agent.
    * Returns a Promise that resolves when the verifier calls resolveInput().
-   * Also pushes an input_request event to the event queue.
+   * Pushes an input_request event with all accumulated output.
    */
   enqueueInputRequest(prompt: string): Promise<string> {
     const output = this.drainAccumulatedOutput();
@@ -51,7 +63,6 @@ export class MessageBus {
     // If there's already an event in the queue, return it immediately
     const next = this.eventQueue.shift();
     if (next) {
-      this.consumeAccumulated(next);
       return Promise.resolve(next);
     }
 
@@ -65,7 +76,6 @@ export class MessageBus {
       this.pendingWaiter = {
         resolve: (event: BusEvent) => {
           clearTimeout(timer);
-          this.consumeAccumulated(event);
           resolve(event);
         },
         reject: (err: Error) => {
@@ -91,7 +101,7 @@ export class MessageBus {
 
   /**
    * Mark the embedded agent as exited.
-   * Pushes an exited event with the accumulated output.
+   * Pushes an exited event with all accumulated output.
    */
   markExited(code: number): void {
     const output = this.drainAccumulatedOutput();
@@ -105,19 +115,6 @@ export class MessageBus {
       waiter.resolve(event);
     } else {
       this.eventQueue.push(event);
-    }
-  }
-
-  /**
-   * When an output event is consumed via waitForEvent, remove its text
-   * from the accumulator so it doesn't appear again in input_request/exited.
-   */
-  private consumeAccumulated(event: BusEvent): void {
-    if (event.type === "output") {
-      const idx = this.accumulatedOutput.indexOf(event.text);
-      if (idx !== -1) {
-        this.accumulatedOutput.splice(idx, 1);
-      }
     }
   }
 

@@ -370,9 +370,9 @@ export async function runCore(
         };
         for (const block of msg.message.content) {
           if (block.type === "text" && block.text) {
-            opts.bus.enqueueOutput(block.text);
+            opts.bus.appendOutput(block.text);
           } else if (block.type === "tool_use" && block.name) {
-            opts.bus.enqueueOutput(
+            opts.bus.appendOutput(
               `[tool_use] ${block.name}(${JSON.stringify(block.input ?? {})})`,
             );
           }
@@ -389,8 +389,9 @@ export async function runCore(
           isError = true;
         }
         if (opts.bus) {
-          // Embedded mode: route result to bus
-          opts.bus.enqueueOutput(resultMsg.result);
+          // Embedded mode: route result to bus, then signal turn complete
+          opts.bus.appendOutput(resultMsg.result);
+          opts.bus.enqueueTurnComplete();
         } else {
           // CLI mode: write to stdout
           process.stdout.write(`${resultMsg.result}\n`);

@@ -56,7 +56,7 @@ export class EmbeddedRun {
       })
       .catch((err: unknown) => {
         const msg = err instanceof Error ? err.message : String(err);
-        this.bus.enqueueOutput(`[embedded error] ${msg}`);
+        this.bus.appendOutput(`[embedded error] ${msg}`);
         this.bus.markExited(1);
       });
   }

@@ -81,7 +81,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
 
   const wait = tool(
     "wait",
-    "Wait for the next event from the embedded agent. Returns status: output, awaiting_input, exited, or timeout.",
+    "Wait for the embedded agent to complete a turn, request input, or exit. Returns status: turn_complete, awaiting_input, exited, or timeout.",
     {
       timeout: z
         .number()
@@ -106,16 +106,6 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
         const event = await activeRun.bus.waitForEvent(args.timeout);
 
         switch (event.type) {
-          case "output":
-            logger?.logEmbedded(event.text);
-            return {
-              content: [
-                {
-                  type: "text" as const,
-                  text: JSON.stringify({ status: "output", text: event.text }),
-                },
-              ],
-            };
           case "input_request":
             if (event.output) {
               logger?.logEmbedded(event.output);
@@ -128,6 +118,21 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
                   text: JSON.stringify({
                     status: "awaiting_input",
                     prompt: event.prompt,
+                    output: event.output,
+                  }),
+                },
+              ],
+            };
+          case "turn_complete":
+            if (event.output) {
+              logger?.logEmbedded(event.output);
+            }
+            return {
+              content: [
+                {
+                  type: "text" as const,
+                  text: JSON.stringify({
+                    status: "turn_complete",
                     output: event.output,
                   }),
                 },

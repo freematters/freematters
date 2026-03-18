@@ -24,6 +24,9 @@ guide: |
   ### wait
   Wait for the next event from the embedded agent. Returns one of:
   - `{ status: "output", text }` — the embedded agent produced text output
+    (assistant text, tool_use calls are also surfaced as output)
+  - `{ status: "turn_complete", output }` — the embedded agent finished its turn
+    (all pending work done, accumulated output since last event included)
   - `{ status: "awaiting_input", prompt, output }` — the embedded agent is requesting
     user input via `request_input`
   - `{ status: "exited", code, output }` — the embedded agent session has ended

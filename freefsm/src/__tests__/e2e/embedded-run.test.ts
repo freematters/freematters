@@ -206,10 +206,10 @@ describe("EmbeddedRun", () => {
       events.push(ev);
     } while (ev.type !== "exited");
 
-    // Should have an output event with the result text
-    const outputEvents = events.filter((e) => e.type === "output");
-    const allOutput = outputEvents
-      .map((e) => (e as { type: "output"; text: string }).text)
+    // Result text should be in turn_complete or exited event output
+    const allOutput = events
+      .filter((e) => "output" in e)
+      .map((e) => (e as { output: string }).output)
       .join("\n");
     expect(allOutput).toContain("Final answer from agent");
   });
