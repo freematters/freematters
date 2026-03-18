@@ -1,0 +1,112 @@
+# Flow:
+#
+#   gather-context → write-plan → validate → done
+#
+
+version: 1
+guide: |
+  E2E test plan generator workflow. Produces a structured markdown test plan
+  compatible with `freefsm e2e verify`.
+
+  The user provides a target workflow YAML, feature description, or codebase context.
+  The agent explores the code, designs test scenarios, and writes a test plan file.
+
+  The generated test plan describes an embedded verification scenario where a verifier
+  agent interacts with a freefsm run via `start_embedded_run`, `wait`, and `send_input`
+  MCP tools — NOT via CLI commands.
+
+  Rules:
+  - Ask the user what to test and where to write the output.
+  - The generated test plan MUST conform to the parser format (see write-plan state).
+
+initial: gather-context
+
+states:
+  gather-context:
+    prompt: |
+      ## Gather Context
+
+      Ask the user:
+      1. What should be tested? (workflow YAML path, feature description, or both)
+      2. Where should the test plan be written? (file path, default: `e2e/<name>.md`)
+
+      Then explore the relevant code and workflow to understand:
+      - What the feature or workflow does
+      - Key states, transitions, and edge cases
+      - What user input the workflow expects (via `request_input`)
+      - What output the agent produces at each state
+
+      Summarize your understanding and confirm with the user before proceeding.
+    transitions:
+      context gathered: write-plan
+
+  write-plan:
+    prompt: |
+      ## Write Test Plan
+
+      Write a test plan markdown file to the path agreed with the user.
+
+      The file MUST follow this exact format for `freefsm e2e verify` compatibility:
+
+      ```
+      # Test: <descriptive test name>
+
+      ## Setup
+      - Workflow: <path to the FSM YAML file to test>
+      - <any other prerequisites — files that must exist, env setup, etc.>
+
+      ## Steps
+      1. **<Step name>**: <What to observe or what input to provide>
+         - Expected: <What the embedded agent should do — output text, state transition, prompt>
+      2. **<Step name>**: <Description>
+         - Expected: <Expected behavior>
+
+      ## Expected Outcomes
+      - <High-level outcome that should be true when all steps pass>
+      - <Another overall outcome>
+
+      ## Cleanup
+      - <Cleanup action — remove temp files, reset state>
+      ```
+
+      Important guidelines for the embedded verify approach:
+      - The verifier does NOT run CLI commands. It starts an embedded `freefsm run`
+        and interacts via `wait()` (to observe output and input requests) and
+        `send_input()` (to provide user input).
+      - Steps should describe the INTERACTION, not CLI commands:
+        - "Wait for the agent to request input" not "Run freefsm run ..."
+        - "Provide '1' as input when asked to choose" not "echo 1 | ..."
+        - "Observe that the agent transitions to state X" not "Check snapshot.json"
+      - The Setup section MUST include a `Workflow:` line with the FSM YAML path.
+        The verifier uses this to start the embedded run.
+      - Steps should be numbered (`1.`, `2.`, etc.)
+      - Step names must be in `**bold**` followed by `:` and the description
+      - Each step must have a `- Expected:` line indented below it
+      - Cover both the interaction flow (inputs/outputs) and state transitions
+      - Include enough detail for the verifier agent to know what input to provide
+    transitions:
+      plan written: validate
+
+  validate:
+    prompt: |
+      ## Validate Test Plan
+
+      Show the user a brief summary of the test plan:
+      - Number of steps
+      - What the plan covers
+      - Which workflow is being tested
+
+      Ask the user if they want any changes before finalizing.
+    transitions:
+      validated: done
+      needs changes: write-plan
+
+  done:
+    prompt: |
+      The test plan has been generated and validated.
+      Tell the user the file path and how to run it:
+
+      ```
+      freefsm e2e verify <plan-path> --test-dir <output-dir>
+      ```
+    transitions: {}
