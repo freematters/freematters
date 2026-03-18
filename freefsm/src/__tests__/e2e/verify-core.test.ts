@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -87,13 +87,12 @@ describe("buildTestPlanContext", () => {
   });
 });
 
-describe("verifyCore — agent execution loop", () => {
+describe("verifyCore — new embedded approach", () => {
   test("creates transcript.jsonl and api.jsonl in test-dir", async () => {
-    // Simulate agent producing an assistant message then a result
     mockMessages.push({
       type: "assistant",
       message: {
-        content: [{ type: "text", text: "Executing step 1..." }],
+        content: [{ type: "text", text: "Starting embedded run..." }],
       },
       uuid: "msg-1",
       session_id: "sess-1",
@@ -151,14 +150,13 @@ describe("verifyCore — agent execution loop", () => {
 
     const entries = readJsonl<TranscriptEntry>(join(tmp, "transcript.jsonl"));
     expect(entries.length).toBeGreaterThanOrEqual(1);
-    // Should have the assistant message logged
     const assistantEntry = entries.find((e) =>
       e.content.includes("Running setup steps"),
     );
     expect(assistantEntry).toBeDefined();
   });
 
-  test("calls query with FSM system prompt and test plan in initial message", async () => {
+  test("calls query with verifier system prompt and test plan as initial message", async () => {
     mockMessages.push({
       type: "result",
       subtype: "success",
@@ -179,13 +177,39 @@ describe("verifyCore — agent execution loop", () => {
 
     expect(query).toHaveBeenCalledOnce();
     const callArgs = vi.mocked(query).mock.calls[0][0];
-    // System prompt now contains FSM template (not the test plan directly)
-    expect(callArgs.options?.systemPrompt).toContain("FSM");
-    expect(callArgs.options?.systemPrompt).toContain("fsm_goto");
+    // System prompt should explain verifier tools (start_embedded_run, wait, send_input)
+    expect(callArgs.options?.systemPrompt).toContain("start_embedded_run");
+    expect(callArgs.options?.systemPrompt).toContain("wait");
+    expect(callArgs.options?.systemPrompt).toContain("send_input");
     // Test plan info is in the initial message (prompt)
     const prompt = callArgs.prompt as string;
     expect(prompt).toContain("Basic workflow test");
     expect(prompt).toContain("Start workflow");
+  });
+
+  test("query is called with mcpServers including freefsm-verifier", async () => {
+    mockMessages.push({
+      type: "result",
+      subtype: "success",
+      result: "Done",
+      duration_ms: 500,
+      duration_api_ms: 400,
+      is_error: false,
+      num_turns: 1,
+      total_cost_usd: 0.002,
+      usage: { input_tokens: 30, output_tokens: 15, server_tool_use_input_tokens: 0 },
+      modelUsage: {},
+      permission_denials: [],
+      uuid: "msg-1",
+      session_id: "sess-1",
+    });
+
+    await verifyCore({ plan: SAMPLE_PLAN, testDir: tmp });
+
+    const callArgs = vi.mocked(query).mock.calls[0][0];
+    expect(callArgs.options?.mcpServers).toBeDefined();
+    // The verifier MCP server should be provided (key name may vary)
+    expect(callArgs.options?.mcpServers).toHaveProperty("freefsm-verifier");
   });
 
   test("generates test-report.md and returns VerifyCoreResult", async () => {
@@ -231,7 +255,7 @@ describe("verifyCore — agent execution loop", () => {
     expect(result.reportPath).toBe(join(tmp, "test-report.md"));
   });
 
-  test("query does NOT bypass permissions by default", async () => {
+  test("query always bypasses permissions", async () => {
     mockMessages.push({
       type: "result",
       subtype: "success",
@@ -249,34 +273,6 @@ describe("verifyCore — agent execution loop", () => {
     });
 
     await verifyCore({ plan: SAMPLE_PLAN, testDir: tmp });
-
-    const callArgs = vi.mocked(query).mock.calls[0][0];
-    expect(callArgs.options?.permissionMode).toBeUndefined();
-    expect(callArgs.options?.allowDangerouslySkipPermissions).toBeUndefined();
-  });
-
-  test("query bypasses permissions when dangerouslyBypassPermissions is set", async () => {
-    mockMessages.push({
-      type: "result",
-      subtype: "success",
-      result: "Done",
-      duration_ms: 500,
-      duration_api_ms: 400,
-      is_error: false,
-      num_turns: 1,
-      total_cost_usd: 0.002,
-      usage: { input_tokens: 30, output_tokens: 15, server_tool_use_input_tokens: 0 },
-      modelUsage: {},
-      permission_denials: [],
-      uuid: "msg-1",
-      session_id: "sess-1",
-    });
-
-    await verifyCore({
-      plan: SAMPLE_PLAN,
-      testDir: tmp,
-      dangerouslyBypassPermissions: true,
-    });
 
     const callArgs = vi.mocked(query).mock.calls[0][0];
     expect(callArgs.options?.permissionMode).toBe("bypassPermissions");
@@ -308,5 +304,75 @@ describe("verifyCore — agent execution loop", () => {
 
     const callArgs = vi.mocked(query).mock.calls[0][0];
     expect(callArgs.options?.model).toBe("claude-opus-4-20250514");
+  });
+
+  test("does not load verifier.fsm.yaml (no FSM-driven approach)", async () => {
+    mockMessages.push({
+      type: "result",
+      subtype: "success",
+      result: "Done",
+      duration_ms: 500,
+      duration_api_ms: 400,
+      is_error: false,
+      num_turns: 1,
+      total_cost_usd: 0.002,
+      usage: { input_tokens: 30, output_tokens: 15, server_tool_use_input_tokens: 0 },
+      modelUsage: {},
+      permission_denials: [],
+      uuid: "msg-1",
+      session_id: "sess-1",
+    });
+
+    await verifyCore({ plan: SAMPLE_PLAN, testDir: tmp });
+
+    const callArgs = vi.mocked(query).mock.calls[0][0];
+    // System prompt should NOT contain fsm_goto (old FSM-driven approach)
+    expect(callArgs.options?.systemPrompt).not.toContain("fsm_goto");
+    expect(callArgs.options?.systemPrompt).not.toContain("fsm_current");
+  });
+
+  test("DualStreamLogger is used for verifier agent output", async () => {
+    mockMessages.push({
+      type: "assistant",
+      message: {
+        content: [{ type: "text", text: "Verifier is running..." }],
+      },
+      uuid: "msg-1",
+      session_id: "sess-1",
+      parent_tool_use_id: null,
+    });
+    mockMessages.push({
+      type: "result",
+      subtype: "success",
+      result: "Done",
+      duration_ms: 500,
+      duration_api_ms: 400,
+      is_error: false,
+      num_turns: 1,
+      total_cost_usd: 0.002,
+      usage: { input_tokens: 30, output_tokens: 15, server_tool_use_input_tokens: 0 },
+      modelUsage: {},
+      permission_denials: [],
+      uuid: "msg-1",
+      session_id: "sess-1",
+    });
+
+    // Capture stderr to check for DualStreamLogger output
+    const stderrWrites: string[] = [];
+    const origWrite = process.stderr.write;
+    process.stderr.write = ((chunk: string) => {
+      stderrWrites.push(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      await verifyCore({ plan: SAMPLE_PLAN, testDir: tmp });
+    } finally {
+      process.stderr.write = origWrite;
+    }
+
+    // Should have [verifier] prefixed output on stderr
+    const verifierOutput = stderrWrites.find((s) => s.includes("[verifier]"));
+    expect(verifierOutput).toBeDefined();
   });
 });
