@@ -36,7 +36,9 @@ export function symlinkSessionLog(
   if (!logPath) return;
   try {
     symlinkSync(logPath, join(destDir, name));
-  } catch {
-    // Ignore if symlink already exists or fails
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") {
+      process.stderr.write(`Warning: failed to symlink session log: ${err}\n`);
+    }
   }
 }

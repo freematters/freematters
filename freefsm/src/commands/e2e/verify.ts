@@ -6,6 +6,7 @@ import { handleError, jsonSuccess, printJson } from "../../output.js";
 export interface VerifyArgs {
   planPath: string;
   testDir: string;
+  root: string;
   json: boolean;
   model?: string;
   verbose?: boolean;
@@ -46,6 +47,7 @@ export async function verify(args: VerifyArgs): Promise<void> {
     const result = await verifyCore({
       planPath: args.planPath,
       testDir: args.testDir,
+      root: args.root,
       model: args.model,
       verbose: args.verbose,
     });

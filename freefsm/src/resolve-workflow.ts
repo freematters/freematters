@@ -35,11 +35,18 @@ function hasFsmExtension(name: string): boolean {
  * 4. If not found anywhere, throw with WORKFLOW_NOT_FOUND.
  */
 export function resolveWorkflow(input: string): string {
+  const isExplicitPath = input.includes("/") || input.startsWith(".");
+
   // If it already has an FSM extension, try as a direct path first
   if (hasFsmExtension(input)) {
     const abs = resolve(input);
     if (existsSync(abs)) return abs;
-    // Fall through to search dirs with the basename
+    if (isExplicitPath) {
+      throw new CliError("WORKFLOW_NOT_FOUND", `File not found: ${abs}`, {
+        context: { fsmPath: input },
+      });
+    }
+    // Bare name — fall through to search dirs
   } else {
     // Try as a direct path (e.g. user passed a full path without extension)
     const abs = resolve(input);

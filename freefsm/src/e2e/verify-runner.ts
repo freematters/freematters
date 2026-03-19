@@ -1,5 +1,4 @@
 import { existsSync } from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { query } from "@anthropic-ai/claude-agent-sdk";
@@ -14,6 +13,7 @@ const VERIFIER_FSM = resolve(__dirname, "../../workflows/verifier.fsm.yaml");
 export interface VerifyCoreArgs {
   planPath: string;
   testDir: string;
+  root?: string;
   model?: string;
   verbose?: boolean;
 }
@@ -102,10 +102,9 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
   // Symlink both Claude session JSONL logs into the verifier's FSM run dir.
   // We generated the run ID above, so the path is deterministic.
   const embeddedSessionId = verifierServer.embeddedSessionId;
-  const root = process.env.FREEFSM_ROOT ?? join(homedir(), ".freefsm");
-  const verifierRunDir = join(root, "runs", runId);
+  const verifierRunDir = args.root ? join(args.root, "runs", runId) : null;
 
-  if (existsSync(verifierRunDir)) {
+  if (verifierRunDir && existsSync(verifierRunDir)) {
     symlinkSessionLog(sessionId, verifierRunDir, "session.jsonl");
     symlinkSessionLog(embeddedSessionId, verifierRunDir, "embedded-session.jsonl");
   }

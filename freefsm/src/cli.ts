@@ -33,7 +33,8 @@ function resolveWorkflowOrExit(input: string, json: boolean): string {
   try {
     return resolveWorkflow(input);
   } catch (err: unknown) {
-    handleError(err, json);
+    handleError(err, json); // handleError is typed `never` (always exits)
+    process.exit(2); // unreachable — satisfies return type if handleError signature changes
   }
 }
 
@@ -201,10 +202,11 @@ program
   .option("--model <model>", "Claude model to use")
   .option("--verbose", "show tool calls in output")
   .action(async (planPath: string, opts: Record<string, unknown>, cmd: Command) => {
-    const { json } = getGlobalOpts(cmd);
+    const { root, json } = getGlobalOpts(cmd);
     await verify({
       planPath: resolve(planPath),
       testDir: resolve(opts.testDir as string),
+      root: resolveRoot(root),
       json: json ?? false,
       model: opts.model as string | undefined,
       verbose: (opts.verbose as boolean) ?? false,

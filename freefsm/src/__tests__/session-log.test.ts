@@ -147,7 +147,7 @@ describe("verifyCore session log symlinking (e2e)", () => {
   test("creates session.jsonl and embedded-session.jsonl symlinks in verifier run dir", async () => {
     const { verifyCore } = await import("../e2e/verify-runner.js");
 
-    await verifyCore({ planPath, testDir });
+    await verifyCore({ planPath, testDir, root: fsmRoot });
 
     // Find the verifier run dir (verifyCore generates verifier-<timestamp>)
     const { readdirSync } = await import("node:fs");
