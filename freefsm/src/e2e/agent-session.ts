@@ -58,12 +58,14 @@ export class AgentSession {
         return { output: output.join("\n---\n") || "[timeout]" };
       }
 
-      const timeoutPromise = new Promise<"timeout">((resolve) =>
-        setTimeout(() => resolve("timeout"), remaining),
-      );
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeoutPromise = new Promise<"timeout">((resolve) => {
+        timer = setTimeout(() => resolve("timeout"), remaining);
+      });
       const nextPromise = iterator.next().then((r) => r);
 
       const result = await Promise.race([nextPromise, timeoutPromise]);
+      clearTimeout(timer);
 
       if (result === "timeout") {
         return { output: output.join("\n---\n") || "[timeout]" };

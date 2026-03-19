@@ -1,0 +1,26 @@
+version: 1
+guide: |
+  This workflow tests running a bash task and showing the result.
+  1. In "run_task", run a bash command: `sleep 3 && date +%Y-%m-%d`
+     Run it in the background using the Bash tool with run_in_background: true.
+  2. Wait for the task to complete. Use TaskOutput to read the result.
+  3. Transition to "show_result" once you have the date.
+  4. In "show_result", output the date you received by printing it, then transition to "done".
+initial: run_task
+states:
+  run_task:
+    prompt: >
+      Run a bash command in the background: sleep 3 && date +%Y-%m-%d
+      Use the Bash tool with run_in_background set to true.
+      After the task completes, read the output with TaskOutput, then transition to show_result.
+    transitions:
+      got_date: show_result
+  show_result:
+    prompt: >
+      Output the date you received from the bash task.
+      Then transition to done.
+    transitions:
+      displayed: done
+  done:
+    prompt: "Workflow complete."
+    transitions: {}
