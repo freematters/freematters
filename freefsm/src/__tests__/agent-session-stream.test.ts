@@ -220,4 +220,46 @@ describe("AgentSession.stream()", () => {
     expect(result.output).toBe("Line 1\n---\nLine 2");
     expect(toolUses).toEqual(["Bash"]);
   });
+
+  test("yields result text as fallback when no prior content was emitted", async () => {
+    // Simulates unknown skill errors where only a result message is sent
+    mockMessages = [
+      { type: "result", is_error: false, result: "Unknown skill: nonexistent" },
+    ];
+
+    const { AgentSession } = await import("../e2e/agent-session.js");
+    const session = new AgentSession();
+    session.send("test");
+
+    const events: TurnEvent[] = [];
+    for await (const event of session.stream(5000)) {
+      events.push(event);
+    }
+    session.close();
+
+    expect(events).toEqual([{ type: "text", text: "Unknown skill: nonexistent" }]);
+  });
+
+  test("does not yield result text when prior content was already emitted", async () => {
+    mockMessages = [
+      {
+        type: "assistant",
+        message: { content: [{ type: "text", text: "Hello" }] },
+      },
+      { type: "result", is_error: false, result: "done" },
+    ];
+
+    const { AgentSession } = await import("../e2e/agent-session.js");
+    const session = new AgentSession();
+    session.send("test");
+
+    const events: TurnEvent[] = [];
+    for await (const event of session.stream(5000)) {
+      events.push(event);
+    }
+    session.close();
+
+    // Result text "done" should NOT appear since assistant text was already emitted
+    expect(events).toEqual([{ type: "text", text: "Hello" }]);
+  });
 });

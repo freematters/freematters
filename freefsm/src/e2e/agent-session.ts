@@ -62,6 +62,7 @@ export class AgentSession {
   async *stream(timeout: number): AsyncGenerator<TurnEvent> {
     const deadline = Date.now() + timeout;
     const iterator = this.session.stream();
+    let hasContent = false;
 
     while (true) {
       const remaining = deadline - Date.now();
@@ -85,7 +86,10 @@ export class AgentSession {
       }
 
       if (result.done) return;
-      yield* this.processMessage(result.value);
+      for (const event of this.processMessage(result.value, hasContent)) {
+        if (event.type === "text" || event.type === "error") hasContent = true;
+        yield event;
+      }
     }
   }
 
@@ -113,7 +117,10 @@ export class AgentSession {
     this.session.close();
   }
 
-  private *processMessage(message: SDKMessage): Generator<TurnEvent> {
+  private *processMessage(
+    message: SDKMessage,
+    hasContent: boolean,
+  ): Generator<TurnEvent> {
     if (message.type === "assistant") {
       const msg = message as {
         type: "assistant";
@@ -145,8 +152,12 @@ export class AgentSession {
       };
       if (resultMsg.is_error && resultMsg.result) {
         yield { type: "error", text: resultMsg.result };
+      } else if (resultMsg.result && !hasContent) {
+        // Include result text only when no prior content was yielded
+        // (e.g. unknown skill errors that skip assistant messages entirely)
+        yield { type: "text", text: resultMsg.result };
       }
-      // result messages end the turn — don't yield, just let the generator return
+      // result messages end the turn — let the generator return after yielding
     } else if (message.type === "user" || message.type === "rate_limit_event") {
       // user echo / rate limit backoff — no action needed
     } else if (message.type === "system") {
