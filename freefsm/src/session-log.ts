@@ -17,6 +17,7 @@ export function getSessionDir(cwd: string): string {
  * Uses the deterministic session directory convention.
  */
 export function findSessionLog(sessionId: string): string | null {
+  if (!/^[a-zA-Z0-9_-]+$/.test(sessionId)) return null;
   const sessionDir = getSessionDir(process.cwd());
   const candidate = join(sessionDir, `${sessionId}.jsonl`);
   return existsSync(candidate) ? candidate : null;

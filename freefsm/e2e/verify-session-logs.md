@@ -20,7 +20,7 @@ IMPORTANT: The `freefsm verify` command is long-running (it launches nested agen
 The freefsm CLI is already built at `dist/cli.js` in the freefsm directory. All commands should be run from the freefsm directory.
 
 ## Steps
-1. **Run verify**: Run `cd /home/ubuntu/Code/freematters/.claude/worktrees/minor/freefsm && node dist/cli.js verify e2e/simple-workflow.md --test-dir /tmp/e2e-session-logs 2>&1; echo "EXIT:$?"` and wait for completion. This command takes 3-5 minutes. If wait() times out, call wait() again until you see output containing "EXIT:".
+1. **Run verify**: Run `node dist/cli.js verify e2e/simple-workflow.md --test-dir /tmp/e2e-session-logs 2>&1; echo "EXIT:$?"` from the freefsm directory and wait for completion. This command takes 3-5 minutes. If wait() times out, call wait() again until you see output containing "EXIT:".
    - Expected: The command completes with EXIT:0 and produces a test report
 2. **Find verifier run directory**: The outer `freefsm verify` creates a run with ID `verifier-<timestamp>`. List `~/.freefsm/runs/verifier-*/` sorted by time and pick the NEWEST one. Check if `session.jsonl` and `embedded-session.jsonl` exist using `ls -la`.
    - Expected: Both `session.jsonl` and `embedded-session.jsonl` exist as symlinks in the verifier's run directory, pointing to actual JSONL files under `~/.claude/projects/`

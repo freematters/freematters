@@ -302,7 +302,8 @@ export async function runCore(
   const runId = opts.runId ?? generateRunId(opts.fsmPath);
   const logFn = opts.logFn ?? log;
 
-  logFn(`run=${runId} fsm=${opts.fsmPath} model=${opts.model ?? "default"}`, c.cyan);
+  const model = opts.model ?? "opus";
+  logFn(`run=${runId} fsm=${opts.fsmPath} model=${model}`, c.cyan);
 
   const store = new Store(opts.root);
   try {
@@ -351,7 +352,7 @@ export async function runCore(
     disallowedTools: ["AskUserQuestion", "EnterPlanMode", "ExitPlanMode"],
     mcpServers: { freefsm: fsmServer },
     ...(allowedTools !== undefined && { allowedTools }),
-    ...(opts.model !== undefined && { model: opts.model }),
+    model,
   });
 
   let isError = false;

@@ -91,7 +91,7 @@ program
       root: resolveRoot(root),
       json: json ?? false,
       prompt: opts.prompt as string | undefined,
-      model: (opts.model as string | undefined) ?? "opus",
+      model: opts.model as string | undefined,
       verbose: (opts.verbose as boolean) ?? false,
       stay: (opts.stay as boolean) ?? false,
     });

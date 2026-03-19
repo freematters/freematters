@@ -57,17 +57,16 @@ export function resolveWorkflow(input: string): string {
   const baseName = hasFsmExtension(input) ? input.replace(/\.fsm\.ya?ml$/, "") : input;
 
   // Search directories
-  for (const dir of searchDirs()) {
+  const dirs = searchDirs();
+  for (const dir of dirs) {
     const found = probeDir(dir, baseName);
     if (found) return found;
   }
 
-  const dirs = searchDirs()
-    .map((d) => `  - ${d}`)
-    .join("\n");
+  const dirList = dirs.map((d) => `  - ${d}`).join("\n");
   throw new CliError(
     "WORKFLOW_NOT_FOUND",
-    `Cannot find workflow "${input}"\nSearched:\n${dirs}`,
+    `Cannot find workflow "${input}"\nSearched:\n${dirList}`,
     { context: { fsmPath: input } },
   );
 }
