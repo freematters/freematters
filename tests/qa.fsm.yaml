@@ -18,7 +18,15 @@ states:
       Ask the user: "What is your favorite hobby?"
       Wait for their response, then comment on it briefly and proceed.
     transitions:
-      answered: summarize
+      answered: bg_task
+
+  bg_task:
+    prompt: |
+      run a background bash task that sleeps for 10 seconds and gets back 
+      with today' date.
+      after getting the date, show it to the user, then transition
+    transitions:
+      got_date: summarize
 
   summarize:
     prompt: |

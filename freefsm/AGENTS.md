@@ -58,8 +58,7 @@ Design principles:
 | `src/e2e/verify-runner.ts` | Verifier agent runner via Agent SDK |
 | `src/e2e/parser.ts` | Test plan markdown parser |
 | `src/e2e/path-enumerator.ts` | DFS path enumeration on FSM transitions |
-| `src/commands/e2e/verify.ts` | `freefsm e2e verify` command |
-| `src/commands/e2e/gen.ts` | `freefsm e2e gen` command |
+| `src/commands/e2e/verify.ts` | `freefsm verify` command |
 
 ## CLI Commands
 
@@ -68,8 +67,7 @@ freefsm start <fsm_path> [--run-id <id>] [-j]
 freefsm current --run-id <id> [-j]
 freefsm goto <target> --run-id <id> --on <label> [-j]
 freefsm finish --run-id <id> [-j]
-freefsm e2e gen <workflow.yaml> [--output <file>] [-j]
-freefsm e2e verify <plan.md> --test-dir <path> [--model <model>] [--verbose] [-j]
+freefsm verify <plan.md> --test-dir <path> [--model <model>] [--verbose] [-j]
 ```
 
 Global: `--root <path>` overrides storage root (default `~/.freefsm/`, env `FREEFSM_ROOT`).
@@ -109,11 +107,8 @@ npm run check        # Biome format + lint
 Agent-driven e2e testing framework. Test plans are structured markdown executed by a Claude agent.
 
 ```bash
-# Generate a test plan from a workflow YAML
-freefsm e2e gen workflows/verifier.fsm.yaml --output test-plan.md
-
 # Execute a test plan with a live agent
-freefsm e2e verify test-plan.md --test-dir ./out
+freefsm verify test-plan.md --test-dir ./out
 ```
 
 Test plans are raw markdown read by the verifier agent.

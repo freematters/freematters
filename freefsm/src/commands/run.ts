@@ -1,13 +1,23 @@
 import { readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
-import { createSdkMcpServer, query, tool } from "@anthropic-ai/claude-agent-sdk";
+import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
+import { Marked } from "marked";
+import { markedTerminal } from "marked-terminal";
 import { z } from "zod";
 import { agentLog, colors as c, logSdkMessage } from "../agent-log.js";
+import { MultiTurnSession } from "../e2e/multi-turn-session.js";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import { formatStateCard, handleError, stateCardFromFsm } from "../output.js";
 import { type RunStatus, Store } from "../store.js";
+
+const marked = new Marked(markedTerminal() as never);
+
+function renderMarkdown(text: string): string {
+  return (marked.parse(text) as string).trimEnd();
+}
 
 export interface RunArgs {
   fsmPath: string;
@@ -15,6 +25,8 @@ export interface RunArgs {
   root: string;
   json: boolean;
   prompt?: string;
+  verbose?: boolean;
+  stay?: boolean;
 }
 
 export interface RunCoreOptions {
@@ -23,6 +35,8 @@ export interface RunCoreOptions {
   root: string;
   prompt?: string;
   model?: string;
+  verbose?: boolean;
+  stay?: boolean;
   logFn?: (msg: string, color?: string) => void;
 }
 
@@ -36,6 +50,16 @@ const PROMPTS_DIR = join(__dirname, "../../prompts");
 
 function loadPrompt(name: string): string {
   return readFileSync(join(PROMPTS_DIR, `${name}.md`), "utf-8");
+}
+
+function promptUser(prompt: string): Promise<string> {
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+  return new Promise((resolve) => {
+    rl.question(prompt, (answer) => {
+      rl.close();
+      resolve(answer);
+    });
+  });
 }
 
 function buildSystemPrompt(fsm: Fsm): string {
@@ -164,6 +188,33 @@ export function createFsmMcpServer(
     },
   );
 
+  const requestInput = tool(
+    "request_input",
+    "Ask the user for input. Blocks until the user responds on the CLI.",
+    {
+      prompt: z.string().describe("Prompt message shown to the user"),
+    },
+    async (args) => {
+      try {
+        process.stderr.write(`${c.yellow}${args.prompt}${c.reset}\n`);
+        const answer = await promptUser(`${c.green}> ${c.reset}`);
+        return {
+          content: [{ type: "text" as const, text: answer }],
+        };
+      } catch (err: unknown) {
+        return {
+          isError: true as const,
+          content: [
+            {
+              type: "text" as const,
+              text: `Error reading input: ${err instanceof Error ? err.message : String(err)}`,
+            },
+          ],
+        };
+      }
+    },
+  );
+
   const fsmCurrent = tool("fsm_current", "Get current FSM state card", {}, async () => {
     try {
       const snapshot = store.readSnapshot(runId);
@@ -200,20 +251,24 @@ export function createFsmMcpServer(
   return createSdkMcpServer({
     name: "freefsm",
     version: "1.0.0",
-    tools: [fsmGoto, fsmCurrent],
+    tools: [fsmGoto, fsmCurrent, requestInput],
   });
 }
 
-const MCP_TOOL_NAMES = ["mcp__freefsm__fsm_goto", "mcp__freefsm__fsm_current"];
+const MCP_TOOL_NAMES = [
+  "mcp__freefsm__fsm_goto",
+  "mcp__freefsm__fsm_current",
+  "mcp__freefsm__request_input",
+];
 
 const log = agentLog;
 
 /**
  * Core run logic shared between CLI run() and EmbeddedRun.
  *
- * Initializes the store, creates the FSM MCP server, and runs the agent loop.
- * When `opts.bus` is provided, request_input uses the bus instead of readline,
- * and result output goes to the bus instead of stdout.
+ * Initializes the store, creates the FSM MCP server, and runs a multi-turn
+ * agent session. Retries within the same session if the workflow is not
+ * complete after a turn.
  *
  * Returns `{ runId, isError }` so callers can inspect the result.
  */
@@ -266,59 +321,112 @@ export async function runCore(
     ? [...MCP_TOOL_NAMES, ...fsm.allowed_tools]
     : undefined;
 
-  const queryOpts = {
+  const session = new MultiTurnSession({
     systemPrompt,
     permissionMode: "bypassPermissions" as const,
     allowDangerouslySkipPermissions: true,
+    disallowedTools: ["AskUserQuestion", "EnterPlanMode", "ExitPlanMode"],
     mcpServers: { freefsm: fsmServer },
     ...(allowedTools !== undefined && { allowedTools }),
     ...(opts.model !== undefined && { model: opts.model }),
-  };
+  });
 
   let isError = false;
   let attempt = 0;
-  let prompt = initialMessage;
-  for (;;) {
-    attempt++;
-    logFn(`session #${attempt} starting`, c.cyan);
+  const pendingTasks = new Set<string>();
+  session.send(initialMessage);
 
-    const session = query({ prompt, options: queryOpts });
-    for await (const message of session) {
-      logSdkMessage(message, { sessionNum: attempt });
+  try {
+    for (;;) {
+      attempt++;
 
-      if (message.type === "result") {
-        const resultMsg = message as {
-          type: "result";
-          result: string;
-          is_error?: boolean;
-        };
-        if (resultMsg.is_error) {
-          isError = true;
+      for await (const message of session.stream()) {
+        if (opts.verbose) {
+          logSdkMessage(message, {
+            sessionNum: attempt,
+            skipTools: ["mcp__freefsm__request_input"],
+          });
         }
-        process.stdout.write(`${resultMsg.result}\n`);
+
+        if (message.type === "result") {
+          const resultMsg = message as {
+            type: "result";
+            result: string;
+            is_error?: boolean;
+            subtype?: string;
+            num_turns?: number;
+            duration_ms?: number;
+          };
+          if (resultMsg.is_error) {
+            isError = true;
+          }
+          process.stdout.write(`${renderMarkdown(resultMsg.result)}\n`);
+        } else if (message.type === "system") {
+          const sysMsg = message as {
+            type: "system";
+            subtype?: string;
+            task_id?: string;
+            description?: string;
+            status?: string;
+            summary?: string;
+          };
+          if (sysMsg.subtype === "task_started" && sysMsg.task_id) {
+            pendingTasks.add(sysMsg.task_id);
+            logFn(`task started: ${sysMsg.description ?? sysMsg.task_id}`, c.cyan);
+          } else if (sysMsg.subtype === "task_notification" && sysMsg.task_id) {
+            pendingTasks.delete(sysMsg.task_id);
+            logFn(
+              `task ${sysMsg.status}: ${sysMsg.summary ?? sysMsg.task_id}`,
+              sysMsg.status === "completed" ? c.green : c.red,
+            );
+          }
+        }
       }
-    }
 
-    const snap = store.readSnapshot(runId);
-    if (!snap || snap.run_status !== "active") {
+      // If background tasks are still running, continue streaming —
+      // the SDK will yield task notifications and wake the model.
+      if (pendingTasks.size > 0) {
+        logFn(
+          `waiting for ${pendingTasks.size} background task(s) to complete`,
+          c.cyan,
+        );
+        continue;
+      }
+
+      const snap = store.readSnapshot(runId);
+      const workflowDone =
+        !snap ||
+        snap.run_status !== "active" ||
+        !fsm.states[snap.state] ||
+        Object.keys(fsm.states[snap.state].transitions).length === 0;
+
+      if (workflowDone) {
+        if (opts.stay) {
+          logFn(
+            `run finished: ${snap?.run_status ?? "unknown"} state=${snap?.state ?? "?"} — staying for input`,
+            c.green,
+          );
+          const userInput = await promptUser(`${c.green}> ${c.reset}`);
+          session.send(userInput);
+          continue;
+        }
+        logFn(
+          `run finished: ${snap?.run_status ?? "unknown"} state=${snap?.state ?? "?"}`,
+          c.green,
+        );
+        break;
+      }
+
       logFn(
-        `run finished: ${snap?.run_status ?? "unknown"} state=${snap?.state ?? "?"}`,
-        c.green,
+        `turn ended but workflow not complete, state=${snap.state} — retrying`,
+        c.magenta,
       );
-      break;
+      session.send(
+        `The workflow is not complete yet. Continue from the current state.\n\n${formatStateCard(stateCardFromFsm(snap.state, fsm.states[snap.state] ?? { transitions: {} }))}`,
+      );
     }
-
-    const currentState = fsm.states[snap.state];
-    if (!currentState || Object.keys(currentState.transitions).length === 0) {
-      logFn(`run finished: terminal state=${snap.state}`, c.green);
-      break;
-    }
-
-    logFn(
-      `session ended but workflow not complete, state=${snap.state} — retrying`,
-      c.magenta,
-    );
-    prompt = `The workflow is not complete yet. Continue executing the current state. Do NOT stop until you reach a terminal state.\n\n${formatStateCard(stateCardFromFsm(snap.state, currentState))}`;
+  } finally {
+    session.close();
   }
 
   return { runId, isError };
@@ -331,6 +439,8 @@ export async function run(args: RunArgs): Promise<void> {
       runId: args.runId,
       root: args.root,
       prompt: args.prompt,
+      verbose: args.verbose,
+      stay: args.stay,
     });
   } catch (err: unknown) {
     handleError(err, args.json);

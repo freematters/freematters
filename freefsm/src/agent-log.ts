@@ -36,8 +36,9 @@ export function formatToolArgs(
       return `(${input.on} → ${input.target})`;
     case "fsm_current":
       return "()";
+    case "mcp__freefsm__request_input":
     case "request_input":
-      return `("${input.prompt}")`;
+      return "";
     case "Read":
       return `(${input.file_path}${input.offset ? `:${input.offset}` : ""})`;
     case "Write":
@@ -70,7 +71,7 @@ function logToolUse(name: string, input: Record<string, unknown> | undefined): v
  */
 export function logSdkMessage(
   message: SDKMessage,
-  opts?: { sessionNum?: number },
+  opts?: { sessionNum?: number; skipTools?: string[] },
 ): void {
   if (message.type === "assistant") {
     const msg = message as {
@@ -88,7 +89,10 @@ export function logSdkMessage(
       if (block.type === "text" && block.text) {
         agentLog(`assistant: ${block.text}`, colors.yellow);
       } else if (block.type === "tool_use") {
-        logToolUse(block.name ?? "unknown", block.input);
+        const toolName = block.name ?? "unknown";
+        if (!opts?.skipTools?.includes(toolName)) {
+          logToolUse(toolName, block.input);
+        }
       }
     }
   } else if (message.type === "result") {
