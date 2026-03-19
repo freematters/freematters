@@ -473,7 +473,7 @@ states:
     transitions: {}
 `,
       "invalid-no-transitions.yaml",
-      /transitions/,
+      /transition/,
     );
   });
 

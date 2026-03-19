@@ -19,25 +19,19 @@ Initialize a new FSM run from a workflow YAML file.
    - If the user chooses to abort, run `freefsm finish --run-id <run_id>` first, then clean up pending/in-progress tasks (set to `deleted`).
    - If the state is `done` or the run doesn't exist, skip this step silently.
 
-2. **Resolve the workflow path** — If PATH is not provided or is just a name (no `/` or `.yaml`), search for a matching `<name>.fsm.yaml` file in this order:
-   1. `./workflows/` (project-local workflows)
-   2. The freefsm package's bundled `workflows/` directory (find it via `$(dirname $(readlink -f $(which freefsm)))/../workflows/`)
+2. **Generate a descriptive run ID** (required) — Use the format `<fsm-name>-$(date '+%Y%m%d%H%M%S')` where fsm-name is derived from the workflow filename and $(date) is the bash command that outputs the current date in YYYY-MM-DD format (e.g., `code-review-2024-12-19`, `plan-execute-2024-12-19`). Use lowercase letters, numbers, and hyphens. You MUST always pass `--run-id`.
 
-   Example: `pdd` resolves to `./workflows/pdd.fsm.yaml` if it exists locally, otherwise to the bundled `<freefsm-package>/workflows/pdd.fsm.yaml`.
-
-3. **Generate a descriptive run ID** (required) — Use the format `<fsm-name>-$(date '+%Y%m%d%H%M%S')` where fsm-name is derived from the workflow filename and $(date) is the bash command that outputs the current date in YYYY-MM-DD format (e.g., `code-review-2024-12-19`, `plan-execute-2024-12-19`). Use lowercase letters, numbers, and hyphens. You MUST always pass `--run-id`.
-
-4. **Run the CLI command:**
+3. **Run the CLI command:**
 
 ```bash
 freefsm start <PATH> --run-id <fsm-name>-$(date)
 ```
 
-Never omit `--run-id`. The run ID is needed for all subsequent commands.
+Never omit `--run-id`. The run ID is needed for all subsequent commands. PATH can be a workflow name (e.g. `pdd`), a filename (e.g. `pdd.fsm.yaml`), or a full path. The CLI resolves it automatically.
 
-5. **Remember the run ID** — Store the `run_id` value for use in subsequent `freefsm current --run-id <run-id>` and `freefsm goto <state> --run-id <run-id> --on <transition-label>` calls within this conversation. The `run_id` will also be used in subsequent `freefsm:current` and `freefsm:finish` calls.
+4. **Remember the run ID** — Store the `run_id` value for use in subsequent `freefsm current --run-id <run-id>` and `freefsm goto <state> --run-id <run-id> --on <transition-label>` calls within this conversation. The `run_id` will also be used in subsequent `freefsm:current` and `freefsm:finish` calls.
 
-6. **Flow CLI output**
+5. **Flow CLI output**
 
 `freefsm start` will output the initial state card. `freefsm goto` will output the new state card. if the target state is `done`, the workflow is completed.
 

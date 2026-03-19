@@ -11,6 +11,7 @@ import { MultiTurnSession } from "../e2e/multi-turn-session.js";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import { formatStateCard, handleError, stateCardFromFsm } from "../output.js";
+import { symlinkSessionLog } from "../session-log.js";
 import { type RunStatus, Store } from "../store.js";
 
 const marked = new Marked(markedTerminal() as never);
@@ -25,6 +26,7 @@ export interface RunArgs {
   root: string;
   json: boolean;
   prompt?: string;
+  model?: string;
   verbose?: boolean;
   stay?: boolean;
 }
@@ -190,12 +192,33 @@ export function createFsmMcpServer(
 
   const requestInput = tool(
     "request_input",
-    "Ask the user for input. Blocks until the user responds on the CLI.",
+    "Ask the user for input. Blocks until the user responds on the CLI. Not available in terminal states.",
     {
       prompt: z.string().describe("Prompt message shown to the user"),
     },
     async (args) => {
       try {
+        // Refuse input when workflow is in a terminal (done) state
+        const snapshot = store.readSnapshot(runId);
+        if (snapshot) {
+          const currentFsmState = fsm.states[snapshot.state];
+          if (
+            snapshot.run_status !== "active" ||
+            !currentFsmState ||
+            Object.keys(currentFsmState.transitions).length === 0
+          ) {
+            return {
+              isError: true as const,
+              content: [
+                {
+                  type: "text" as const,
+                  text: `Workflow is in terminal state "${snapshot.state}". Cannot request user input. Complete the state instructions and exit.`,
+                },
+              ],
+            };
+          }
+        }
+
         process.stderr.write(`${c.yellow}${args.prompt}${c.reset}\n`);
         const answer = await promptUser(`${c.green}> ${c.reset}`);
         return {
@@ -279,7 +302,7 @@ export async function runCore(
   const runId = opts.runId ?? generateRunId(opts.fsmPath);
   const logFn = opts.logFn ?? log;
 
-  logFn(`run=${runId} fsm=${opts.fsmPath}`, c.cyan);
+  logFn(`run=${runId} fsm=${opts.fsmPath} model=${opts.model ?? "default"}`, c.cyan);
 
   const store = new Store(opts.root);
   try {
@@ -333,6 +356,7 @@ export async function runCore(
 
   let isError = false;
   let attempt = 0;
+  let sessionId: string | null = null;
   const pendingTasks = new Set<string>();
   session.send(initialMessage);
 
@@ -341,6 +365,12 @@ export async function runCore(
       attempt++;
 
       for await (const message of session.stream()) {
+        // Capture and log session_id from the first message that has one
+        if (!sessionId && "session_id" in message) {
+          sessionId = (message as { session_id: string }).session_id;
+          logFn(`session=${sessionId}`, c.cyan);
+        }
+
         if (opts.verbose) {
           logSdkMessage(message, {
             sessionNum: attempt,
@@ -429,6 +459,10 @@ export async function runCore(
     session.close();
   }
 
+  // Symlink the Claude session JSONL log into the run dir
+  const runDir = join(opts.root, "runs", runId);
+  symlinkSessionLog(sessionId, runDir, "session.jsonl");
+
   return { runId, isError };
 }
 
@@ -439,6 +473,7 @@ export async function run(args: RunArgs): Promise<void> {
       runId: args.runId,
       root: args.root,
       prompt: args.prompt,
+      model: args.model,
       verbose: args.verbose,
       stay: args.stay,
     });

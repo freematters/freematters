@@ -14,6 +14,8 @@ import { run as runCmd } from "./commands/run.js";
 import { start } from "./commands/start.js";
 import { validate } from "./commands/validate.js";
 import { main as postToolUseMain } from "./hooks/post-tool-use.js";
+import { handleError } from "./output.js";
+import { resolveWorkflow } from "./resolve-workflow.js";
 
 function resolveRoot(flagRoot?: string): string {
   if (flagRoot) return resolve(flagRoot);
@@ -25,6 +27,14 @@ type GlobalOpts = { root?: string; json?: boolean };
 
 function getGlobalOpts(cmd: Command): GlobalOpts {
   return cmd.optsWithGlobals() as GlobalOpts;
+}
+
+function resolveWorkflowOrExit(input: string, json: boolean): string {
+  try {
+    return resolveWorkflow(input);
+  } catch (err: unknown) {
+    handleError(err, json);
+  }
 }
 
 const program = new Command()
@@ -56,7 +66,7 @@ program
   .action((_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     start({
-      fsmPath: resolve(_fsmPath),
+      fsmPath: resolveWorkflowOrExit(_fsmPath, json ?? false),
       runId: opts.runId as string | undefined,
       root: resolveRoot(root),
       json: json ?? false,
@@ -69,16 +79,18 @@ program
   .argument("<fsm_path>", "path to FSM YAML file")
   .option("--run-id <id>", "run identifier (auto-generated if omitted)")
   .option("--prompt <text>", "user prompt to append to the initial state card")
+  .option("--model <model>", "Claude model to use")
   .option("--verbose", "show tool calls and agent messages in output")
   .option("--stay", "stay and accept user input after workflow completes")
   .action(async (_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     await runCmd({
-      fsmPath: resolve(_fsmPath),
+      fsmPath: resolveWorkflowOrExit(_fsmPath, json ?? false),
       runId: opts.runId as string | undefined,
       root: resolveRoot(root),
       json: json ?? false,
       prompt: opts.prompt as string | undefined,
+      model: (opts.model as string | undefined) ?? "opus",
       verbose: (opts.verbose as boolean) ?? false,
       stay: (opts.stay as boolean) ?? false,
     });

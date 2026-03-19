@@ -13,12 +13,29 @@
  */
 
 import { type SDKMessage, query } from "@anthropic-ai/claude-agent-sdk";
+import { getSessionDir } from "../session-log.js";
 
 export class MultiTurnSession {
   private messageQueue: string[] = [];
   private waitForMessage: { resolve: (value: string) => void } | null = null;
   private queryInstance: ReturnType<typeof query> | null = null;
   private iterator: AsyncIterator<SDKMessage> | null = null;
+  private _sessionId: string | null = null;
+
+  /** Claude session ID, available after the init message is received. */
+  get sessionId(): string | null {
+    return this._sessionId;
+  }
+
+  /**
+   * Path to the Claude session JSONL log file.
+   * Uses the deterministic session dir convention: ~/.claude/projects/<encoded-cwd>/<session_id>.jsonl
+   * Returns null if session ID is not yet available.
+   */
+  get sessionLogPath(): string | null {
+    if (!this._sessionId) return null;
+    return `${getSessionDir(process.cwd())}/${this._sessionId}.jsonl`;
+  }
 
   constructor(private queryOptions: Record<string, unknown> = {}) {}
 
@@ -74,6 +91,13 @@ export class MultiTurnSession {
     while (true) {
       const { value, done } = await this.iterator.next();
       if (done) return;
+
+      // Capture session_id from any message that carries it
+      if (!this._sessionId && "session_id" in value) {
+        const sid = (value as { session_id: string }).session_id;
+        if (sid) this._sessionId = sid;
+      }
+
       yield value;
       if (value.type === "result") {
         return;

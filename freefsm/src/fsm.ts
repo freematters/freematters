@@ -152,13 +152,11 @@ export function loadFsm(path: string): Fsm {
       todos = s.todos as string[];
     }
 
-    // transitions: required object
-    if (
-      s.transitions === null ||
-      s.transitions === undefined ||
-      typeof s.transitions !== "object" ||
-      Array.isArray(s.transitions)
-    ) {
+    // transitions: optional object (defaults to {} for terminal states)
+    if (s.transitions === null || s.transitions === undefined) {
+      s.transitions = {};
+    }
+    if (typeof s.transitions !== "object" || Array.isArray(s.transitions)) {
       fail(`state "${name}": "transitions" must be an object`);
     }
 

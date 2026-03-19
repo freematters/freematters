@@ -74,7 +74,7 @@ Global: `--root <path>` overrides storage root (default `~/.freefsm/`, env `FREE
 
 ## Error Codes
 
-`SCHEMA_INVALID`, `RUN_EXISTS`, `RUN_NOT_FOUND`, `RUN_NOT_ACTIVE`, `STATE_NOT_FOUND`, `INVALID_TRANSITION`, `ARGS_INVALID`
+`SCHEMA_INVALID`, `RUN_EXISTS`, `RUN_NOT_FOUND`, `RUN_NOT_ACTIVE`, `STATE_NOT_FOUND`, `INVALID_TRANSITION`, `ARGS_INVALID`, `WORKFLOW_NOT_FOUND`, `WORKFLOW_AMBIGUOUS`
 
 Exit codes: `0` success, `2` failure.
 
@@ -86,7 +86,9 @@ Exit codes: `0` success, `2` failure.
     fsm.meta.json    # Run metadata
     events.jsonl     # Append-only event log
     snapshot.json    # Current state snapshot
-    lock/            # Directory-based file lock
+    session.jsonl            # Symlink to Claude session JSONL log
+    embedded-session.jsonl   # (verify only) Symlink to embedded agent's session log
+    lock/                    # Directory-based file lock
   sessions/
     <session_id>.json      # Session→run binding
     <session_id>.counter   # Hook call counter
@@ -114,6 +116,10 @@ freefsm verify test-plan.md --test-dir ./out
 Test plans are raw markdown read by the verifier agent.
 Output: `test-report.md` in `--test-dir`.
 Dogfood test plans live in `e2e/`.
+
+Both `freefsm run` and `freefsm verify` print the Claude session ID to stderr on session start.
+`freefsm run` symlinks the Claude session JSONL log (`session.jsonl`) into the FSM run directory.
+`freefsm verify` symlinks both the verifier's (`session.jsonl`) and embedded agent's (`embedded-session.jsonl`) Claude session logs into the verifier's FSM run directory.
 
 ## Implementation Status
 

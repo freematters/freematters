@@ -1,8 +1,10 @@
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { formatToolArgs } from "../agent-log.js";
+import { symlinkSessionLog } from "../session-log.js";
 import { DualStreamLogger } from "./dual-stream-logger.js";
 import { createVerifierMcpServer } from "./verifier-tools.js";
 
@@ -37,8 +39,9 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
     verbose: args.verbose,
   });
 
+  const runId = `verifier-${Date.now()}`;
   const prompt = [
-    `Run the e2e verifier workflow with: /freefsm:start ${VERIFIER_FSM}`,
+    `Run the e2e verifier workflow with: /freefsm:start ${VERIFIER_FSM} --run-id ${runId}`,
     "",
     `Test plan file: ${resolve(planPath)}`,
     `Test output directory: ${resolve(testDir)}`,
@@ -58,8 +61,16 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
     },
   });
 
+  let sessionId: string | null = null;
+
   try {
     for await (const message of session) {
+      // Capture session_id from the first message that has one
+      if (!sessionId && "session_id" in message) {
+        sessionId = (message as { session_id: string }).session_id;
+        dualLogger.logVerifier(`session: ${sessionId}`);
+      }
+
       if (message.type === "assistant") {
         const msg = message as {
           type: "assistant";
@@ -86,6 +97,17 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
   } finally {
     verifierServer.closeSession();
     session.close();
+  }
+
+  // Symlink both Claude session JSONL logs into the verifier's FSM run dir.
+  // We generated the run ID above, so the path is deterministic.
+  const embeddedSessionId = verifierServer.embeddedSessionId;
+  const root = process.env.FREEFSM_ROOT ?? join(homedir(), ".freefsm");
+  const verifierRunDir = join(root, "runs", runId);
+
+  if (existsSync(verifierRunDir)) {
+    symlinkSessionLog(sessionId, verifierRunDir, "session.jsonl");
+    symlinkSessionLog(embeddedSessionId, verifierRunDir, "embedded-session.jsonl");
   }
 
   return { reportPath: existsSync(reportPath) ? reportPath : null };

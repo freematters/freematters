@@ -37,6 +37,9 @@ export async function verify(args: VerifyArgs): Promise<void> {
     if (!args.json) {
       process.stdout.write(`Test plan: ${args.planPath}\n`);
       process.stdout.write(`Output: ${args.testDir}\n`);
+      if (args.model) {
+        process.stdout.write(`Model: ${args.model}\n`);
+      }
     }
 
     // Execute the verification via freefsm run with verifier.fsm.yaml
