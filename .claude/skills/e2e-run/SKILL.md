@@ -105,4 +105,4 @@ cat ./out/test-report.md
 
 ## Writing Test Plans
 
-See the **e2e-verify** skill (`freefsm/skills/e2e-verify/SKILL.md`) for the full guide on writing test plan markdown files.
+See the **e2e-gen** skill for the full guide on writing test plan markdown files.
