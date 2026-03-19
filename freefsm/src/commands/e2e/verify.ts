@@ -6,6 +6,7 @@ import { handleError, jsonSuccess, printJson } from "../../output.js";
 export interface VerifyArgs {
   planPath: string;
   testDir: string;
+  root: string;
   json: boolean;
   model?: string;
   verbose?: boolean;
@@ -37,12 +38,16 @@ export async function verify(args: VerifyArgs): Promise<void> {
     if (!args.json) {
       process.stdout.write(`Test plan: ${args.planPath}\n`);
       process.stdout.write(`Output: ${args.testDir}\n`);
+      if (args.model) {
+        process.stdout.write(`Model: ${args.model}\n`);
+      }
     }
 
     // Execute the verification via freefsm run with verifier.fsm.yaml
     const result = await verifyCore({
       planPath: args.planPath,
       testDir: args.testDir,
+      root: args.root,
       model: args.model,
       verbose: args.verbose,
     });

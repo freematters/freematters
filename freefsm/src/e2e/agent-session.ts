@@ -5,8 +5,9 @@
  *
  * Flow:
  *   1. send(text) buffers a user message (can be called multiple times)
- *   2. wait(timeout) reads agent output until turn complete, returns TurnResult
- *   3. send(text) again → wait() for next turn
+ *   2. stream(timeout) yields TurnEvents as they arrive, or
+ *      wait(timeout) accumulates all output and returns TurnResult
+ *   3. send(text) again → stream/wait() for next turn
  */
 
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
@@ -23,9 +24,20 @@ export interface TurnResult {
   output: string;
 }
 
+export type TurnEvent =
+  | { type: "text"; text: string }
+  | { type: "tool_use"; name: string; input: Record<string, unknown> }
+  | { type: "error"; text: string }
+  | { type: "timeout" };
+
 export class AgentSession {
   private session: MultiTurnSession;
   private options: AgentSessionOptions;
+
+  /** Claude session ID, available after the init message is received. */
+  get sessionId(): string | null {
+    return this.session.sessionId;
+  }
 
   constructor(options: AgentSessionOptions = {}) {
     this.options = options;
@@ -38,24 +50,25 @@ export class AgentSession {
     });
   }
 
-  /** Buffer a user message. Sent to the agent on the next wait() call. */
+  /** Buffer a user message. Sent to the agent on the next stream/wait call. */
   send(text: string): void {
     this.session.send(text);
   }
 
   /**
-   * Read agent output until the current turn completes (result message).
-   * Returns accumulated assistant text. Times out if the turn takes too long.
+   * Async generator that yields TurnEvents as the agent produces them.
+   * Completes when the turn ends (result message) or on timeout.
    */
-  async wait(timeout: number): Promise<TurnResult> {
-    const output: string[] = [];
+  async *stream(timeout: number): AsyncGenerator<TurnEvent> {
     const deadline = Date.now() + timeout;
     const iterator = this.session.stream();
+    let hasContent = false;
 
     while (true) {
       const remaining = deadline - Date.now();
       if (remaining <= 0) {
-        return { output: output.join("\n---\n") || "[timeout]" };
+        yield { type: "timeout" };
+        return;
       }
 
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -68,13 +81,35 @@ export class AgentSession {
       clearTimeout(timer);
 
       if (result === "timeout") {
-        return { output: output.join("\n---\n") || "[timeout]" };
+        yield { type: "timeout" };
+        return;
       }
 
-      if (result.done) break;
-      this.processMessage(result.value, output);
+      if (result.done) return;
+      for (const event of this.processMessage(result.value, hasContent)) {
+        if (event.type === "text" || event.type === "error") hasContent = true;
+        yield event;
+      }
     }
+  }
 
+  /**
+   * Read agent output until the current turn completes (result message).
+   * Returns accumulated assistant text. Times out if the turn takes too long.
+   */
+  async wait(timeout: number): Promise<TurnResult> {
+    const output: string[] = [];
+    for await (const event of this.stream(timeout)) {
+      if (event.type === "text") {
+        output.push(event.text);
+      } else if (event.type === "error") {
+        output.push(`[error] ${event.text}`);
+      } else if (event.type === "tool_use") {
+        this.options.onToolUse?.(event.name, event.input);
+      } else if (event.type === "timeout") {
+        return { output: output.join("\n---\n") || "[timeout]" };
+      }
+    }
     return { output: output.join("\n---\n") };
   }
 
@@ -82,7 +117,10 @@ export class AgentSession {
     this.session.close();
   }
 
-  private processMessage(message: SDKMessage, output: string[]): void {
+  private *processMessage(
+    message: SDKMessage,
+    hasContent: boolean,
+  ): Generator<TurnEvent> {
     if (message.type === "assistant") {
       const msg = message as {
         type: "assistant";
@@ -97,9 +135,13 @@ export class AgentSession {
       };
       for (const block of msg.message.content) {
         if (block.type === "text" && block.text?.trim()) {
-          output.push(block.text.trim());
+          yield { type: "text", text: block.text.trim() };
         } else if (block.type === "tool_use" && block.name) {
-          this.options.onToolUse?.(block.name, block.input ?? {});
+          yield {
+            type: "tool_use",
+            name: block.name,
+            input: block.input ?? {},
+          };
         }
       }
     } else if (message.type === "result") {
@@ -109,12 +151,13 @@ export class AgentSession {
         result?: string;
       };
       if (resultMsg.is_error && resultMsg.result) {
-        output.push(`[error] ${resultMsg.result}`);
-      } else if (resultMsg.result && output.length === 0) {
-        // Only include result text if no assistant messages were captured
+        yield { type: "error", text: resultMsg.result };
+      } else if (resultMsg.result && !hasContent) {
+        // Include result text only when no prior content was yielded
         // (e.g. unknown skill errors that skip assistant messages entirely)
-        output.push(resultMsg.result);
+        yield { type: "text", text: resultMsg.result };
       }
+      // result messages end the turn — let the generator return after yielding
     } else if (message.type === "user" || message.type === "rate_limit_event") {
       // user echo / rate limit backoff — no action needed
     } else if (message.type === "system") {
@@ -122,8 +165,6 @@ export class AgentSession {
       if (sysMsg.message) {
         process.stderr.write(`[agent-session] system: ${sysMsg.message}\n`);
       }
-    } else {
-      process.stderr.write(`[agent-session] unhandled message type: ${message.type}\n`);
     }
   }
 }
