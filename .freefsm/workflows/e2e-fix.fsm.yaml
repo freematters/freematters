@@ -9,16 +9,16 @@ initial: diagnose
 states:
   diagnose:
     prompt: |
-      Analyze the failed e2e run directory to understand the root cause.
+      Dispatch a sub-agent to analyze the failed e2e run directory and diagnose the root cause.
 
-      Read these artifacts from the run directory:
+      The sub-agent should read these artifacts from the run directory:
       - test-report.md (in --test-dir) — verifier verdict and per-step results
       - session.jsonl — verifier's Claude session log (symlink in run dir)
       - embedded-session.jsonl — embedded agent's session log (symlink in run dir)
       - events.jsonl — FSM state transition history
       - snapshot.json — final FSM state
 
-      Produce a concise diagnosis:
+      The sub-agent should produce a concise diagnosis:
       1. Which step failed and what was expected vs actual
       2. The root cause — what code path or behavior is broken
       3. Which source files are involved
@@ -28,8 +28,8 @@ states:
 
       ## Hypothesis-driven debugging
 
-      If you have a hypothesis but cannot confirm it from the artifacts alone,
-      add temporary debug logging (e.g. `process.stderr.write(...)` or
+      If the sub-agent has a hypothesis but cannot confirm it from the artifacts alone,
+      it should add temporary debug logging (e.g. `process.stderr.write(...)` or
       `console.error(...)`) to the suspect code paths. These logs will appear
       in the session logs on the next real e2e run (verify state), letting you
       confirm or reject the hypothesis from concrete evidence.
@@ -91,8 +91,8 @@ states:
 
   verify:
     prompt: |
-      Run the original e2e test plan with /e2e-run to confirm the fix works
-      end-to-end with the real agent runner.
+      Dispatch a sub-agent to run the original e2e test plan with `freefsm verify`
+      to confirm the fix works end-to-end with the real agent runner.
 
       After the run, check the `freefsm verify` command's stdout/stderr output
       for any `[e2e-debug]` lines from debug logging added in the diagnose
