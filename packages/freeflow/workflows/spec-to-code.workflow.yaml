@@ -33,6 +33,20 @@ guide: |
   Rules that apply across ALL states:
 
   - TDD discipline: Write tests BEFORE implementation. RED → GREEN → REFACTOR cycle.
+  - Contract-first testing: Before writing any test, define the input/output contract
+    (expected inputs, outputs, side effects, error conditions). Tests verify contracts,
+    not implementation details. Do NOT mock internal dependencies unless absolutely necessary
+    (e.g., external APIs, network calls). Prefer real dependencies for honest coverage.
+  - Test type priorities (highest ROI first):
+    1. **Integration tests** — test components working together with real dependencies.
+       AI excels at generating diverse scenario combinations; leverage this.
+    2. **Property-based tests** — define invariants (e.g., "output is always non-negative",
+       "round-trip encode/decode is identity") rather than enumerating cases.
+       Use the language's property testing library (Hypothesis for Python, fast-check for TS, etc.).
+    3. **Regression tests** — when fixing bugs, ALWAYS write a failing test that reproduces
+       the bug BEFORE writing the fix. Every regression test corresponds to a real bug.
+    4. **Unit tests** — use sparingly and only for pure functions with clear contracts.
+       Avoid tautological tests that just restate the implementation.
   - One step at a time: Implement exactly one plan.md step per cycle.
   - Spec is authoritative: design.md is the source of truth.
   - Demoable after each step: Every completed step MUST leave the system working.
@@ -125,19 +139,6 @@ states:
     prompt: |
       ## Implement, Validate & Commit Next Step
 
-      ### 0. Choose execution mode (first entry only)
-
-      On the **first** entry into this state (no steps committed yet), ask the user:
-
-      > How should I implement the steps?
-      > 1. **One at a time** — dispatch a sub-agent per step, commit after each (default)
-      > 2. **All in one agent** — dispatch a single sub-agent to implement ALL remaining steps
-
-      Remember the choice as `exec_mode` ("per-step" or "batch").
-      On subsequent entries (looping back), skip this prompt and reuse the saved choice.
-
-      ---
-
       ### 1. Select
 
       Read `./specs/<slug>/plan.md`, find the first unchecked step (`- [ ]`).
@@ -147,8 +148,6 @@ states:
 
       ### 2. Execute
 
-      #### Mode A: Per-step (exec_mode = "per-step")
-
       Dispatch a sub-agent to implement AND validate the **current step only**:
 
       > Implement Step N of ./specs/<slug>/plan.md using strict TDD (RED → GREEN → REFACTOR).
@@ -157,51 +156,24 @@ states:
       > Before coding, explore existing code for patterns, conventions, and style to follow.
       >
       > Create a todo list and work through it:
-      > 1. Write failing tests (RED)
-      > 2. Write minimum implementation to pass (GREEN)
-      > 3. Refactor — clean up, run linter/formatter
-      > 4. Run full test suite (not just new tests) — check for regressions
-      > 5. Execute the step's Demo criteria from plan.md — verify expected output
-      > 6. Update ./specs/<slug>/progress.md — append a summary:
+      > 1. Define the contract: identify inputs, expected outputs, side effects, and error
+      >    conditions for the code you're about to write. This is what your tests will verify.
+      > 2. Write failing tests (RED) — follow these priorities:
+      >    - Prefer integration tests that exercise components together with real dependencies.
+      >    - For functions with invariants, write property-based tests (Hypothesis / fast-check / etc.).
+      >    - Only mock external boundaries (network, third-party APIs), never internal modules.
+      >    - Avoid tautological unit tests that just restate the implementation.
+      > 3. Write minimum implementation to pass (GREEN)
+      > 4. Refactor — clean up, run linter/formatter
+      > 5. Update ./specs/<slug>/progress.md — append a summary:
       >    ## Step N: <title>
       >    - **Files changed**: <list of key files added/modified>
       >    - **What was built**: <1-2 sentence summary>
-      >    - **Tests**: <number of tests added, all passing/failing>
+      >    - **Tests**: <number of tests added, type breakdown (integration/property/unit), all passing/failing>
       >    - **Notes**: <any gotchas, workarounds, or deviations from spec>
-      > 7. If the spec is ambiguous or has minor issues, use your best judgment to
+      > 6. If the spec is ambiguous or has minor issues, use your best judgment to
       >    work around them. Note any spec deviations in progress.md under **Notes**.
-      > 8. Report: tests passed/failed, demo result, lint issues, any spec deviations
-      >
-      > Do NOT modify plan.md — the orchestrator handles plan.md updates.
-
-      #### Mode B: Batch (exec_mode = "batch")
-
-      Dispatch a **single** sub-agent to implement ALL remaining unchecked steps:
-
-      > Implement ALL remaining unchecked steps of ./specs/<slug>/plan.md using strict TDD
-      > (RED → GREEN → REFACTOR) for each step.
-      > Read ./specs/<slug>/design.md for component interfaces and data models.
-      > Read the last 300 lines of ./specs/<slug>/progress.md for context on recent steps (if it exists).
-      > Before coding, explore existing code for patterns, conventions, and style to follow.
-      >
-      > For EACH unchecked step, in order:
-      > 1. Write failing tests (RED)
-      > 2. Write minimum implementation to pass (GREEN)
-      > 3. Refactor — clean up, run linter/formatter
-      > 4. Run full test suite (not just new tests) — check for regressions
-      > 5. Execute the step's Demo criteria from plan.md — verify expected output
-      > 6. Update ./specs/<slug>/progress.md — append a summary:
-      >    ## Step N: <title>
-      >    - **Files changed**: <list of key files added/modified>
-      >    - **What was built**: <1-2 sentence summary>
-      >    - **Tests**: <number of tests added, all passing/failing>
-      >    - **Notes**: <any gotchas, workarounds, or deviations from spec>
-      > 7. Stage all relevant files and create a git commit: `feat(scope): step N - <step title>`
-      > 8. If the spec is ambiguous or has minor issues, use your best judgment.
-      >    Note any spec deviations in progress.md under **Notes**.
-      >
-      > After ALL steps are done, report: total steps completed, tests passed/failed,
-      > any spec deviations, any steps that could not be completed.
+      > 7. Report: tests passed/failed, lint issues, any spec deviations
       >
       > Do NOT modify plan.md — the orchestrator handles plan.md updates.
 
@@ -214,8 +186,6 @@ states:
 
       The sub-agent has already tested and validated. Proceed directly to commit.
 
-      #### Per-step mode
-
       1. Update `./specs/<slug>/plan.md` — change `- [ ] Step N` to `- [x] Step N`
       2. Stage all relevant files (new and modified, including progress.md and plan.md)
       3. Create a git commit: `feat(scope): step N - <step title>`
@@ -224,20 +194,9 @@ states:
       - Commit message
       - Progress: "Step N/M complete"
 
-      #### Batch mode
-
-      The sub-agent already committed each step individually. Now:
-
-      1. Update `./specs/<slug>/plan.md` — change ALL completed `- [ ]` steps to `- [x]`
-      2. Stage and commit plan.md: `chore: mark completed steps in plan.md`
-
-      Present to the user:
-      - Steps completed
-      - Progress: "N/M steps complete"
-
       #### Issue mode additional steps
 
-      If `source_mode == "issue"`, also (for each newly completed step):
+      If `source_mode == "issue"`, also:
 
       4. Push to remote:
          ```bash
@@ -259,14 +218,15 @@ states:
          - **Tests**: <count> added, all passing
          ```
 
-      Then loop back to step 1 for the next unchecked step (per-step mode),
-      or transition to e2e-test/done (batch mode, since all steps are done).
+      Then loop back to step 1 for the next unchecked step.
 
       ### Constraints
       - You MUST NOT write implementation before tests exist
+      - You MUST define the input/output contract before writing tests
+      - When fixing a bug, you MUST write a failing regression test that reproduces
+        the bug BEFORE writing the fix
       - You MUST reference design.md — do not invent interfaces
-      - Per-step mode: implement ONLY the current step — no future steps
-      - Batch mode: implement ALL remaining steps in order, committing each individually
+      - Implement ONLY the current step — no future steps
       - You MUST dispatch a sub-agent, even if the task seems simple.
         The orchestrator's job is to manage workflow state, not to write code itself.
     transitions:
@@ -409,9 +369,9 @@ states:
       >
       > For each issue you fix:
       > 1. Read the relevant code
-      > 2. Fix the issue — keep changes minimal and focused
-      > 3. Run the full test suite to ensure no regressions
-      > 4. If the fix requires new tests, add them
+      > 2. Write a failing regression test that reproduces the bug BEFORE fixing it
+      > 3. Fix the issue — keep changes minimal and focused
+      > 4. Run the full test suite to ensure no regressions
       >
       > Report: what was fixed, what medium issues were skipped (with reason), test results.
 
