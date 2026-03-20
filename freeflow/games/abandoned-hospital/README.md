@@ -1,6 +1,6 @@
 # Abandoned Hospital
 
-A psychological horror interactive fiction game powered by FreeFSM.
+A psychological horror interactive fiction game powered by FreeFlow.
 
 ## Synopsis
 
@@ -20,8 +20,8 @@ Uncover the truth about what happened to 27 psychiatric patients and the nurse w
 ## How to Play
 
 ```bash
-cd freefsm/games/abandoned-hospital
-freefsm start abandoned-hospital.fsm.yaml
+cd freeflow/games/abandoned-hospital
+fflow start abandoned-hospital.workflow.yaml
 ```
 
 The game master (your AI agent) will describe scenes, track your stats, and enforce the rules. You interact by choosing numbered options or typing free-form actions.
@@ -30,5 +30,5 @@ The game master (your AI agent) will describe scenes, track your stats, and enfo
 
 | File | Description |
 |------|-------------|
-| `abandoned-hospital.fsm.yaml` | Game runtime FSM |
+| `abandoned-hospital.workflow.yaml` | Game runtime FSM |
 | `spec.md` | Full game design (contains spoilers!) |

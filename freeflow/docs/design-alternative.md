@@ -1,4 +1,4 @@
-# FreeFSM Design
+# FreeFlow Design
 
 > FSM-based agent workflow plugin for Claude Code.
 > Marries natural language flexibility with FSM determinism.
@@ -44,16 +44,16 @@ Code is deterministic but rigid, hard to extend, and bug-prone.
 |                           reminder           |
 |                                              |
 +----------------------------------------------+
-|              freefsm CLI (TypeScript)         |
+|              fflow CLI (TypeScript)           |
 |                                              |
-|  freefsm start <yaml>   load FSM, enter     |
+|  fflow start <yaml>   load FSM, enter       |
 |                          initial state       |
-|  freefsm current         query current state |
-|  freefsm goto <state>    validate+transition |
-|  freefsm finish          abort run           |
+|  fflow current         query current state   |
+|  fflow goto <state>    validate+transition   |
+|  fflow finish          abort run             |
 |                                              |
 +----------------------------------------------+
-|              ~/.freefsm/                      |
+|              ~/.freeflow/                     |
 |  runs/<run_id>/                               |
 |    fsm.meta.json  <- run metadata             |
 |    events.jsonl   <- append-only event log    |
@@ -67,12 +67,12 @@ Code is deterministic but rigid, hard to extend, and bug-prone.
 
 **Data flow:**
 
-1. `/freefsm:start workflow.yaml` -> skill instructs agent to call `freefsm start`
-2. `freefsm start` -> writes start event, outputs guide + initial state card
-3. Agent works -> PostToolUse hook every 5 tool calls injects state reminder via `freefsm current`
-4. Agent calls `freefsm goto X --on "label"` -> CLI validates transition legality; if legal, writes event, outputs new state card
+1. `/fflow:start workflow.yaml` -> skill instructs agent to call `fflow start`
+2. `fflow start` -> writes start event, outputs guide + initial state card
+3. Agent works -> PostToolUse hook every 5 tool calls injects state reminder via `fflow current`
+4. Agent calls `fflow goto X --on "label"` -> CLI validates transition legality; if legal, writes event, outputs new state card
 5. Agent reaches `done` state -> run completes (`run_status=completed`)
-6. `/freefsm:finish` -> aborts an active run (`run_status=aborted`)
+6. `/fflow:finish` -> aborts an active run (`run_status=aborted`)
 
 ## Run Lifecycle
 
@@ -91,8 +91,8 @@ version: 1
 
 guide: |
   You are in an FSM workflow.
-  Use freefsm goto <State> --on "<condition>" to transition.
-  Use freefsm current to check current state.
+  Use fflow goto <State> --on "<condition>" to transition.
+  Use fflow current to check current state.
 
 initial: Plan
 
@@ -146,11 +146,11 @@ states:
 - Non-`done` states must have at least one transition; `done` may have empty transitions
 - `prompt` is required, plain text, no template variables
 - `todos` is optional; items must be non-empty, unique strings (soft constraint only)
-- `freefsm start` validates the schema and rejects invalid YAML (`SCHEMA_INVALID`)
+- `fflow start` validates the schema and rejects invalid YAML (`SCHEMA_INVALID`)
 
 ## Storage
 
-**Default root:** `~/.freefsm/` (override via `--root` flag or `FREEFSM_ROOT` env var).
+**Default root:** `~/.freeflow/` (override via `--root` flag or `FREEFLOW_ROOT` env var).
 
 ### Data contracts
 
@@ -159,7 +159,7 @@ states:
 ```json
 {
   "run_id": "plan-execute-auth",
-  "fsm_path": "./workflows/plan-execute.fsm.yaml",
+  "fsm_path": "./workflows/plan-execute.workflow.yaml",
   "created_at": "2026-02-28T09:00:00.000Z",
   "version": 1
 }
@@ -203,16 +203,16 @@ For state-changing operations (`start`, `goto`, `finish`):
 
 ## CLI Commands
 
-### `freefsm start <yaml> [--run-id <id>] [-j]`
+### `fflow start <yaml> [--run-id <id>] [-j]`
 
 ```
-$ freefsm start workflow.yaml
+$ fflow start workflow.yaml
 OK FSM initialized (run_id: a1b2c3)
 
 Guide:
   You are in an FSM workflow.
-  Use freefsm goto <State> to transition.
-  Use freefsm current to check current state.
+  Use fflow goto <State> to transition.
+  Use fflow current to check current state.
 
 State: Plan
   Understand requirements, break into subtasks, confirm with user.
@@ -227,10 +227,10 @@ Transitions:
 - Outputs guide + initial state card + transitions
 - Rejects if `run_id` already exists (`RUN_EXISTS`)
 
-### `freefsm current --run-id <id> [-j]`
+### `fflow current --run-id <id> [-j]`
 
 ```
-$ freefsm current --run-id a1b2c3
+$ fflow current --run-id a1b2c3
 
 State: Execute
   Implement according to plan. Do not run tests.
@@ -244,10 +244,10 @@ Transitions:
 - Outputs state card (state, prompt, todos, transitions)
 - Errors if run not found (`RUN_NOT_FOUND`)
 
-### `freefsm goto <state> --run-id <id> --on <label> [-j]`
+### `fflow goto <state> --run-id <id> --on <label> [-j]`
 
 ```
-$ freefsm goto Test --run-id a1b2c3 --on "implementation complete"
+$ fflow goto Test --run-id a1b2c3 --on "implementation complete"
 OK Execute -> Test (on: implementation complete)
 
 State: Test
@@ -263,10 +263,10 @@ Transitions:
 - If target is `done`: sets `run_status=completed`, `completion_reason=done_auto`
 - Errors with available transitions if illegal (`INVALID_TRANSITION`)
 
-### `freefsm finish --run-id <id> [-j]`
+### `fflow finish --run-id <id> [-j]`
 
 ```
-$ freefsm finish --run-id a1b2c3
+$ fflow finish --run-id a1b2c3
 OK FSM aborted (run_id: a1b2c3)
 Final state: Execute
 ```
@@ -296,7 +296,7 @@ Final state: Execute
         "hooks": [
           {
             "type": "command",
-            "command": "freefsm _hook post-tool-use",
+            "command": "fflow _hook post-tool-use",
             "timeout": 10
           }
         ]
@@ -306,7 +306,7 @@ Final state: Execute
 }
 ```
 
-Hook logic is a hidden CLI subcommand (`freefsm _hook post-tool-use`), eliminating path resolution issues when distributed via npm.
+Hook logic is a hidden CLI subcommand (`fflow _hook post-tool-use`), eliminating path resolution issues when distributed via npm.
 
 ### Logic
 
@@ -333,34 +333,34 @@ Transitions:
 
 ## Skills
 
-### `/freefsm:create [PATH]`
+### `/fflow:create [PATH]`
 
 Interactively create an FSM workflow YAML through conversation. User describes workflows in natural language, agent generates schema-compliant YAML.
 
-Does not depend on `freefsm` CLI. Pure conversation, agent writes YAML via Write tool.
+Does not depend on `fflow` CLI. Pure conversation, agent writes YAML via Write tool.
 
-### `/freefsm:start PATH`
+### `/fflow:start PATH`
 
-Start an FSM workflow run. Generates a descriptive slug as `run_id`, calls `freefsm start`, and guides the agent into the state machine.
+Start an FSM workflow run. Generates a descriptive slug as `run_id`, calls `fflow start`, and guides the agent into the state machine.
 
-### `/freefsm:current`
+### `/fflow:current`
 
-Show current FSM state. Calls `freefsm current` and displays the state card.
+Show current FSM state. Calls `fflow current` and displays the state card.
 
-### `/freefsm:finish`
+### `/fflow:finish`
 
-Abort the current FSM run. Calls `freefsm finish` and displays the terminal summary.
+Abort the current FSM run. Calls `fflow finish` and displays the terminal summary.
 
 ### Skills design decisions
 
 - **Hooks are always mounted, activated on demand** — hooks check for an active session/run and no-op if none exists. No dynamic install/uninstall.
-- **`/freefsm:create` does not depend on CLI** — pure conversation to generate YAML
+- **`/fflow:create` does not depend on CLI** — pure conversation to generate YAML
 - **`goto` is not a skill** — transitions are driven by agent via CLI, not exposed as slash commands
 
 ## Plugin Structure
 
 ```
-freefsm/
+freeflow/
 ├── skills/
 │   ├── create/
 │   │   └── SKILL.md
@@ -373,7 +373,7 @@ freefsm/
 ├── hooks/
 │   └── hooks.json
 ├── bin/
-│   └── freefsm
+│   └── fflow
 ├── src/
 │   ├── cli.ts                 # CLI command routing
 │   ├── commands/
@@ -393,14 +393,14 @@ freefsm/
 
 ### Distribution
 
-- **npm:** `npm i -g freefsm` installs CLI globally
-- Hook commands use `freefsm _hook post-tool-use` (hidden CLI subcommand), so no path resolution issues after npm install
+- **npm:** `npm i -g @freematters/freeflow` installs CLI globally
+- Hook commands use `fflow _hook post-tool-use` (hidden CLI subcommand), so no path resolution issues after npm install
 
 ## Future Work (TBD)
 
 - `strict: true` for hard todo enforcement
 - `vars` for state-scoped variables
-- `freefsm viz` for state graph visualization
-- `freefsm log` for event history viewing
+- `fflow viz` for state graph visualization
+- `fflow log` for event history viewing
 - Configurable hook reminder interval per state
 - PreToolUse validation hook (reject illegal transitions before CLI execution)

@@ -6,6 +6,7 @@ Set up TypeScript project, YAML loading, and schema validation.
 
 **Outcome:** `loadFsm(path)` returns a validated FSM object or throws with `SCHEMA_INVALID`. All validation rules enforced. Unit tests pass for valid/invalid YAML inputs.
 
+
 **Files:** `package.json`, `tsconfig.json`, `src/fsm.ts`
 
 **Ref:** [design-primary.md §3.1](../docs/design-primary.md#31-fsm-schema)
@@ -28,9 +29,9 @@ Implement directory layout, file lock, event append, and snapshot read/write.
 
 Initialize a new run: validate schema, create run directory, write `fsm.meta.json`, append `start` event, write initial snapshot, output state card.
 
-**Outcome:** `freefsm start <path> [--run-id <id>] [-j]` works end-to-end. Auto-generates `run_id` when omitted. Rejects duplicate `run_id`. Human-readable and JSON output match spec.
+**Outcome:** `fflow start <path> [--run-id <id>] [-j]` works end-to-end. Auto-generates `run_id` when omitted. Rejects duplicate `run_id`. Human-readable and JSON output match spec.
 
-**Files:** `src/commands/start.ts`, `src/cli.ts`, `bin/freefsm`
+**Files:** `src/commands/start.ts`, `src/cli.ts`, `bin/fflow`
 
 **Ref:** [design-primary.md §3.3 start](../docs/design-primary.md#start), [§3.4 start validation](../docs/design-primary.md#34-validation-order--error-precedence)
 
@@ -40,7 +41,7 @@ Initialize a new run: validate schema, create run directory, write `fsm.meta.jso
 
 Read snapshot + resolve state definition from FSM.
 
-**Outcome:** `freefsm current --run-id <id> [-j]` outputs `state`, `prompt`, `todos`, `transitions`. JSON mode additionally includes `run_id`, `run_status`. Errors on missing run.
+**Outcome:** `fflow current --run-id <id> [-j]` outputs `state`, `prompt`, `todos`, `transitions`. JSON mode additionally includes `run_id`, `run_status`. Errors on missing run.
 
 **Files:** `src/commands/current.ts`
 
@@ -52,7 +53,7 @@ Read snapshot + resolve state definition from FSM.
 
 Validate transition, append event, update snapshot, output new state card. Handle `done` state (set `run_status=completed`, `completion_reason=done_auto`).
 
-**Outcome:** `freefsm goto <target> --run-id <id> --on <label> [-j]` works. Invalid transitions rejected with available transitions in stderr (and structured data in `-j`). `goto done` completes the run.
+**Outcome:** `fflow goto <target> --run-id <id> --on <label> [-j]` works. Invalid transitions rejected with available transitions in stderr (and structured data in `-j`). `goto done` completes the run.
 
 **Files:** `src/commands/goto.ts`
 
@@ -64,7 +65,7 @@ Validate transition, append event, update snapshot, output new state card. Handl
 
 Abort an active run: append `finish` event, set `run_status=aborted`.
 
-**Outcome:** `freefsm finish --run-id <id> [-j]` outputs terminal summary. JSON includes `run_status=aborted`, `completion_reason=manual_abort`. Rejects if run not active.
+**Outcome:** `fflow finish --run-id <id> [-j]` outputs terminal summary. JSON includes `run_status=aborted`, `completion_reason=manual_abort`. Rejects if run not active.
 
 **Files:** `src/commands/finish.ts`
 

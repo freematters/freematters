@@ -1,26 +1,26 @@
 
 ### Overview
 
-A general-purpose, agent-driven e2e testing framework that ships with freefsm. An AI agent executes natural-language test plans against real infrastructure, observes effects, and produces structured logs for debugging.
+A general-purpose, agent-driven e2e testing framework that ships with fflow. An AI agent executes natural-language test plans against real infrastructure, observes effects, and produces structured logs for debugging.
 
 ### CLI Interface
 
-Two sub-commands under `freefsm e2e`:
+Two sub-commands under `fflow e2e`:
 
 | Command | Purpose |
 |---------|---------|
-| `freefsm e2e gen` | Generate a test plan from a workflow or prompt |
-| `freefsm e2e verify` | Execute a test plan using an agent and produce a test report |
+| `fflow e2e gen` | Generate a test plan from a workflow or prompt |
+| `fflow e2e verify` | Execute a test plan using an agent and produce a test report |
 
-### `freefsm e2e verify`
+### `fflow e2e verify`
 
-- Loads a `verifier.fsm.yaml` workflow internally to drive the verification process
+- Loads a `verifier.workflow.yaml` workflow internally to drive the verification process
 - Accepts a test plan file (structured markdown) as input
 - **`--test-dir <path>`** — required output directory for all artifacts
-- Uses real freefsm integration (e.g., `freefsm run` or `freefsm:start` skill) to execute workflows under test
+- Uses real fflow integration (e.g., `fflow run` or `fflow:start` skill) to execute workflows under test
 - The agent follows the test plan steps, interacts with external services, and determines pass/fail
 
-### `freefsm e2e gen`
+### `fflow e2e gen`
 
 - Generates a structured markdown test plan from a workflow definition or user prompt
 - Output is a `.md` file in the test plan format (see below)
@@ -52,9 +52,9 @@ Structured markdown with these sections:
 
 ### Scope
 
-- **General-purpose** — not tightly coupled to freefsm; can test any CLI/workflow tool
-- Ships bundled with freefsm but architecturally independent
-- `verifier.fsm.yaml` is bundled in freefsm's `workflows/` directory
+- **General-purpose** — not tightly coupled to fflow; can test any CLI/workflow tool
+- Ships bundled with fflow but architecturally independent
+- `verifier.workflow.yaml` is bundled in fflow's `workflows/` directory
 
 ### Non-Functional Requirements
 

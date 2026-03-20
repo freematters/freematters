@@ -1,20 +1,20 @@
 # Test: Error handling for invalid transitions and missing states
 
 ## Setup
-- Ensure freefsm CLI is built and available at `dist/cli.js`
+- Ensure fflow CLI is built and available at `dist/cli.js`
 - Create a temporary directory for run storage
 - Create a 2-state FSM YAML file (start -> done) with only one valid transition
 
 ## Steps
-1. **Start workflow**: Run `freefsm start simple.fsm.yaml --run-id test-errors` to initialize
+1. **Start workflow**: Run `fflow start simple.workflow.yaml --run-id test-errors` to initialize
    - Expected: Run initializes successfully in "start" state
-2. **Invalid transition label**: Run `freefsm goto done --run-id test-errors --on "nonexistent"` with a label that does not exist
+2. **Invalid transition label**: Run `fflow goto done --run-id test-errors --on "nonexistent"` with a label that does not exist
    - Expected: Command exits with non-zero exit code and an INVALID_TRANSITION error
-3. **Invalid target state**: Run `freefsm goto nowhere --run-id test-errors --on "next"` targeting a state that does not exist
+3. **Invalid target state**: Run `fflow goto nowhere --run-id test-errors --on "next"` targeting a state that does not exist
    - Expected: Command exits with non-zero exit code and an error indicating invalid transition or state not found
-4. **Missing run ID**: Run `freefsm current --run-id nonexistent-run` for a run that was never started
+4. **Missing run ID**: Run `fflow current --run-id nonexistent-run` for a run that was never started
    - Expected: Command exits with non-zero exit code and a RUN_NOT_FOUND error
-5. **Verify state unchanged after errors**: Run `freefsm current --run-id test-errors` to confirm state was not corrupted
+5. **Verify state unchanged after errors**: Run `fflow current --run-id test-errors` to confirm state was not corrupted
    - Expected: Current state is still "start" — failed transitions do not alter state
 
 ## Expected Outcomes

@@ -1,25 +1,25 @@
 
-# Implementation Plan: FreeFSM E2E Testing Framework
+# Implementation Plan: FreeFlow E2E Testing Framework
 
 ## Checklist
 - [x] Step 1: CLI scaffolding and test plan parser
-- [x] Step 2: TranscriptLogger and `freefsm e2e verify` core loop
+- [x] Step 2: TranscriptLogger and `fflow e2e verify` core loop
 - [x] Step 3: ReportGenerator and `test-report.md` output
-- [x] Step 4: `verifier.fsm.yaml` workflow
-- [x] Step 5: `freefsm e2e gen` command
-- [x] Step 6: Dogfood — self-test freefsm with the e2e framework
+- [x] Step 4: `verifier.workflow.yaml` workflow
+- [x] Step 5: `fflow e2e gen` command
+- [x] Step 6: Dogfood — self-test fflow with the e2e framework
 
 ---
 
 ## Step 1: CLI scaffolding and test plan parser
 
-**Objective**: Register `freefsm e2e verify` and `freefsm e2e gen` as CLI subcommands. Implement the test plan markdown parser that extracts `## Setup`, `## Steps`, `## Expected Outcomes`, `## Cleanup` sections into a typed data structure.
+**Objective**: Register `fflow e2e verify` and `fflow e2e gen` as CLI subcommands. Implement the test plan markdown parser that extracts `## Setup`, `## Steps`, `## Expected Outcomes`, `## Cleanup` sections into a typed data structure.
 
 **Test Requirements**:
 - Parse a valid test plan markdown → returns all 4 sections with step details
 - Parse a plan missing `## Expected Outcomes` → returns validation error
-- `freefsm e2e verify` with no args → exits with `ARGS_INVALID`
-- `freefsm e2e verify plan.md --test-dir ./out` → creates output directory
+- `fflow e2e verify` with no args → exits with `ARGS_INVALID`
+- `fflow e2e verify plan.md --test-dir ./out` → creates output directory
 
 **Implementation Guidance**:
 - Add `e2e` command group to `src/cli.ts` using Commander's `.command()` chaining (see existing `start`, `goto` patterns)
@@ -31,11 +31,11 @@
 
 **Integration Notes**: First step — establishes the CLI surface and data model used by all subsequent steps.
 
-**Demo**: `freefsm e2e verify test-plan.md --test-dir ./out` parses the plan and prints the parsed structure (JSON mode). Exits with error on invalid plans.
+**Demo**: `fflow e2e verify test-plan.md --test-dir ./out` parses the plan and prints the parsed structure (JSON mode). Exits with error on invalid plans.
 
 ---
 
-## Step 2: TranscriptLogger and `freefsm e2e verify` core loop
+## Step 2: TranscriptLogger and `fflow e2e verify` core loop
 
 **Objective**: Implement the transcript logging middleware and the core verification loop that launches a Claude agent, feeds it the test plan, and captures all interactions.
 
@@ -60,7 +60,7 @@
 
 **Integration Notes**: Builds on Step 1's parser. The agent runs but doesn't produce a formatted report yet (Step 3).
 
-**Demo**: `freefsm e2e verify plan.md --test-dir ./out` executes a simple 2-step test plan. `./out/transcript.jsonl` and `./out/api.jsonl` contain captured interactions.
+**Demo**: `fflow e2e verify plan.md --test-dir ./out` executes a simple 2-step test plan. `./out/transcript.jsonl` and `./out/api.jsonl` contain captured interactions.
 
 ---
 
@@ -83,38 +83,38 @@
 - Add JSON envelope support (design §7, AC5)
 - Agent's final message should include structured verdicts — parse them from the transcript
 
-**Integration Notes**: Called at the end of the verify loop (Step 2). Completes the full `freefsm e2e verify` pipeline.
+**Integration Notes**: Called at the end of the verify loop (Step 2). Completes the full `fflow e2e verify` pipeline.
 
-**Demo**: `freefsm e2e verify plan.md --test-dir ./out` produces `./out/test-report.md` with per-step results and an overall verdict.
+**Demo**: `fflow e2e verify plan.md --test-dir ./out` produces `./out/test-report.md` with per-step results and an overall verdict.
 
 ---
 
-## Step 4: `verifier.fsm.yaml` workflow
+## Step 4: `verifier.workflow.yaml` workflow
 
 **Objective**: Create the FSM workflow that structures the verification agent's execution through setup → execute → evaluate → report → done states.
 
 **Test Requirements**:
-- `verifier.fsm.yaml` passes schema validation (`freefsm start` succeeds)
+- `verifier.workflow.yaml` passes schema validation (`fflow start` succeeds)
 - All state transitions are valid (setup → execute-steps → evaluate → report → done)
 - State prompts reference test plan sections correctly
 
 **Implementation Guidance**:
-- New file: `workflows/verifier.fsm.yaml`
+- New file: `workflows/verifier.workflow.yaml`
 - States per design §4.5: `setup`, `execute-steps`, `evaluate`, `report`, `done`
 - Each state prompt instructs the agent on what to do with the test plan
 - `setup` prompt: read test plan, verify prerequisites, run setup steps
 - `execute-steps` prompt: execute each step sequentially, log evidence, judge each step
 - `evaluate` prompt: compare all observations against expected outcomes, determine overall verdict
 - `report` prompt: write `test-report.md` to `--test-dir`
-- Modify `verify.ts` to use `freefsm run` internally with this workflow instead of raw Agent SDK
+- Modify `verify.ts` to use `fflow run` internally with this workflow instead of raw Agent SDK
 
 **Integration Notes**: Replaces the ad-hoc agent loop from Step 2 with a structured FSM-driven execution. This is the key "dogfooding" integration.
 
-**Demo**: `freefsm e2e verify plan.md --test-dir ./out` now runs through the FSM states visibly. State transitions appear in transcript.
+**Demo**: `fflow e2e verify plan.md --test-dir ./out` now runs through the FSM states visibly. State transitions appear in transcript.
 
 ---
 
-## Step 5: `freefsm e2e gen` command
+## Step 5: `fflow e2e gen` command
 
 **Objective**: Generate structured markdown test plans from a workflow YAML or free-text prompt.
 
@@ -132,15 +132,15 @@
 - Output: write to `--output <file>` or stdout
 - Validate generated plan passes the parser before outputting
 
-**Integration Notes**: Uses the parser from Step 1 for validation. Can optionally use `gen.fsm.yaml` workflow per design §4.6.
+**Integration Notes**: Uses the parser from Step 1 for validation. Can optionally use `gen.workflow.yaml` workflow per design §4.6.
 
-**Demo**: `freefsm e2e gen workflows/pdd.fsm.yaml --output pdd-test.md` produces a test plan. `freefsm e2e verify pdd-test.md --test-dir ./out` can execute it.
+**Demo**: `fflow e2e gen workflows/pdd.workflow.yaml --output pdd-test.md` produces a test plan. `fflow e2e verify pdd-test.md --test-dir ./out` can execute it.
 
 ---
 
-## Step 6: Dogfood — self-test freefsm with the e2e framework
+## Step 6: Dogfood — self-test fflow with the e2e framework
 
-**Objective**: Write and run e2e tests for freefsm's own workflows using the new framework, proving it works end-to-end.
+**Objective**: Write and run e2e tests for fflow's own workflows using the new framework, proving it works end-to-end.
 
 **Test Requirements**:
 - A test plan for a simple 2-state workflow passes verification
@@ -151,7 +151,7 @@
 - Create `e2e/` directory with test plans:
   - `e2e/simple-workflow.md` — tests basic start → goto → done lifecycle
   - `e2e/error-handling.md` — tests invalid transitions, missing states
-- Run `freefsm e2e verify` against each plan
+- Run `fflow e2e verify` against each plan
 - Validate reports manually, then add as CI integration test
 - Add `npm run test:e2e` script to `package.json`
 

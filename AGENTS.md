@@ -6,16 +6,16 @@ Monorepo for agent-native developer tools — CLI tools designed as plugins for 
 
 | Package | Description | Language |
 |---------|-------------|----------|
-| [freefsm](freefsm/) | CLI-first FSM runtime for agent workflows | TypeScript |
+| [freeflow](freeflow/) | CLI-first workflow runtime for agent workflows | TypeScript |
 
 ## Local Commands
 
 | Command | Expands to |
 |---------|------------|
-| `/pdd` | `/freefsm:start pdd` |
-| `/spec-to-code` | `/freefsm:start spec-to-code` |
-| `/pr` | `/freefsm:start pr-lifecycle` |
-| `/release` | `/freefsm:start release` |
+| `/pdd` | `/fflow:start pdd` |
+| `/spec-to-code` | `/fflow:start spec-to-code` |
+| `/pr` | `/fflow:start pr-lifecycle` |
+| `/release` | `/fflow:start release` |
 
 ## Conventions
 

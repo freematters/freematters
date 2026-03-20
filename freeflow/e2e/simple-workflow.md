@@ -1,18 +1,18 @@
 # Test: Simple workflow lifecycle
 
 ## Setup
-- Ensure freefsm CLI is built and available at `dist/cli.js`
+- Ensure fflow CLI is built and available at `dist/cli.js`
 - Create a temporary directory for run storage
 - Create a minimal 2-state FSM YAML file (start -> done)
 
 ## Steps
-1. **Start workflow**: Run `freefsm start simple.fsm.yaml --run-id test-simple` to initialize a new run
+1. **Start workflow**: Run `fflow start simple.workflow.yaml --run-id test-simple` to initialize a new run
    - Expected: Run initializes successfully in "start" state with exit code 0
-2. **Check current state**: Run `freefsm current --run-id test-simple` to verify initial state
+2. **Check current state**: Run `fflow current --run-id test-simple` to verify initial state
    - Expected: Current state is "start" with valid state card output
-3. **Transition to done**: Run `freefsm goto done --run-id test-simple --on "next"` to transition
+3. **Transition to done**: Run `fflow goto done --run-id test-simple --on "next"` to transition
    - Expected: State transitions to "done" with exit code 0
-4. **Verify final state**: Run `freefsm current --run-id test-simple` to confirm final state
+4. **Verify final state**: Run `fflow current --run-id test-simple` to confirm final state
    - Expected: Current state is "done"
 
 ## Expected Outcomes

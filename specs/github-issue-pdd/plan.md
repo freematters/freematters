@@ -1,7 +1,7 @@
 # Implementation Plan: Issue Bot
 
 ## Checklist
-- [x] Step 1: Create `issue-bot.fsm.yaml` with all states and transitions
+- [x] Step 1: Create `issue-bot.workflow.yaml` with all states and transitions
 - [x] Step 2: Implement `create-issue` state prompt (issue creation + initial comment)
 - [x] Step 3: Implement ETag polling pattern and comment filtering in `requirements` state
 - [x] Step 4: Implement `research` and `checkpoint` state prompts
@@ -12,17 +12,17 @@
 
 ---
 
-## Step 1: Create `issue-bot.fsm.yaml` with all states and transitions
+## Step 1: Create `issue-bot.workflow.yaml` with all states and transitions
 
-**Objective**: Establish the FSM skeleton with all 8 states and correct transitions matching `pdd.fsm.yaml` flow.
+**Objective**: Establish the FSM skeleton with all 8 states and correct transitions matching `pdd.workflow.yaml` flow.
 
 **Test Requirements**:
-- `freefsm validate freefsm/workflows/issue-bot.fsm.yaml` passes
+- `fflow validate fflow/workflows/issue-bot.workflow.yaml` passes
 - All states exist: `create-issue`, `requirements`, `research`, `checkpoint`, `design`, `plan`, `e2e-test-design`, `done`
 - Transition graph matches design.md §3 state diagram
 
 **Implementation Guidance**:
-- Create `freefsm/workflows/issue-bot.fsm.yaml` with `version: 1`
+- Create `fflow/workflows/issue-bot.workflow.yaml` with `version: 1`
 - Add all 8 states with placeholder prompts (e.g., `prompt: "TODO"`)
 - Wire transitions exactly as in design.md §3:
   - `create-issue` → requirements | research
@@ -36,7 +36,7 @@
 
 **Integration Notes**: This is the foundation. All subsequent steps replace placeholder prompts.
 
-**Demo**: Run `freefsm validate freefsm/workflows/issue-bot.fsm.yaml` — exit code 0. Run `freefsm start freefsm/workflows/issue-bot.fsm.yaml --run-id test-issue-bot` — shows initial state card with `create-issue` state.
+**Demo**: Run `fflow validate fflow/workflows/issue-bot.workflow.yaml` — exit code 0. Run `fflow start fflow/workflows/issue-bot.workflow.yaml --run-id test-issue-bot` — shows initial state card with `create-issue` state.
 
 ---
 
@@ -173,7 +173,7 @@
   3. Post a summary comment listing all artifact comments with links
   4. Report completion to the user
 
-**Integration Notes**: This is the terminal state. After this, the freefsm workflow ends.
+**Integration Notes**: This is the terminal state. After this, the fflow workflow ends.
 
 **Demo**: Verify issue has `spec-ready` label, all status checkboxes are checked, and summary comment lists all artifacts.
 
@@ -184,7 +184,7 @@
 **Objective**: Add the `guide` section with cross-state rules for polling, comment formatting, minimize API, and creator filtering.
 
 **Test Requirements**:
-- `freefsm validate` still passes after adding guide
+- `fflow validate` still passes after adding guide
 - Guide text covers: ETag polling pattern, comment title format, minimize API usage, creator-only filtering, status checklist updates
 
 **Implementation Guidance**:
@@ -198,7 +198,7 @@
 
 **Integration Notes**: Guide rules complement state prompts. They should not duplicate state-specific instructions.
 
-**Demo**: Read the full YAML. Verify guide covers all cross-cutting concerns. Run `freefsm validate` — passes.
+**Demo**: Read the full YAML. Verify guide covers all cross-cutting concerns. Run `fflow validate` — passes.
 
 ---
 

@@ -1,6 +1,6 @@
-# FreeFSM
+# FreeFlow
 
-CLI-first FSM runtime for agent workflows. Define states and transitions in YAML; the CLI enforces valid paths while leaving in-state reasoning to the LLM.
+CLI-first workflow runtime for agent workflows. Define states and transitions in YAML; the CLI enforces valid paths while leaving in-state reasoning to the LLM.
 
 Works with **Claude Code** and **Codex**.
 
@@ -11,47 +11,47 @@ AI coding agents are powerful but unreliable at following multi-step workflows. 
 - **Natural language prompts** are flexible but non-deterministic — agents drift from instructions, skip steps, and ignore constraints no matter how many "MUST" and "ALWAYS" directives you add.
 - **Hardcoded logic** is deterministic but rigid — every workflow change requires code changes, and bugs are inevitable.
 
-FreeFSM resolves this by separating **what the agent does** (flexible, LLM-driven) from **where the agent goes** (deterministic, FSM-enforced). The agent stays in control of reasoning and tool use within each state, but the FSM governs which states exist and which transitions are legal.
+FreeFlow resolves this by separating **what the agent does** (flexible, LLM-driven) from **where the agent goes** (deterministic, FSM-enforced). The agent stays in control of reasoning and tool use within each state, but the FSM governs which states exist and which transitions are legal.
 
 ## Install
 
 Tell this to your coding agent:
 
 ```
-Read https://github.com/freematters/freematters/blob/main/freefsm/README.md to install freefsm
+Read https://github.com/freematters/freeflow/blob/main/freeflow/README.md to install freeflow
 ```
 
 Or install manually:
 
 ```bash
-npm install -g @freematters/freefsm
+npm install -g @freematters/freeflow
 
 # Claude Code — registers skills + PostToolUse hook
-freefsm install claude
+fflow install claude
 
 # Codex — links skills (no hook support)
-freefsm install codex
+fflow install codex
 ```
 
 ### For Contributors
 
 ```bash
-git clone https://github.com/freematters/freematters.git
-cd freematters/freefsm
+git clone https://github.com/freematters/freeflow.git
+cd freeflow/freeflow
 npm install && npm run build
 npm link
 
-freefsm install claude
+fflow install claude
 ```
 
 ## Usage
 
-FreeFSM is typically used through these skills:
+FreeFlow is typically used through these skills:
 
-- `/freefsm:create` — guided Q&A to create a workflow YAML
-- `/freefsm:start <path>` — start a workflow run (also searches `./workflows/` by name)
-- `/freefsm:current` — show current state
-- `/freefsm:finish` — abort an active run
+- `/fflow:create` — guided Q&A to create a workflow YAML
+- `/fflow:start <path>` — start a workflow run (also searches `./workflows/` by name)
+- `/fflow:current` — show current state
+- `/fflow:finish` — abort an active run
 
 Codex skill names use `$` instead of `/`.
 
@@ -64,7 +64,7 @@ Codex skill names use `$` instead of `/`.
 Start a bundled workflow by name:
 
 ```
-/freefsm:start pdd
+/fflow:start pdd
 ```
 
 ## How It Works
@@ -92,9 +92,9 @@ states:
 
 The runtime works through three mechanisms:
 
-1. **Skills** invoke the CLI — `/freefsm:start` loads the YAML, validates the schema, and enters the initial state. The agent sees a state card with the current prompt and available transitions.
-2. **CLI enforces transitions** — when the agent calls `freefsm goto feedback --on found_issues`, the CLI validates the transition against the YAML before committing it. Illegal transitions are rejected.
-3. **Hooks inject reminders** — a PostToolUse hook runs `freefsm current` every 5 tool calls, re-injecting the current state card into the agent's context. This counteracts context drift in long conversations.
+1. **Skills** invoke the CLI — `/fflow:start` loads the YAML, validates the schema, and enters the initial state. The agent sees a state card with the current prompt and available transitions.
+2. **CLI enforces transitions** — when the agent calls `fflow goto feedback --on found_issues`, the CLI validates the transition against the YAML before committing it. Illegal transitions are rejected.
+3. **Hooks inject reminders** — a PostToolUse hook runs `fflow current` every 5 tool calls, re-injecting the current state card into the agent's context. This counteracts context drift in long conversations.
 
 All state changes are recorded as an append-only event log (JSONL), with a snapshot for fast reads. Runs are isolated by ID with directory-based file locking for concurrent safety.
 
