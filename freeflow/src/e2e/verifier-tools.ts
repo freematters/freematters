@@ -160,7 +160,7 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
   );
 
   const server = createSdkMcpServer({
-    name: "freefsm-verifier",
+    name: "freeflow-verifier",
     version: "1.0.0",
     tools: [runAgent, wait, send],
   });

@@ -36,7 +36,7 @@ export function formatToolArgs(
       return `(${input.on} → ${input.target})`;
     case "fsm_current":
       return "()";
-    case "mcp__freefsm__request_input":
+    case "mcp__freeflow__request_input":
     case "request_input":
       return "";
     case "Read":

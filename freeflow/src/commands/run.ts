@@ -272,16 +272,16 @@ export function createFsmMcpServer(
   });
 
   return createSdkMcpServer({
-    name: "freefsm",
+    name: "freeflow",
     version: "1.0.0",
     tools: [fsmGoto, fsmCurrent, requestInput],
   });
 }
 
 const MCP_TOOL_NAMES = [
-  "mcp__freefsm__fsm_goto",
-  "mcp__freefsm__fsm_current",
-  "mcp__freefsm__request_input",
+  "mcp__freeflow__fsm_goto",
+  "mcp__freeflow__fsm_current",
+  "mcp__freeflow__request_input",
 ];
 
 const log = agentLog;
@@ -350,7 +350,7 @@ export async function runCore(
     permissionMode: "bypassPermissions" as const,
     allowDangerouslySkipPermissions: true,
     disallowedTools: ["AskUserQuestion", "EnterPlanMode", "ExitPlanMode"],
-    mcpServers: { freefsm: fsmServer },
+    mcpServers: { freeflow: fsmServer },
     ...(allowedTools !== undefined && { allowedTools }),
     model,
   });
@@ -375,7 +375,7 @@ export async function runCore(
         if (opts.verbose) {
           logSdkMessage(message, {
             sessionNum: attempt,
-            skipTools: ["mcp__freefsm__request_input"],
+            skipTools: ["mcp__freeflow__request_input"],
           });
         }
 

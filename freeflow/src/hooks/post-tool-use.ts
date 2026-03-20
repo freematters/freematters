@@ -10,9 +10,9 @@ export interface HookInput {
   tool_response: unknown;
 }
 
-const START_RE = /freefsm\s+start\b/;
-const FINISH_RE = /freefsm\s+finish\b/;
-const GOTO_DONE_RE = /freefsm\s+goto\s+done\b/;
+const START_RE = /(?:fflow|freefsm)\s+start\b/;
+const FINISH_RE = /(?:fflow|freefsm)\s+finish\b/;
+const GOTO_DONE_RE = /(?:fflow|freefsm)\s+goto\s+done\b/;
 const RUN_ID_FLAG_RE = /--run-id\s+(\S+)/;
 
 /**
@@ -23,7 +23,7 @@ export function handlePostToolUse(input: HookInput, root: string): string | null
   const store = new Store(root);
   const sessionId = input.session_id;
 
-  // 1. Auto-detect freefsm commands
+  // 1. Auto-detect fflow/freefsm commands
   if (input.tool_name === "Bash") {
     const cmd =
       typeof input.tool_input?.command === "string" ? input.tool_input.command : "";
@@ -100,7 +100,7 @@ export function main(): void {
     try {
       const input = JSON.parse(raw) as HookInput;
 
-      const root = process.env.FREEFSM_ROOT ?? `${homedir()}/.freefsm`;
+      const root = process.env.FREEFLOW_ROOT ?? process.env.FREEFSM_ROOT ?? `${homedir()}/.freeflow`;
 
       const reminder = handlePostToolUse(input, root);
 

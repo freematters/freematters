@@ -13,14 +13,16 @@ import { list } from "./commands/list.js";
 import { run as runCmd } from "./commands/run.js";
 import { start } from "./commands/start.js";
 import { validate } from "./commands/validate.js";
+import { registerMigrate } from "./commands/migrate.js";
 import { main as postToolUseMain } from "./hooks/post-tool-use.js";
 import { handleError } from "./output.js";
 import { resolveWorkflow } from "./resolve-workflow.js";
 
 function resolveRoot(flagRoot?: string): string {
   if (flagRoot) return resolve(flagRoot);
-  if (process.env.FREEFSM_ROOT) return resolve(process.env.FREEFSM_ROOT);
-  return join(homedir(), ".freefsm");
+  const envRoot = process.env.FREEFLOW_ROOT ?? process.env.FREEFSM_ROOT;
+  if (envRoot) return resolve(envRoot);
+  return join(homedir(), ".freeflow");
 }
 
 type GlobalOpts = { root?: string; json?: boolean };
@@ -39,18 +41,18 @@ function resolveWorkflowOrExit(input: string, json: boolean): string {
 }
 
 const program = new Command()
-  .name("freefsm")
+  .name("fflow")
   .description(
     `CLI-first FSM runtime for agent workflows
 
 Example:
-  $ freefsm start workflow.yaml --run-id my-run
-  $ freefsm goto review --run-id my-run --on "draft ready"
-  $ freefsm current --run-id my-run
-  $ freefsm finish --run-id my-run`,
+  $ fflow start workflow.yaml --run-id my-run
+  $ fflow goto review --run-id my-run --on "draft ready"
+  $ fflow current --run-id my-run
+  $ fflow finish --run-id my-run`,
   )
   .version("0.1.0")
-  .option("--root <path>", "storage root (default: ~/.freefsm/ or $FREEFSM_ROOT)")
+  .option("--root <path>", "storage root (default: ~/.freeflow/ or $FREEFLOW_ROOT)")
   .option("-j, --json", "output as JSON envelope")
   .configureOutput({
     outputError: (str, write) => write(str),
@@ -184,7 +186,7 @@ program
 
 program
   .command("install")
-  .description("register freefsm with an agent platform")
+  .description("register freeflow with an agent platform")
   .argument("<platform>", "target platform: claude or codex")
   .action((platform: string) => {
     if (platform !== "claude" && platform !== "codex") {
@@ -224,5 +226,7 @@ hookCmd
   .action(() => {
     postToolUseMain();
   });
+
+registerMigrate(program);
 
 program.parse();
