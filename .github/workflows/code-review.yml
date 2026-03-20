@@ -44,10 +44,10 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: freefsm/package-lock.json
+          cache-dependency-path: freeflow/package-lock.json
 
       - name: Install freefsm
-        working-directory: freefsm
+        working-directory: freeflow
         run: npm ci && npm run build && npm link && echo "$(npm root -g)/.bin" >> $GITHUB_PATH
 
       - name: Install Claude Code

@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: freefsm
+        working-directory: freeflow
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -21,7 +21,7 @@ jobs:
           node-version: '22'
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
-          cache-dependency-path: freefsm/package-lock.json
+          cache-dependency-path: freeflow/package-lock.json
       - run: npm install -g npm@11.11.1
       - run: npm ci
       - run: npm run build
