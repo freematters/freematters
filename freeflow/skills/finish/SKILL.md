@@ -1,26 +1,26 @@
 ---
-name: freefsm:finish
-description: Use when the user wants to abort or terminate an active FSM workflow run. Runs `freefsm finish` to set the run as aborted and display a terminal summary.
+name: fflow:finish
+description: Use when the user wants to abort or terminate an active workflow run. Runs `fflow finish` to set the run as aborted and display a terminal summary.
 ---
 
 # Finish (Abort) FSM Run
 
 Abort an active FSM run. This sets the run status to `aborted` with reason `manual_abort`.
 
-For normal completion, use `freefsm goto done` instead — that happens automatically when the workflow reaches its terminal state.
+For normal completion, use `fflow goto done` instead — that happens automatically when the workflow reaches its terminal state.
 
 ## Usage
 
-`/freefsm:finish` — uses the run ID from the most recent `/freefsm:start` in this conversation.
+`/fflow:finish` — uses the run ID from the most recent `/fflow:start` in this conversation.
 
 ## Process
 
-1. **Retrieve the run ID** — Use the `run_id` remembered from the previous `/freefsm:start` call in this conversation.
+1. **Retrieve the run ID** — Use the `run_id` remembered from the previous `/fflow:start` call in this conversation.
 
 2. **Run the CLI command:**
 
 ```bash
-freefsm finish --run-id <run_id>
+fflow finish --run-id <run_id>
 ```
 
 3. **Clean up tasks** — After aborting, delete all pending and in-progress tasks from the task list using `TaskList` and `TaskUpdate` (set status to `deleted`). These tasks were created by the workflow and are no longer relevant.

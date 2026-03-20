@@ -25,4 +25,4 @@ After the PR is merged (workflow reaches `done` state):
 
 Then proceed with the workflow:
 
-/freefsm:start pr-lifecycle
+/fflow:start pr-lifecycle

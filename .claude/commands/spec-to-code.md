@@ -2,4 +2,4 @@
 description: Start spec-to-code workflow
 ---
 
-/freefsm:start spec-to-code
+/fflow:start spec-to-code

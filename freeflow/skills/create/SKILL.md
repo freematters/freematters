@@ -1,26 +1,26 @@
 ---
-name: freefsm:create
-description: Create FreeFSM workflow file.
+name: fflow:create
+description: Create FreeFlow workflow file.
 ---
 
 # Create Workflow
 
 Primary goal: your goal is to co-create a workflow with the user in an interactive way. Human input is important for 
-this creative work as the user knows much better on what they will want to achieve. Your mission is to help, inspire and assist user to write a freefsm compatible yaml workflow file, your mission is not to take over the creative process.
+this creative work as the user knows much better on what they will want to achieve. Your mission is to help, inspire and assist user to write a fflow compatible yaml workflow file, your mission is not to take over the creative process.
 
-You DON'T want to provide implmentation detail of freefsm to the user and you MUST not make users feel like they are filling a schema.
+You DON'T want to provide implmentation detail of fflow to the user and you MUST not make users feel like they are filling a schema.
 
-## Background on `freefsm` (Internal only for you to undetstand):
+## Background on `fflow` (Internal only for you to undetstand):
 
-This skill does NOT call the `freefsm` CLI. It generates YAML and saves it with the Write tool.
+This skill does NOT call the `fflow` CLI. It generates YAML and saves it with the Write tool.
 
-FreeFSM is a CLI-first finite-state-machine runtime for agent workflows.
+FreeFlow is a CLI-first finite-state-machine runtime for agent workflows.
 At runtime, the YAML definition is authoritative for allowed transitions.
 Each state provides guidance (`prompt`, optional `todos`) and named transition labels to next states.
 
 Core runtime flow:
-- `freefsm start <fsm_path>` initializes a run at the configured initial state.
-- `freefsm goto <target> --run-id <id> --on <label>` validates exact transition label/target match, then advances state.
+- `fflow start <fsm_path>` initializes a run at the configured initial state.
+- `fflow goto <target> --run-id <id> --on <label>` validates exact transition label/target match, then advances state.
 
 Example state card (internal reference):
 ```text
@@ -55,7 +55,7 @@ Transitions:
   3. Ask user if there are important decision points in the workflow that must require human approval or input. If there is such, put it as hard todos in any state.
    
 2. **Model the workflow internally**
-   - Create the blank workflow YAML to user-specified path, or default to `./workflows/<name>.fsm.yaml`. With only guide:, version:, initial: , states: with only state name (with blank prompt and transitions). When iterating with YAML, only need to verify at step 4, do not do in 2 nad 3.
+   - Create the blank workflow YAML to user-specified path, or default to `./workflows/<name>.workflow.yaml`. With only guide:, version:, initial: , states: with only state name (with blank prompt and transitions). When iterating with YAML, only need to verify at step 4, do not do in 2 nad 3.
    - You must create TODO or Task for each phase/state for you to work with the user to fill. 
    - For each state, propose state prompt (instructions) and transitions to the user, ask user to review and approve. Keep the transition label concise and meaningful.
    - Ask if there are any must todos in this state.

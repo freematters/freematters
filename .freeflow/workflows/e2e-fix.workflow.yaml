@@ -1,6 +1,6 @@
 version: 1
 guide: |
-  Debug a failed freefsm e2e run. Analyze the run directory artifacts,
+  Debug a failed fflow e2e run. Analyze the run directory artifacts,
   write a shell script that reproduces the failure, fix the code, and
   verify with the real e2e runner.
 
@@ -22,7 +22,7 @@ states:
       1. Which step failed and what was expected vs actual
       2. The root cause — what code path or behavior is broken
       3. Which source files are involved
-      4. The path of the original test plan (from the freefsm verify invocation
+      4. The path of the original test plan (from the fflow verify invocation
          in the session log, or from the test-report.md header) — needed later
          for the verify state to re-run it
 
@@ -91,10 +91,10 @@ states:
 
   verify:
     prompt: |
-      Dispatch a sub-agent to run the original e2e test plan with `freefsm verify`
+      Dispatch a sub-agent to run the original e2e test plan with `fflow verify`
       to confirm the fix works end-to-end with the real agent runner.
 
-      After the run, check the `freefsm verify` command's stdout/stderr output
+      After the run, check the `fflow verify` command's stdout/stderr output
       for any `[e2e-debug]` lines from debug logging added in the diagnose
       state. These appear in the terminal output, not in session JSONL logs.
 
