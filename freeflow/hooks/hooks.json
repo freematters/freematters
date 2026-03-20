@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "freefsm _hook post-tool-use",
+            "command": "fflow _hook post-tool-use",
             "timeout": 10
           }
         ]

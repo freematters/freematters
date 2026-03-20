@@ -1,11 +1,11 @@
 {
-  "name": "@freematters/freefsm",
+  "name": "@freematters/freeflow",
   "version": "0.4.0",
   "description": "CLI-first FSM runtime for agent workflows",
   "type": "module",
   "main": "dist/cli.js",
   "bin": {
-    "freefsm": "dist/cli.js"
+    "fflow": "dist/cli.js"
   },
   "scripts": {
     "build": "tsc",
@@ -44,7 +44,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/freematters/freematters",
-    "directory": "freefsm"
+    "directory": "freeflow"
   },
   "license": "MIT"
 }

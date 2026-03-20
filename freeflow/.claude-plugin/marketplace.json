@@ -1,11 +1,11 @@
 {
-  "name": "freefsm-local",
+  "name": "freeflow-local",
   "owner": {
     "name": "freematters"
   },
   "plugins": [
     {
-      "name": "freefsm",
+      "name": "freeflow",
       "description": "CLI-first FSM runtime for agent workflows",
       "version": "0.1.0",
       "source": "./"

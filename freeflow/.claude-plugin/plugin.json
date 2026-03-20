@@ -1,5 +1,5 @@
 {
-  "name": "freefsm",
+  "name": "freeflow",
   "version": "0.1.0",
   "description": "CLI-first FSM runtime for agent workflows",
   "author": {
