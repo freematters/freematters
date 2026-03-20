@@ -5,8 +5,8 @@ Thanks for your interest in contributing to Freematters!
 ## Development Setup
 
 ```bash
-git clone git@github.com:freematters/freeflow.git
-cd freeflow/freeflow
+git clone git@github.com:freematters/freematters.git
+cd freematters/freeflow
 npm install
 npm run build
 npm link          # symlinks fflow to PATH (reflects changes immediately)

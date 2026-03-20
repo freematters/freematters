@@ -36,8 +36,8 @@ fflow install codex
 ### For Contributors
 
 ```bash
-git clone https://github.com/freematters/freeflow.git
-cd freeflow/freeflow
+git clone https://github.com/freematters/freematters.git
+cd freematters/freeflow
 npm install && npm run build
 npm link
 
