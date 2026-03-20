@@ -1,6 +1,6 @@
 # Flow:
 #
-#   setup → execute → report → done
+#   verify → done
 #
 
 version: 1
@@ -10,7 +10,7 @@ guide: |
 
   The test plan file path and test output directory are provided in the initial prompt.
   The agent reads the test plan, starts an embedded agent, interacts with it
-  via run_agent/wait/send, and generates a report.
+  via run_agent/wait/send, judges each step, and writes a report.
 
   ## Available MCP Tools
 
@@ -34,59 +34,37 @@ guide: |
   - Execute steps exactly as described in the test plan.
   - Decide what input to provide based on the test plan's steps and goals.
   - Do NOT skip steps or invent steps not in the plan.
-  - Always proceed through all states — do not stop early.
 
-initial: setup
+initial: verify
 
 states:
-  setup:
+  verify:
     prompt: |
-      ## Setup
+      ## Verify
 
       1. Read the test plan file (path provided in the initial prompt).
       2. Understand the background, steps, and expected outcomes.
       3. Start the embedded agent using `run_agent` with the prompt from the
-         test plan's first step.
-      4. Verify the agent started successfully.
+         test plan's Setup section.
+      4. Execute each test step by interacting with the embedded agent:
+         - Call `wait()` to receive the agent's output from its current turn.
+         - Compare actual behavior against expected outcomes for each step.
+         - When the plan requires sending input or instructions, use `send()`.
+         - Judge each step as PASS or FAIL with evidence.
+         - Continue until all steps are complete or the agent session ends.
+         - Do NOT stop on failure — observe all steps even if one fails.
+      5. Write a `test-report.md` file to the test output directory with:
+         - Overall verdict: PASS or FAIL
+         - Per-step verdicts with evidence
+         - Any unexpected observations
+         - Failure details with evidence for debugging
+      6. Output a final summary: overall verdict, steps passed/failed.
 
-      If the test plan is invalid, report the error and proceed
-      to the report state to write a FAIL report.
+      If the test plan is invalid, write a FAIL report explaining the error.
     transitions:
-      setup complete: execute
-
-  execute:
-    prompt: |
-      ## Execute Test Steps
-
-      Execute each test step from the plan by interacting with the embedded agent:
-
-      1. Call `wait()` to receive the agent's output from its current turn.
-      2. Compare actual behavior against expected outcomes for each step.
-      3. When the plan requires sending input or instructions, use `send()`.
-      4. Judge each step as PASS or FAIL with evidence.
-      5. Continue until all steps are complete or the agent session ends.
-
-      Do NOT stop on failure — observe all steps even if one fails.
-    transitions:
-      all steps executed: report
-
-  report:
-    prompt: |
-      ## Generate Report
-
-      Write a test-report.md file to the test output directory (provided in the
-      initial prompt) with:
-
-      - Overall verdict: PASS or FAIL
-      - Per-step verdicts with evidence
-      - Any unexpected observations
-      - Failure details with evidence for debugging
-
-      Then provide a final summary as your output: overall verdict, steps passed/failed.
-    transitions:
-      report written: done
+      done: done
 
   done:
     prompt: |
-      Verification complete. Output the final summary.
+      Verification complete.
     transitions: {}

@@ -16,11 +16,9 @@ describe("verifier.fsm.yaml", () => {
     expect(content).toContain("send");
   });
 
-  test("has setup → execute → report → done flow", () => {
+  test("has verify → done flow", () => {
     const content = readFileSync(VERIFIER_FSM, "utf-8");
-    expect(content).toContain("initial: setup");
-    expect(content).toContain("setup complete: execute");
-    expect(content).toContain("all steps executed: report");
-    expect(content).toContain("report written: done");
+    expect(content).toContain("initial: verify");
+    expect(content).toContain("done: done");
   });
 });
