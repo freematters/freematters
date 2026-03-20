@@ -84,8 +84,10 @@ Exit codes: `0` success, `2` failure.
     fsm.meta.json    # Run metadata
     events.jsonl     # Append-only event log
     snapshot.json    # Current state snapshot
-    session.jsonl            # Symlink to Claude session JSONL log
-    embedded-session.jsonl   # (verify only) Symlink to embedded agent's session log
+    session.jsonl            # Symlink to Claude session JSONL log (freefsm run)
+    verifier-session.jsonl   # (verify only) Verifier agent's session log
+    executor-session.jsonl   # (verify only) Executor agent's session log
+    <test-plan>.md           # (verify only) Copy of the test plan
     lock/                    # Directory-based file lock
   sessions/
     <session_id>.json      # Session→run binding
@@ -117,5 +119,5 @@ Dogfood test plans live in `e2e/`.
 
 Both `fflow run` and `fflow verify` print the Claude session ID to stderr on session start.
 `fflow run` symlinks the Claude session JSONL log (`session.jsonl`) into the run directory.
-`fflow verify` symlinks both the verifier's (`session.jsonl`) and embedded agent's (`embedded-session.jsonl`) Claude session logs into the verifier's run directory.
+`fflow verify` symlinks the verifier's (`verifier-session.jsonl`) and executor's (`executor-session.jsonl`) session logs into the run directory, along with a copy of the test plan.
 

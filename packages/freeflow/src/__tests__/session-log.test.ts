@@ -144,7 +144,7 @@ describe("verifyCore session log symlinking (e2e)", () => {
     process.env.FREEFLOW_ROOT = undefined;
   });
 
-  test("creates session.jsonl and embedded-session.jsonl symlinks in verifier run dir", async () => {
+  test("creates verifier-session.jsonl, executor-session.jsonl symlinks and test plan copy in verifier run dir", async () => {
     const { verifyCore } = await import("../e2e/verify-runner.js");
 
     await verifyCore({ planPath, testDir, root: fsmRoot });
@@ -156,8 +156,8 @@ describe("verifyCore session log symlinking (e2e)", () => {
     expect(runDirs.length).toBeGreaterThanOrEqual(1);
 
     const runDir = join(runsDir, runDirs[runDirs.length - 1]);
-    const sessionLink = join(runDir, "session.jsonl");
-    const embeddedLink = join(runDir, "embedded-session.jsonl");
+    const sessionLink = join(runDir, "verifier-session.jsonl");
+    const embeddedLink = join(runDir, "executor-session.jsonl");
 
     // Both symlinks must exist
     expect(existsSync(sessionLink)).toBe(true);
@@ -166,6 +166,11 @@ describe("verifyCore session log symlinking (e2e)", () => {
     // Both must be symlinks (not copies)
     expect(lstatSync(sessionLink).isSymbolicLink()).toBe(true);
     expect(lstatSync(embeddedLink).isSymbolicLink()).toBe(true);
+
+    // Test plan copy must exist
+    const { basename } = await import("node:path");
+    const planCopy = join(runDir, basename(planPath));
+    expect(existsSync(planCopy)).toBe(true);
 
     // Symlinks point to the correct session JSONL files
     const sessionDir = getSessionDir(process.cwd());

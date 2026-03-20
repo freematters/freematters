@@ -56,14 +56,14 @@ Codex skill names use `$` instead of `/`.
 
 ## Bundled Workflows
 
-- `pdd` — Plan-Driven Development: interactive requirements, research, design, and planning
-- `spec-to-code` — implements a spec directory (from PDD) into working code via TDD
+- `spec-gen` — generates a complete specification: interactive requirements, research, design, and planning
+- `spec-to-code` — implements a spec directory (from spec-gen) into working code via TDD
 - `mr-lifecycle` — merge request lifecycle management
 
 Start a bundled workflow by name:
 
 ```
-/fflow:start pdd
+/fflow:start spec-gen
 ```
 
 ## How It Works

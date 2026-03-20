@@ -13,8 +13,7 @@
 #            user requests    re-run e2e / review
 #            fixes → fix-review → review (loop)
 #
-# Credit: State machine inspired by ralph-orchestrator's spec-driven.yml and pdd-to-code-assist.yml prompts.
-# Picks up where PDD left off — reads ./specs/<slug>/ artifacts and implements them.
+# Picks up where spec-gen left off — reads ./specs/<slug>/ artifacts and implements them.
 
 version: 1
 guide: |
@@ -126,7 +125,7 @@ states:
       - Source mode: local or issue (with issue URL if applicable)
 
       If `./specs/<slug>/plan.md` or `./specs/<slug>/design.md` does not exist, inform the user and suggest
-      running the PDD workflow first (or the issue-bot workflow for issue-driven specs).
+      running the spec-gen workflow first (`/freefsm:start spec-gen`) or the issue-bot workflow for issue-driven specs.
 
       Create a todo item for each uncompleted step (using the step title). Mark already-completed steps as done.
 
@@ -240,25 +239,25 @@ states:
 
       All implementation steps are complete. Run E2E tests to verify the feature works end-to-end.
 
-      Read `./specs/<slug>/e2e.md` for the scenario, infrastructure, and how to run.
-      If `e2e.md` does not exist, skip directly to review.
+      Read `./specs/<slug>/e2e.md`. If it does not exist, skip directly to review.
 
-      If `e2e.md` exists, you MUST attempt to execute it. Do NOT skip because the setup
-      looks complex or you assume infrastructure is unavailable. Check whether the required
-      environment is available (e.g., run `docker info`, check for running services, verify
-      dependencies). Only flag to the user if execution genuinely fails, never preemptively.
+      `e2e.md` is a verifier–executor test plan designed for `freefsm verify`.
+      The verifier agent reads the plan, launches an executor agent to operate the software,
+      and judges pass/fail by observing the executor's output in a shared sandbox.
 
-      Dispatch a sub-agent to execute the E2E scenario:
+      ### Run the test
 
-      > Read `./specs/<slug>/e2e.md` for the full test plan.
-      > Follow the "How to Run" section for environment setup and commands.
-      > Execute each action, compare actual vs expected output, record PASS/FAIL.
-      > Write results to `./specs/<slug>/e2e-report.md`.
-      > On failure: identify root cause, fix minimally, run full test suite, re-run full scenario.
+      ```bash
+      freefsm verify ./specs/<slug>/e2e.md --test-dir ./specs/<slug>/e2e-out
+      ```
 
-      - **Pass** → transition to review
-      - **Fail (attempt < 5)** → sub-agent fixes and re-runs the full scenario within this state
-      - **Fail (attempt >= 5) or cannot execute after attempting** → flag to user, ask how to proceed
+      This produces `./specs/<slug>/e2e-out/test-report.md` with per-step results.
+
+      - **Pass** (exit code 0) → transition to review
+      - **Fail** (exit code 2, attempt < 5) → read the test report, diagnose the failure,
+        fix the code minimally, run the full test suite to check for regressions,
+        then re-run `freefsm verify`
+      - **Fail** (attempt >= 5) → flag to user, ask how to proceed
 
       Update `./specs/<slug>/progress.md` with E2E result, attempt count, and notes.
     transitions:
@@ -369,9 +368,9 @@ states:
       >
       > For each issue you fix:
       > 1. Read the relevant code
-      > 2. Write a failing regression test that reproduces the bug BEFORE fixing it
-      > 3. Fix the issue — keep changes minimal and focused
-      > 4. Run the full test suite to ensure no regressions
+      > 2. Fix the issue — keep changes minimal and focused
+      > 3. Run the full test suite to ensure no regressions
+      > 4. If the fix requires new tests, add them
       >
       > Report: what was fixed, what medium issues were skipped (with reason), test results.
 
@@ -431,7 +430,7 @@ states:
       Present the summary to the user.
 
       If the workflow was started because the spec was missing, remind the user to run
-      the PDD workflow (`/freefsm:start pdd`) first.
+      the spec-gen workflow (`/freefsm:start spec-gen`) first.
 
       ### Issue mode additional steps
 

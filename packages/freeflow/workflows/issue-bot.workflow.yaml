@@ -1,4 +1,4 @@
-# Issue Bot — GitHub Issue-driven PDD workflow
+# Issue Bot — GitHub Issue-driven spec-gen workflow
 #
 # Flow:
 #
@@ -20,13 +20,13 @@
 
 version: 1
 guide: |
-  Issue Bot — Plan-Driven Development (PDD) via GitHub Issues.
+  Issue Bot — Spec generation via GitHub Issues.
 
-  This workflow drives a complete PDD process through GitHub issue comments. The bot creates
+  This workflow drives a complete spec-gen process through GitHub issue comments. The bot creates
   a GitHub issue, then interacts with the user entirely via issue comments — gathering
   requirements, conducting research, producing a design, and outputting an implementation plan.
   All artifacts are posted as issue comments (not local files). The final output is a GitHub
-  issue labeled `spec-ready` with a plan checklist in the body and all PDD artifacts as comments.
+  issue labeled `spec-ready` with a plan checklist in the body and all spec artifacts as comments.
 
   Rules that apply across ALL states:
 
@@ -187,7 +187,7 @@ states:
       Then post an initial welcome comment on the issue:
 
       ```bash
-      gh issue comment {n} --repo {repo} --body "👋 Welcome! I'll guide you through a Plan-Driven Development process on this issue.
+      gh issue comment {n} --repo {repo} --body "👋 Welcome! I'll guide you through a spec generation process on this issue.
 
       Where would you like to start?
 
@@ -709,7 +709,7 @@ states:
          ```bash
          gh issue comment {n} --repo {repo} --body "## Spec Complete! 🎉
 
-         All PDD phases are done. This issue now contains a complete specification.
+         All spec-gen phases are done. This issue now contains a complete specification.
 
          ### Artifacts
 
