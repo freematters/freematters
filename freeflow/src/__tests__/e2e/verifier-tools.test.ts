@@ -34,7 +34,7 @@ import { createVerifierMcpServer } from "../../e2e/verifier-tools.js";
 let tmp: string;
 
 beforeEach(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freefsm-verifier-tools-"));
+  tmp = mkdtempSync(join(tmpdir(), "freeflow-verifier-tools-"));
   vi.clearAllMocks();
 });
 

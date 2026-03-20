@@ -15,7 +15,7 @@ export function readJsonl<T>(filePath: string): T[] {
 }
 
 /**
- * Run the freefsm CLI with the given args string.
+ * Run the fflow CLI with the given args string.
  * By default throws on non-zero exit; set expectFail to allow failures.
  */
 export function runCli(

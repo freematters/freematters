@@ -40,7 +40,7 @@ const describeCodex = describe.skipIf(!hasCommand("codex"));
 
 describeCodex("install codex", () => {
   const agentsDir = join(homedir(), ".agents", "skills");
-  const target = join(agentsDir, "freefsm");
+  const target = join(agentsDir, "freeflow");
   const backup = `${target}.bak`;
 
   // Snapshot for restore
@@ -75,7 +75,7 @@ describeCodex("install codex", () => {
     if (existsSync(target)) rmSync(target, { force: true });
 
     const stdout = cli("install codex");
-    expect(stdout).toContain("FreeFSM skills linked for Codex");
+    expect(stdout).toContain("FreeFlow skills linked for Codex");
 
     expect(existsSync(target)).toBe(true);
     expect(lstatSync(target).isSymbolicLink()).toBe(true);
@@ -85,7 +85,7 @@ describeCodex("install codex", () => {
   test("re-install updates existing symlink", () => {
     const stdout = cli("install codex");
     expect(stdout).toContain("Updating existing symlink");
-    expect(stdout).toContain("FreeFSM skills linked for Codex");
+    expect(stdout).toContain("FreeFlow skills linked for Codex");
 
     expect(lstatSync(target).isSymbolicLink()).toBe(true);
     expect(readlinkSync(target)).toBe(join(PACKAGE_ROOT, "skills"));
@@ -99,7 +99,7 @@ describeCodex("install codex", () => {
 
     const stdout = cli("install codex");
     expect(stdout).toContain("Backed up");
-    expect(stdout).toContain("FreeFSM skills linked for Codex");
+    expect(stdout).toContain("FreeFlow skills linked for Codex");
 
     expect(lstatSync(target).isSymbolicLink()).toBe(true);
 
@@ -139,21 +139,21 @@ describeClaude("install claude", () => {
 
   test("registers marketplace and installs plugin", () => {
     const stdout = cli("install claude");
-    expect(stdout).toContain("FreeFSM plugin installed for Claude Code");
+    expect(stdout).toContain("FreeFlow plugin installed for Claude Code");
 
     const known = JSON.parse(readFileSync(knownPath, "utf-8"));
-    expect(known["freefsm-local"]).toBeDefined();
-    expect(known["freefsm-local"].source.source).toBe("directory");
-    expect(known["freefsm-local"].source.path).toBe(PACKAGE_ROOT);
+    expect(known["freeflow-local"]).toBeDefined();
+    expect(known["freeflow-local"].source.source).toBe("directory");
+    expect(known["freeflow-local"].source.path).toBe(PACKAGE_ROOT);
 
     const installed = JSON.parse(readFileSync(installedPath, "utf-8"));
-    expect(installed.plugins["freefsm@freefsm-local"]).toBeDefined();
-    expect(installed.plugins["freefsm@freefsm-local"].length).toBeGreaterThan(0);
+    expect(installed.plugins["freeflow@freeflow-local"]).toBeDefined();
+    expect(installed.plugins["freeflow@freeflow-local"].length).toBeGreaterThan(0);
   });
 
   test("re-install succeeds without errors", () => {
     const stdout = cli("install claude");
-    expect(stdout).toContain("FreeFSM plugin installed for Claude Code");
+    expect(stdout).toContain("FreeFlow plugin installed for Claude Code");
   });
 });
 
@@ -178,7 +178,7 @@ describe("workflow e2e after install", () => {
   let fsmPath: string;
 
   beforeAll(() => {
-    tmp = mkdtempSync(join(tmpdir(), "freefsm-install-e2e-"));
+    tmp = mkdtempSync(join(tmpdir(), "freeflow-install-e2e-"));
     fsmPath = join(tmp, "hello.yaml");
     writeFileSync(fsmPath, HELLO_WORKFLOW, "utf-8");
   });

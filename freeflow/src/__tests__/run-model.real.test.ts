@@ -17,8 +17,8 @@ let tmp: string;
 let fsmPath: string;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freefsm-model-test-"));
-  fsmPath = join(tmp, "done-only.fsm.yaml");
+  tmp = mkdtempSync(join(tmpdir(), "freeflow-model-test-"));
+  fsmPath = join(tmp, "done-only.workflow.yaml");
   writeFileSync(fsmPath, DONE_ONLY_FSM);
 });
 
@@ -26,7 +26,7 @@ afterAll(() => {
   rmSync(tmp, { recursive: true, force: true });
 });
 
-describe("freefsm run --model", () => {
+describe("fflow run --model", () => {
   test("haiku model is passed to Claude session", async () => {
     const root = join(tmp, "store");
     const { runId, isError } = await runCore({

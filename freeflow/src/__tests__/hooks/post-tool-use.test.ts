@@ -29,7 +29,7 @@ states:
 `;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freefsm-hook-test-"));
+  tmp = mkdtempSync(join(tmpdir(), "freeflow-hook-test-"));
   fsmPath = join(tmp, "workflow.yaml");
   writeFileSync(fsmPath, MINIMAL_FSM, "utf-8");
 });
@@ -81,8 +81,8 @@ describe("handlePostToolUse — no active run", () => {
   });
 });
 
-describe("handlePostToolUse — auto-detect freefsm start", () => {
-  test("binds session from freefsm start command", () => {
+describe("handlePostToolUse — auto-detect fflow start", () => {
+  test("binds session from fflow start command", () => {
     const root = freshRoot();
     const store = new Store(root);
     store.initRun("auto-run", fsmPath);
@@ -102,7 +102,7 @@ describe("handlePostToolUse — auto-detect freefsm start", () => {
     const input = makeInput({
       tool_name: "Bash",
       tool_input: {
-        command: `freefsm start ${fsmPath} --run-id auto-run --root ${root}`,
+        command: `fflow start ${fsmPath} --run-id auto-run --root ${root}`,
       },
       tool_response: "You are in **plan** state.\n\nrun_id: auto-run",
     });
@@ -115,15 +115,15 @@ describe("handlePostToolUse — auto-detect freefsm start", () => {
   });
 });
 
-describe("handlePostToolUse — auto-detect freefsm finish", () => {
-  test("unbinds session on freefsm finish", () => {
+describe("handlePostToolUse — auto-detect fflow finish", () => {
+  test("unbinds session on fflow finish", () => {
     const root = freshRoot();
     const store = setupActiveRun(root, "finish-run");
 
     const input = makeInput({
       tool_name: "Bash",
       tool_input: {
-        command: `freefsm finish --run-id finish-run --root ${root}`,
+        command: `fflow finish --run-id finish-run --root ${root}`,
       },
       tool_response: "Run aborted.",
     });
@@ -135,14 +135,14 @@ describe("handlePostToolUse — auto-detect freefsm finish", () => {
 });
 
 describe("handlePostToolUse — auto-detect goto done", () => {
-  test("unbinds session on freefsm goto done", () => {
+  test("unbinds session on fflow goto done", () => {
     const root = freshRoot();
     const store = setupActiveRun(root, "goto-done-run");
 
     const input = makeInput({
       tool_name: "Bash",
       tool_input: {
-        command: `freefsm goto done --run-id goto-done-run --on "complete" --root ${root}`,
+        command: `fflow goto done --run-id goto-done-run --on "complete" --root ${root}`,
       },
       tool_response: "Transitioned to done.",
     });

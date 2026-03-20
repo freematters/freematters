@@ -3,7 +3,7 @@
  *
  * Calls verifyCore() directly. Mocks only query() (Agent SDK) since we can't
  * launch real Claude sessions in tests. The mock simulates what the verifier
- * agent would do: create the FSM run dir via the real freefsm CLI.
+ * agent would do: create the FSM run dir via the real fflow CLI.
  * Everything else — symlink creation, session dir convention, filesystem — is real.
  */
 
@@ -32,7 +32,7 @@ import {
 import { getSessionDir } from "../session-log.js";
 
 const CLI = resolve(__dirname, "../../dist/cli.js");
-const VERIFIER_FSM = resolve(__dirname, "../../workflows/verifier.fsm.yaml");
+const VERIFIER_FSM = resolve(__dirname, "../../workflows/verifier.workflow.yaml");
 
 let tmp: string;
 let fsmRoot: string;
@@ -43,8 +43,8 @@ const VERIFIER_SESSION_ID = "verifier-sess-test-abc123";
 const EMBEDDED_SESSION_ID = "embedded-sess-test-def456";
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freefsm-verify-e2e-"));
-  fsmRoot = join(tmp, "freefsm-root");
+  tmp = mkdtempSync(join(tmpdir(), "freeflow-verify-e2e-"));
+  fsmRoot = join(tmp, "freeflow-root");
   testDir = join(tmp, "test-output");
   mkdirSync(testDir, { recursive: true });
 
@@ -82,7 +82,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", async (importOriginal) => {
         execFileSync(
           "node",
           [CLI, "start", VERIFIER_FSM, "--run-id", runId, "--root", fsmRoot],
-          { encoding: "utf-8", env: { ...process.env, FREEFSM_ROOT: fsmRoot } },
+          { encoding: "utf-8", env: { ...process.env, FREEFLOW_ROOT: fsmRoot } },
         );
       }
 
@@ -137,11 +137,11 @@ vi.mock("../e2e/verifier-tools.js", () => ({
 
 describe("verifyCore session log symlinking (e2e)", () => {
   beforeEach(() => {
-    process.env.FREEFSM_ROOT = fsmRoot;
+    process.env.FREEFLOW_ROOT = fsmRoot;
   });
 
   afterEach(() => {
-    process.env.FREEFSM_ROOT = undefined;
+    process.env.FREEFLOW_ROOT = undefined;
   });
 
   test("creates session.jsonl and embedded-session.jsonl symlinks in verifier run dir", async () => {

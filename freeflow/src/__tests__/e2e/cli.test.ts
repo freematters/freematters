@@ -7,7 +7,7 @@ import { runCli } from "./helpers.js";
 let tmp: string;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freefsm-e2e-cli-"));
+  tmp = mkdtempSync(join(tmpdir(), "freeflow-e2e-cli-"));
 });
 
 afterAll(() => {
@@ -18,10 +18,10 @@ function run(
   args: string,
   opts: { expectFail?: boolean } = {},
 ): { stdout: string; stderr: string; exitCode: number } {
-  return runCli(args, { ...opts, env: { FREEFSM_ROOT: undefined } });
+  return runCli(args, { ...opts, env: { FREEFLOW_ROOT: undefined } });
 }
 
-describe("freefsm verify — CLI arg validation", () => {
+describe("fflow verify — CLI arg validation", () => {
   test("exits with error when no args provided", () => {
     const { exitCode, stderr } = run("verify", { expectFail: true });
     expect(exitCode).not.toBe(0);

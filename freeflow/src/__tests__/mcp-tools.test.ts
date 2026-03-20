@@ -45,7 +45,7 @@ let toolHandlers: Record<
 let toolDefinitions: Array<{ name: string; handler: unknown }>;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freefsm-mcp-test-"));
+  tmp = mkdtempSync(join(tmpdir(), "freeflow-mcp-test-"));
   fsmPath = join(tmp, "test.yaml");
   writeFileSync(fsmPath, MINIMAL_FSM, "utf-8");
 });
@@ -80,7 +80,7 @@ beforeEach(() => {
   // createSdkMcpServer returns a mock server config
   const mockCreateServer = vi.mocked(createSdkMcpServer);
   mockCreateServer.mockImplementation(((opts: { name?: string }) => {
-    return { type: "sdk", name: opts?.name ?? "freefsm", instance: {} };
+    return { type: "sdk", name: opts?.name ?? "freeflow", instance: {} };
   }) as typeof createSdkMcpServer);
 });
 

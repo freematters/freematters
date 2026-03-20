@@ -7,7 +7,7 @@ import { type EventInput, type SnapshotInput, Store } from "../store.js";
 let tmp: string;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freefsm-store-test-"));
+  tmp = mkdtempSync(join(tmpdir(), "freeflow-store-test-"));
 });
 
 afterAll(() => {

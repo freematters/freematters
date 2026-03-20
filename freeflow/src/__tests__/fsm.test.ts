@@ -7,7 +7,7 @@ import { FsmError, loadFsm } from "../fsm.js";
 let tmp: string;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freefsm-test-"));
+  tmp = mkdtempSync(join(tmpdir(), "freeflow-test-"));
 });
 
 afterAll(() => {

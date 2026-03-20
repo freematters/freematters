@@ -49,7 +49,7 @@ states:
 `;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freefsm-integ-"));
+  tmp = mkdtempSync(join(tmpdir(), "freeflow-integ-"));
   fsmMinimal = join(tmp, "minimal.yaml");
   fsmMulti = join(tmp, "multi.yaml");
   writeFileSync(fsmMinimal, MINIMAL_FSM, "utf-8");
@@ -75,7 +75,7 @@ function run(
   try {
     const stdout = execFileSync("node", [CLI, ...fullArgs.split(/\s+/)], {
       encoding: "utf-8",
-      env: { ...process.env, FREEFSM_ROOT: undefined },
+      env: { ...process.env, FREEFLOW_ROOT: undefined },
     });
     return { stdout, exitCode: 0 };
   } catch (err: unknown) {
@@ -96,7 +96,7 @@ function runJson(
   try {
     const stdout = execFileSync("node", [CLI, ...fullArgs.split(/\s+/)], {
       encoding: "utf-8",
-      env: { ...process.env, FREEFSM_ROOT: undefined },
+      env: { ...process.env, FREEFLOW_ROOT: undefined },
     });
     return { envelope: JSON.parse(stdout), exitCode: 0 };
   } catch (err: unknown) {
@@ -384,7 +384,7 @@ describe.concurrent("Hook — post-tool-use", () => {
     expect(result).toBeNull();
   });
 
-  test("binds session on freefsm start detection", () => {
+  test("binds session on fflow start detection", () => {
     const id = uniqueRunId("hook-bind");
     const hookRoot = join(tmp, "hook-bind-root");
 
@@ -396,7 +396,7 @@ describe.concurrent("Hook — post-tool-use", () => {
       hookInput({
         tool_name: "Bash",
         tool_input: {
-          command: `freefsm start ${fsmMulti} --run-id ${id} --root ${hookRoot}`,
+          command: `fflow start ${fsmMulti} --run-id ${id} --root ${hookRoot}`,
         },
         tool_response: `FSM started.\n\nYou are in **start** state.\nrun_id: ${id}`,
       }),
@@ -433,7 +433,7 @@ describe.concurrent("Hook — post-tool-use", () => {
         session_id: "counter-sess",
         tool_name: "Bash",
         tool_input: {
-          command: `freefsm start ${fsmMulti} --run-id ${id} --root ${hookRoot}`,
+          command: `fflow start ${fsmMulti} --run-id ${id} --root ${hookRoot}`,
         },
         tool_response: `run_id: ${id}`,
       }),
@@ -453,7 +453,7 @@ describe.concurrent("Hook — post-tool-use", () => {
     expect(r5).toContain("Begin work.");
   });
 
-  test("unbinds session on freefsm finish detection", () => {
+  test("unbinds session on fflow finish detection", () => {
     const id = uniqueRunId("hook-finish");
     const hookRoot = join(tmp, "hook-finish-root");
 
@@ -465,7 +465,7 @@ describe.concurrent("Hook — post-tool-use", () => {
         session_id: "finish-sess",
         tool_name: "Bash",
         tool_input: {
-          command: `freefsm start ${fsmMulti} --run-id ${id} --root ${hookRoot}`,
+          command: `fflow start ${fsmMulti} --run-id ${id} --root ${hookRoot}`,
         },
         tool_response: `run_id: ${id}`,
       }),
@@ -478,7 +478,7 @@ describe.concurrent("Hook — post-tool-use", () => {
         session_id: "finish-sess",
         tool_name: "Bash",
         tool_input: {
-          command: `freefsm finish --run-id ${id} --root ${hookRoot}`,
+          command: `fflow finish --run-id ${id} --root ${hookRoot}`,
         },
         tool_response: "Run aborted.",
       }),
@@ -493,7 +493,7 @@ describe.concurrent("Hook — post-tool-use", () => {
     expect(result).toBeNull();
   });
 
-  test("unbinds session on freefsm goto done detection", () => {
+  test("unbinds session on fflow goto done detection", () => {
     const id = uniqueRunId("hook-goto-done");
     const hookRoot = join(tmp, "hook-goto-done-root");
 
@@ -505,7 +505,7 @@ describe.concurrent("Hook — post-tool-use", () => {
         session_id: "goto-done-sess",
         tool_name: "Bash",
         tool_input: {
-          command: `freefsm start ${fsmMinimal} --run-id ${id} --root ${hookRoot}`,
+          command: `fflow start ${fsmMinimal} --run-id ${id} --root ${hookRoot}`,
         },
         tool_response: `run_id: ${id}`,
       }),
@@ -518,7 +518,7 @@ describe.concurrent("Hook — post-tool-use", () => {
         session_id: "goto-done-sess",
         tool_name: "Bash",
         tool_input: {
-          command: `freefsm goto done --run-id ${id} --on next --root ${hookRoot}`,
+          command: `fflow goto done --run-id ${id} --on next --root ${hookRoot}`,
         },
         tool_response: "Transitioned to done.",
       }),

@@ -9,7 +9,7 @@ const E2E_DIR = resolve(__dirname, "../../../../e2e");
 let tmp: string;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freefsm-dogfood-"));
+  tmp = mkdtempSync(join(tmpdir(), "freeflow-dogfood-"));
 });
 
 afterAll(() => {
@@ -20,7 +20,7 @@ function runCli(
   args: string,
   opts: { expectFail?: boolean } = {},
 ): { stdout: string; stderr: string; exitCode: number } {
-  return runCliHelper(args, { ...opts, env: { FREEFSM_ROOT: tmp } });
+  return runCliHelper(args, { ...opts, env: { FREEFLOW_ROOT: tmp } });
 }
 
 describe("e2e test plan files — run-stops-for-user-input.md", () => {
