@@ -6,7 +6,7 @@ Thanks for your interest in contributing to Freematters!
 
 ```bash
 git clone git@github.com:freematters/freematters.git
-cd freematters/freeflow
+cd freematters
 npm install
 npm run build
 npm link          # symlinks fflow to PATH (reflects changes immediately)
@@ -31,13 +31,11 @@ npm run check
 
 ```
 freematters/
-├── freeflow/        # Workflow runtime package
-│   ├── src/           # TypeScript source
-│   ├── skills/        # Claude Code / Codex skills
-│   ├── hooks/         # Claude Code hooks
-│   ├── workflows/     # Bundled workflow definitions
-│   └── docs/          # Design docs
-└── ...                # Future packages
+├── src/             # TypeScript source
+├── skills/          # Claude Code / Codex skills
+├── hooks/           # Claude Code hooks
+├── workflows/       # Bundled workflow definitions
+└── docs/            # Design docs
 ```
 
 ## Code Style
@@ -48,7 +46,7 @@ freematters/
 
 ## Adding a Workflow
 
-Workflow YAML files go in `freeflow/workflows/`. They must pass `fflow start` validation:
+Workflow YAML files go in `workflows/`. They must pass `fflow start` validation:
 
 - `version: 1`
 - `initial` state exists

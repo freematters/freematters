@@ -360,7 +360,7 @@ Abort the current FSM run. Calls `fflow finish` and displays the terminal summar
 ## Plugin Structure
 
 ```
-freeflow/
+./
 ├── skills/
 │   ├── create/
 │   │   └── SKILL.md

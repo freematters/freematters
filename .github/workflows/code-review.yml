@@ -44,10 +44,8 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: freeflow/package-lock.json
 
       - name: Install freeflow
-        working-directory: freeflow
         run: npm ci && npm run build && npm link && echo "$(npm root -g)/.bin" >> $GITHUB_PATH
 
       - name: Install Claude Code
@@ -69,7 +67,7 @@ jobs:
           NEVER modify files, push commits, or approve the PR.
           Your ONLY task is to review code for bugs, security issues, and quality.
 
-          Use /fflow:start freeflow/workflows/code-review.workflow.yaml to run the code review workflow.
+          Use /fflow:start workflows/code-review.workflow.yaml to run the code review workflow.
           Drive it to completion — do not stop between states.
           PROMPT
           )" \

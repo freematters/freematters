@@ -6,6 +6,7 @@ export default defineConfig({
       "**/node_modules/**",
       "**/dist/**",
       "**/.fc-worktrees/**",
+      "**/.claude/worktrees/**",
       "**/install.test.ts",
       "**/*.real.test.ts",
     ],

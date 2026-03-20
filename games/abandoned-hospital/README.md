@@ -20,7 +20,7 @@ Uncover the truth about what happened to 27 psychiatric patients and the nurse w
 ## How to Play
 
 ```bash
-cd freeflow/games/abandoned-hospital
+cd games/abandoned-hospital
 fflow start abandoned-hospital.workflow.yaml
 ```
 

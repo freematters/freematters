@@ -43,8 +43,7 @@
   "files": ["dist/", "prompts/", "workflows/", "skills/", "hooks/", ".claude-plugin/"],
   "repository": {
     "type": "git",
-    "url": "https://github.com/freematters/freematters",
-    "directory": "freeflow"
+    "url": "https://github.com/freematters/freematters"
   },
   "license": "MIT"
 }

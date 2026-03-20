@@ -4,7 +4,7 @@ import { join, resolve } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { runCli as runCliHelper } from "./helpers.js";
 
-const E2E_DIR = resolve(__dirname, "../../../../e2e");
+const E2E_DIR = resolve(__dirname, "../../../e2e");
 
 let tmp: string;
 
