@@ -14,7 +14,6 @@ import { registerMigrate } from "./commands/migrate.js";
 import { run as runCmd } from "./commands/run.js";
 import { start } from "./commands/start.js";
 import { validate } from "./commands/validate.js";
-import { registerMigrate } from "./commands/migrate.js";
 import { main as postToolUseMain } from "./hooks/post-tool-use.js";
 import { handleError } from "./output.js";
 import { resolveWorkflow } from "./resolve-workflow.js";
@@ -229,7 +228,5 @@ hookCmd
   .action(() => {
     postToolUseMain();
   });
-
-registerMigrate(program);
 
 program.parse();

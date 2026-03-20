@@ -100,7 +100,10 @@ export function main(): void {
     try {
       const input = JSON.parse(raw) as HookInput;
 
-      const root = process.env.FREEFLOW_ROOT ?? process.env.FREEFSM_ROOT ?? `${homedir()}/.freeflow`;
+      const root =
+        process.env.FREEFLOW_ROOT ??
+        process.env.FREEFSM_ROOT ??
+        `${homedir()}/.freeflow`;
 
       const reminder = handlePostToolUse(input, root);
 

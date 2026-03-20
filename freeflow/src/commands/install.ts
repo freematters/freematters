@@ -47,9 +47,7 @@ function installClaude(packageRoot: string): void {
   run("claude", ["plugin", "install", pluginKey]);
 
   console.log("\nFreeflow plugin installed for Claude Code.");
-  console.log(
-    "\nSkills: /fflow:create, /fflow:start, /fflow:current, /fflow:finish",
-  );
+  console.log("\nSkills: /fflow:create, /fflow:start, /fflow:current, /fflow:finish");
   console.log("Hook: PostToolUse state reminder (every 5 tool calls)");
   console.log("\nRestart Claude Code to activate the plugin.");
 }

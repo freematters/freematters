@@ -15,7 +15,12 @@ function searchDirs(): string[] {
   ];
 }
 
-const WORKFLOW_EXTENSIONS = [".workflow.yaml", ".workflow.yml", ".fsm.yaml", ".fsm.yml"] as const;
+const WORKFLOW_EXTENSIONS = [
+  ".workflow.yaml",
+  ".workflow.yml",
+  ".fsm.yaml",
+  ".fsm.yml",
+] as const;
 
 function hasWorkflowExtension(name: string): boolean {
   return WORKFLOW_EXTENSIONS.some((ext) => name.endsWith(ext));
