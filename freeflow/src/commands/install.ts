@@ -46,7 +46,7 @@ function installClaude(packageRoot: string): void {
   console.log(`\nInstalling plugin ${pluginKey}`);
   run("claude", ["plugin", "install", pluginKey]);
 
-  console.log("\nFreeflow plugin installed for Claude Code.");
+  console.log("\nFreeFlow plugin installed for Claude Code.");
   console.log("\nSkills: /fflow:create, /fflow:start, /fflow:current, /fflow:finish");
   console.log("Hook: PostToolUse state reminder (every 5 tool calls)");
   console.log("\nRestart Claude Code to activate the plugin.");
@@ -80,7 +80,7 @@ function installCodex(packageRoot: string): void {
   }
 
   symlinkSync(skillsSource, target);
-  console.log(`Freeflow skills linked for Codex: ${target} -> ${skillsSource}`);
+  console.log(`FreeFlow skills linked for Codex: ${target} -> ${skillsSource}`);
   console.log(
     `\nNote: Codex does not support hooks. The agent won't get periodic state reminders.`,
   );
