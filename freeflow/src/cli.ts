@@ -10,6 +10,7 @@ import { goto } from "./commands/goto.js";
 import { history } from "./commands/history.js";
 import { install } from "./commands/install.js";
 import { list } from "./commands/list.js";
+import { registerMigrate } from "./commands/migrate.js";
 import { run as runCmd } from "./commands/run.js";
 import { start } from "./commands/start.js";
 import { validate } from "./commands/validate.js";
@@ -214,6 +215,8 @@ program
       verbose: (opts.verbose as boolean) ?? false,
     });
   });
+
+registerMigrate(program);
 
 // Hidden hook commands (not shown in --help)
 const hookCmd = program
