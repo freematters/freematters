@@ -43,7 +43,7 @@ function resolveWorkflowOrExit(input: string, json: boolean): string {
 const program = new Command()
   .name("fflow")
   .description(
-    `CLI-first FSM runtime for agent workflows
+    `CLI-first workflow runtime for agent workflows
 
 Example:
   $ fflow start workflow.yaml --run-id my-run
@@ -64,7 +64,7 @@ Example:
 program
   .command("start")
   .description("initialize a new run from a workflow YAML")
-  .argument("<fsm_path>", "path to FSM YAML file")
+  .argument("<fsm_path>", "path to workflow YAML file")
   .option("--run-id <id>", "run identifier (auto-generated if omitted)")
   .action((_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
@@ -79,7 +79,7 @@ program
 program
   .command("run")
   .description("launch an Agent SDK session to execute a workflow autonomously")
-  .argument("<fsm_path>", "path to FSM YAML file")
+  .argument("<fsm_path>", "path to workflow YAML file")
   .option("--run-id <id>", "run identifier (auto-generated if omitted)")
   .option("--prompt <text>", "user prompt to append to the initial state card")
   .option("--model <model>", "Claude model to use")
@@ -174,8 +174,8 @@ program
 
 program
   .command("validate")
-  .description("validate an FSM YAML file and report stats")
-  .argument("<fsm_path>", "path to FSM YAML file")
+  .description("validate a workflow YAML file and report stats")
+  .argument("<fsm_path>", "path to workflow YAML file")
   .action((_fsmPath: string, _opts: Record<string, unknown>, cmd: Command) => {
     const { json } = getGlobalOpts(cmd);
     validate({

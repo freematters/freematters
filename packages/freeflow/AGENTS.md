@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-FreeFlow is a CLI-first workflow runtime for agent workflows. It combines structured workflow control (FSM YAML) with flexible in-state reasoning (LLM). Designed as a Claude Code plugin with CLI + hooks architecture.
+FreeFlow is a CLI-first workflow runtime for agent workflows. It combines structured workflow control (YAML) with flexible in-state reasoning (LLM). Designed as a Claude Code plugin with CLI + hooks architecture.
 
 Language: TypeScript (npm distribution). Node.js >= 18.
 
@@ -36,7 +36,7 @@ Design principles:
 | File | Purpose |
 |------|---------|
 | `src/cli.ts` | CLI entry point, arg parsing, command routing |
-| `src/fsm.ts` | FSM YAML loader, full schema validation |
+| `src/fsm.ts` | Workflow YAML loader, full schema validation |
 | `src/store.ts` | Storage: events.jsonl, snapshot.json, file lock |
 | `src/errors.ts` | `CliError` + `FsmError` classes |
 | `src/output.ts` | `formatStateCard()` + `jsonEnvelope()` |
@@ -46,7 +46,7 @@ Design principles:
 | `src/commands/finish.ts` | Abort run, commit finish event |
 | `src/hooks/post-tool-use.ts` | PostToolUse hook: auto-detect, counter, reminder |
 | `hooks/hooks.json` | Claude Code hook declarations |
-| `skills/create/SKILL.md` | /fflow:create — guided FSM YAML creation |
+| `skills/create/SKILL.md` | /fflow:create — guided workflow YAML creation |
 | `skills/start/SKILL.md` | /fflow:start — initialize a workflow run |
 | `skills/e2e-run/SKILL.md` | /fflow:e2e-run — run e2e agent tests |
 | `src/e2e/multi-turn-session.ts` | V1 query() wrapper for multi-turn agent sessions |
@@ -55,7 +55,7 @@ Design principles:
 | `src/e2e/dual-stream-logger.ts` | Color-coded stderr logger for embedded/verifier/input streams |
 | `src/e2e/verify-runner.ts` | Verifier agent runner via Agent SDK |
 | `src/e2e/parser.ts` | Test plan markdown parser |
-| `src/e2e/path-enumerator.ts` | DFS path enumeration on FSM transitions |
+| `src/e2e/path-enumerator.ts` | DFS path enumeration on workflow transitions |
 | `src/commands/e2e/verify.ts` | `fflow verify` command |
 
 ## CLI Commands
@@ -116,6 +116,6 @@ Output: `test-report.md` in `--test-dir`.
 Dogfood test plans live in `e2e/`.
 
 Both `fflow run` and `fflow verify` print the Claude session ID to stderr on session start.
-`fflow run` symlinks the Claude session JSONL log (`session.jsonl`) into the FSM run directory.
-`fflow verify` symlinks both the verifier's (`session.jsonl`) and embedded agent's (`embedded-session.jsonl`) Claude session logs into the verifier's FSM run directory.
+`fflow run` symlinks the Claude session JSONL log (`session.jsonl`) into the run directory.
+`fflow verify` symlinks both the verifier's (`session.jsonl`) and embedded agent's (`embedded-session.jsonl`) Claude session logs into the verifier's run directory.
 

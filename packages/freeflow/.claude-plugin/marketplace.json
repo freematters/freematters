@@ -6,7 +6,7 @@
   "plugins": [
     {
       "name": "freeflow",
-      "description": "CLI-first FSM runtime for agent workflows",
+      "description": "CLI-first workflow runtime for agent workflows",
       "version": "0.1.0",
       "source": "./"
     }

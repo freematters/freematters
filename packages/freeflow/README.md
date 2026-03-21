@@ -11,7 +11,7 @@ AI coding agents are powerful but unreliable at following multi-step workflows. 
 - **Natural language prompts** are flexible but non-deterministic — agents drift from instructions, skip steps, and ignore constraints no matter how many "MUST" and "ALWAYS" directives you add.
 - **Hardcoded logic** is deterministic but rigid — every workflow change requires code changes, and bugs are inevitable.
 
-FreeFlow resolves this by separating **what the agent does** (flexible, LLM-driven) from **where the agent goes** (deterministic, FSM-enforced). The agent stays in control of reasoning and tool use within each state, but the FSM governs which states exist and which transitions are legal.
+FreeFlow resolves this by separating **what the agent does** (flexible, LLM-driven) from **where the agent goes** (deterministic, workflow-enforced). The agent stays in control of reasoning and tool use within each state, but the workflow engine governs which states exist and which transitions are legal.
 
 ## Install
 
@@ -68,7 +68,7 @@ Start a bundled workflow by name:
 
 ## How It Works
 
-A workflow is a YAML file that defines states, transitions, and per-state prompts. The agent sees the current state's prompt and available transitions — it reasons freely within each state, but can only move where the FSM allows.
+A workflow is a YAML file that defines states, transitions, and per-state prompts. The agent sees the current state's prompt and available transitions — it reasons freely within each state, but can only move where the workflow allows.
 
 ### Example 1: Bug fix (simple, linear)
 

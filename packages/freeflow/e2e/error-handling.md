@@ -3,7 +3,7 @@
 ## Setup
 - Ensure fflow CLI is built and available at `dist/cli.js`
 - Create a temporary directory for run storage
-- Create a 2-state FSM YAML file (start -> done) with only one valid transition
+- Create a 2-state workflow YAML file (start -> done) with only one valid transition
 
 ## Steps
 1. **Start workflow**: Run `fflow start simple.workflow.yaml --run-id test-errors` to initialize
@@ -21,9 +21,9 @@
 - Invalid transition labels are rejected with descriptive error messages
 - Invalid target states are rejected with descriptive error messages
 - Querying a nonexistent run produces a clear RUN_NOT_FOUND error
-- Failed transitions do not corrupt the FSM state
+- Failed transitions do not corrupt the workflow state
 - All error responses include appropriate error codes
 
 ## Cleanup
 - Remove the temporary run storage directory
-- Remove the temporary FSM YAML file
+- Remove the temporary workflow YAML file

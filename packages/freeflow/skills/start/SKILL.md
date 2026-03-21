@@ -3,13 +3,13 @@ name: fflow:start
 description: Use when the user wants to start or initialize a new workflow run. Runs `fflow start` with an auto-generated run ID and displays the initial state card.
 ---
 
-# Start FSM Run
+# Start Workflow Run
 
-Initialize a new FSM run from a workflow YAML file.
+Initialize a new workflow run from a workflow YAML file.
 
 ## Usage
 
-`/fflow:start PATH` — where PATH is the FSM YAML file to run.
+`/fflow:start PATH` — where PATH is the workflow YAML file to run.
 
 ## Process
 
@@ -19,12 +19,12 @@ Initialize a new FSM run from a workflow YAML file.
    - If the user chooses to abort, run `fflow finish --run-id <run_id>` first, then clean up pending/in-progress tasks (set to `deleted`).
    - If the state is `done` or the run doesn't exist, skip this step silently.
 
-2. **Generate a descriptive run ID** (required) — Use the format `<fsm-name>-$(date '+%Y%m%d%H%M%S')` where fsm-name is derived from the workflow filename and $(date) is the bash command that outputs the current date in YYYY-MM-DD format (e.g., `code-review-2024-12-19`, `plan-execute-2024-12-19`). Use lowercase letters, numbers, and hyphens. You MUST always pass `--run-id`.
+2. **Generate a descriptive run ID** (required) — Use the format `<workflow-name>-$(date '+%Y%m%d%H%M%S')` where workflow-name is derived from the workflow filename and $(date) is the bash command that outputs the current date in YYYY-MM-DD format (e.g., `code-review-2024-12-19`, `plan-execute-2024-12-19`). Use lowercase letters, numbers, and hyphens. You MUST always pass `--run-id`.
 
 3. **Run the CLI command:**
 
 ```bash
-fflow start <PATH> --run-id <fsm-name>-$(date)
+fflow start <PATH> --run-id <workflow-name>-$(date)
 ```
 
 Never omit `--run-id`. The run ID is needed for all subsequent commands. PATH can be a workflow name (e.g. `pdd`), a filename (e.g. `pdd.workflow.yaml`), or a full path. The CLI resolves it automatically.
