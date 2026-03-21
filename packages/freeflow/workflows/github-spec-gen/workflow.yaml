@@ -20,6 +20,8 @@
 #                   e2e-gen  design (revision)
 #                      |
 #                    done
+#
+#   Fast forward: requirements → design → plan → e2e-gen → done (no intermediate approvals)
 
 version: 1
 extends_guide: ../spec-gen/workflow.yaml
@@ -204,10 +206,12 @@ states:
       2. Update the issue body status checklist: check off "gathering requirements".
       3. Post transition options:
          - Review progress (checkpoint) → `requirements complete`
+         - Fast forward — generate design, plan, and e2e in one shot (no intermediate approvals) → `fast forward`
          - Research first → `need research`
       4. Poll for the user's choice.
     transitions:
       requirements complete: checkpoint
+      fast forward: design
       need research: research
 
   research:
@@ -278,7 +282,10 @@ states:
       ### GitHub Adaptation
 
       Skip the "Design approaches" step (Step 1) — proceed directly to the full design.
-      Ignore fast forward mode — always require explicit user approval via issue comment.
+
+      **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT poll
+      for approval. Complete the design, post it as an artifact comment, update the status
+      checklist, and immediately transition to plan.
 
       Before writing, fetch all issue comments to read requirements and research artifacts:
       ```bash
@@ -298,7 +305,9 @@ states:
 
       ### GitHub Adaptation
 
-      Ignore fast forward mode — always require explicit user approval via issue comment.
+      **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT poll
+      for approval. Complete the plan, post it as an artifact comment, update the status
+      checklist and plan task list in the issue body, and immediately transition to e2e-gen.
 
       Fetch all comments to read the latest `## design.md` artifact:
       ```bash
