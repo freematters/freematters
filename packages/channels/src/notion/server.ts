@@ -41,7 +41,7 @@ async function readState(): Promise<PollState> {
 
 async function writeState(state: PollState): Promise<void> {
   await fs.mkdir(CHANNEL_DIR, { recursive: true });
-  await fs.writeFile(STATE_FILE, JSON.stringify(state, null, 2) + "\n");
+  await fs.writeFile(STATE_FILE, `${JSON.stringify(state, null, 2)}\n`);
 }
 
 export async function main(): Promise<void> {

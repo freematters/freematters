@@ -105,7 +105,7 @@ async function buildChannel(channel: ChannelDef): Promise<void> {
   await fs.mkdir(pluginDir, { recursive: true });
   await fs.writeFile(
     path.join(pluginDir, "plugin.json"),
-    JSON.stringify(
+    `${JSON.stringify(
       {
         name: channel.name,
         description: channel.description,
@@ -114,13 +114,13 @@ async function buildChannel(channel: ChannelDef): Promise<void> {
       },
       null,
       2,
-    ) + "\n",
+    )}\n`,
   );
 
   // 3. Generate .mcp.json
   await fs.writeFile(
     path.join(outDir, ".mcp.json"),
-    JSON.stringify(
+    `${JSON.stringify(
       {
         mcpServers: {
           [channel.name]: {
@@ -131,7 +131,7 @@ async function buildChannel(channel: ChannelDef): Promise<void> {
       },
       null,
       2,
-    ) + "\n",
+    )}\n`,
   );
 
   // 4. Build skills

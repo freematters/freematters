@@ -29,7 +29,7 @@ export async function writeAccess(
 ): Promise<void> {
   const filePath = path.join(channelDir, "access.json");
   await fs.mkdir(channelDir, { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(config, null, 2) + "\n");
+  await fs.writeFile(filePath, `${JSON.stringify(config, null, 2)}\n`);
 }
 
 export function isAllowed(
