@@ -1,15 +1,14 @@
 # Flow:
 #
-#   setup → implement (parallel waves via worktrees)
+#   setup → implement (parallel via worktrees)
 #               |
 #            e2e-test (all steps complete)
 #               |
-#         pass → review
+#         pass → review (self-fixing loop)
 #               |
 #         user approves → checkpoint → done
-#               |              |
-#         user requests    re-run e2e / review
-#         fixes → fix-review → review (loop)
+#                              |
+#                         re-run e2e
 #
 # Picks up where spec-gen left off — reads ./specs/<slug>/ artifacts and implements them.
 
@@ -211,9 +210,9 @@ states:
 
   review:
     prompt: |
-      ## Code Review
+      ## Code Review & Fix
 
-      Review the full diff for quality issues.
+      Review the full diff, fix issues, and repeat until clean.
 
       ### 1. Gather the diff
 
@@ -224,118 +223,61 @@ states:
       Where `<base>` is the commit before the first implementation step (check `./specs/<slug>/progress.md`
       for the earliest commit hash, then use its parent).
 
-      ### 2. Dispatch review sub-agents (in parallel)
+      ### 2. Review (sub-agent)
 
-      Dispatch these sub-agents concurrently, each reviewing `git diff <base>...HEAD`:
+      Dispatch a review sub-agent:
 
-      **Sub-agent A — Spec Compliance**
-      > Read ./specs/<slug>/design.md and ./specs/<slug>/progress.md.
-      > Check: Does the implementation match design.md? Any missing or extra functionality?
-      > Flag any spec deviations.
+      > Review `git diff <base>...HEAD` against ./specs/<slug>/design.md.
+      > Check for:
+      > - Spec compliance — missing or extra functionality, spec deviations
+      > - Code quality — readability, duplication, YAGNI/KISS violations, idiomatic patterns
+      > - Correctness & security — edge cases, bugs, injection risks, secrets handling
+      > - Run the full test suite and linter
+      >
+      > Classify each issue:
+      > - 🔴 **Major** — must fix (bugs, security, spec violations)
+      > - 🟠 **Medium** — should fix (YAGNI/KISS, poor error handling, architectural issues)
+      > - 🟡 **Minor** — nice to fix but not blocking (style, naming)
+      >
+      > Produce a review report with verdict (PASS/FAIL), issues by severity, and total counts.
 
-      **Sub-agent B — Code Quality**
-      > Review the diff for:
-      > - Readability, naming, duplication, complexity
-      > - YAGNI: Any code not required by the spec? Unused functions, future-proofing abstractions?
-      > - KISS: Is this the simplest solution? Unnecessary abstractions?
-      > - Idiomatic: Does code match existing codebase patterns?
+      Write the report to `./specs/<slug>/review-round-N.md`.
 
-      **Sub-agent C — Correctness & Security**
-      > Review the diff for:
-      > - Edge cases, error handling, potential bugs
-      > - Architecture: separation of concerns, coupling, cohesion
-      > - Security: input validation, injection risks, secrets handling
-      > - Run the full test suite and linter — report results
+      ### 3. Fix (sub-agent, if needed)
 
-      Each sub-agent classifies issues as:
-      - 🔴 **Major** — must fix before completion (bugs, security, spec violations)
-      - 🟠 **Medium** — should fix, significant quality concern (YAGNI/KISS violations, poor error handling, architectural issues)
-      - 🟡 **Minor** — nice to fix but not blocking (style, naming, minor duplication)
+      If there are major or medium issues, dispatch a fix sub-agent:
 
-      ### 3. Dispatch merge sub-agent
+      > Fix the issues in ./specs/<slug>/review-round-N.md.
+      > Read ./specs/<slug>/design.md for intended architecture.
+      >
+      > You MUST fix all 🔴 Major issues.
+      > You MAY fix 🟠 Medium issues if effort is low and improvement is clear.
+      > Do NOT fix 🟡 Minor issues.
+      >
+      > For each fix: read the code, fix minimally, run tests, add tests if needed.
+      > Report: what was fixed, what was skipped (with reason), test results.
 
-      Dispatch a sub-agent to combine the three review reports:
+      Commit the fixes: `fix: address review issues (round N)`
+      If `source_mode == "issue"`, push to remote.
 
-      > Read the reports from sub-agents A, B, and C.
-      > Deduplicate overlapping findings across reports.
-      > Resolve any conflicting severity classifications (use the higher severity).
-      > Produce a single merged review report with:
-      > - Overall verdict: PASS (no major/medium) or FAIL
-      > - Combined major issues (deduplicated, with source sub-agent noted)
-      > - Combined medium issues
-      > - Combined minor issues
-      > - Total counts per severity
+      Then loop back to step 2 for a fresh review. Repeat until the review verdict is PASS
+      or only minor issues remain.
 
-      Write the merged report to `./specs/<slug>/review-round-N.md`
-      (where N is the current round number).
+      ### 4. Present to user
 
-      ### 4. Evaluate
+      Present the final review report. Ask (in user's language):
 
-      If this is round 1 AND there are major issues → transition directly to fix-review
-      (no need to ask the user).
-
-      Otherwise, present the review report to the user with a summary of issues. Ask (in user's language):
-
-      > Review round N complete.
+      > Review complete (N rounds).
       > - 🔴 Major: N
       > - 🟠 Medium: N
       > - 🟡 Minor: N
       >
-      > 1. Looks good — proceed to done
-      > 2. Fix more issues — run another fix/re-review cycle
-      > 3. I'll handle the rest manually — proceed to done
+      > 1. Looks good — proceed
+      > 2. I'll handle the rest manually — proceed
 
-      Update `./specs/<slug>/progress.md` with review round summary.
+      Update `./specs/<slug>/progress.md` with review summary.
     transitions:
       user approves: checkpoint
-      major issues in round 1: fix-review
-      user requests fixes: fix-review
-
-  fix-review:
-    prompt: |
-      ## Fix Review Issues
-
-      The user requested fixes for issues found in code review.
-
-      ### 1. Dispatch fix sub-agent
-
-      Dispatch a sub-agent with the latest review report (`./specs/<slug>/review-round-N.md`):
-
-      > Fix the following issues identified in code review.
-      > Read ./specs/<slug>/design.md for the intended architecture and interfaces.
-      > Read ./specs/<slug>/progress.md for context on what was built.
-      >
-      > You MUST fix all 🔴 Major issues.
-      > You MAY fix 🟠 Medium issues at your discretion — fix them if the effort is low
-      > and the improvement is clear, skip if the fix is risky or complex.
-      > Do NOT fix 🟡 Minor issues.
-      >
-      > For each issue you fix:
-      > 1. Read the relevant code
-      > 2. Fix the issue — keep changes minimal and focused
-      > 3. Run the full test suite to ensure no regressions
-      > 4. If the fix requires new tests, add them
-      >
-      > Report: what was fixed, what medium issues were skipped (with reason), test results.
-
-      ### 2. Summarize
-
-      Present a fix summary to the user:
-      - Issues fixed (with brief description of each fix)
-      - Medium issues skipped (with reason)
-      - Test results
-
-      ### 3. Commit
-
-      Stage and commit the fixes: `fix: address review issues (round N)`
-
-      If `source_mode == "issue"`, push to remote after committing.
-
-      ### 4. Re-review
-
-      Transition back to review for a fresh review of the updated code.
-    transitions:
-      fixes committed: review
 
   checkpoint:
     prompt: |
@@ -351,11 +293,9 @@ states:
 
       > 1. Looks good — finalize
       > 2. Re-run E2E tests
-      > 3. Run another review round
     transitions:
       finalize: done
       re-run e2e: e2e-test
-      re-run review: review
 
   done:
     prompt: |
