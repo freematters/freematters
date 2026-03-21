@@ -137,23 +137,15 @@ states:
          > 5. Commit your work in the worktree: `feat(scope): step N - <step title>`
          > 6. Report: tests passed/failed, lint issues, any spec deviations
          >
-         > Do NOT modify plan.md or progress.md — the orchestrator handles those.
+         > Do NOT modify plan.md — the orchestrator handles it.
 
       2. When any sub-agent completes, immediately:
          - Merge its worktree branch into the feature branch.
-           Resolve conflicts if any — prefer the feature branch for plan.md/progress.md,
+           Resolve conflicts if any — prefer the feature branch for plan.md,
            prefer the worktree branch for implementation files.
          - Run the full test suite to verify the merge is clean.
          - Update `./specs/<slug>/plan.md` — check off the step (`- [x] Step N`).
-         - Update `./specs/<slug>/progress.md` — append a summary:
-           ```
-           ## Step N: <title>
-           - **Files changed**: <list of key files added/modified>
-           - **What was built**: <1-2 sentence summary>
-           - **Tests**: <number of tests added, type breakdown, all passing/failing>
-           - **Notes**: <any gotchas, workarounds, or deviations from spec>
-           ```
-         - Commit the plan.md and progress.md updates.
+         - Commit the plan.md update.
          - Check the dependency graph: if this completion unblocks new steps,
            dispatch them immediately.
 
@@ -168,23 +160,33 @@ states:
          git push -u origin {branch_name}   # first push
          git push                            # subsequent pushes
          ```
-      7. Update the issue body checklist for each completed step.
-      8. Post a `[from bot]` progress comment per step:
+      7. Check off the step in the issue body's Plan section. Re-read the current
+         issue body before editing to avoid overwriting concurrent changes:
+         ```bash
+         gh api "repos/{owner}/{repo}/issues/{issue_number}" --jq .body > /tmp/issue_body.md
+         # Edit to change "- [ ] Step N: ..." to "- [x] Step N: ..."
+         gh issue edit {issue_number} --repo {owner}/{repo} --body-file /tmp/issue_body.md
          ```
-         [from bot] Step N/M complete: <step title>
-         - **Commit**: https://github.com/{owner}/{repo}/commit/{sha}
-         - **Files changed**: <list of key files>
-         - **Tests**: <count> added, all passing
+      8. Post a `[from bot]` progress comment on the issue:
+         ```markdown
+         [from bot] **Step {n}/{total}: {title}** ✅
+
+         - Files changed: {list}
+         - Tests: {count} passed
+         - Commit: {short_hash}
+         ```
+         ```bash
+         gh issue comment {issue_number} --repo {owner}/{repo} --body "$comment"
          ```
 
       Then proceed to the next wave. Repeat until all steps are complete.
 
       ### Constraints
       - The orchestrator MUST NOT write implementation code — only manage branches,
-        merge, and update plan.md/progress.md.
+        merge, and update plan.md.
       - Each sub-agent runs in its own worktree branched from the feature branch.
       - You MUST NOT skip sub-agent dispatch, even for simple steps.
-      - Sub-agents MUST NOT modify plan.md or progress.md.
+      - Sub-agents MUST NOT modify plan.md.
     transitions:
       more steps remain: implement
       all steps complete: e2e-test
@@ -206,7 +208,34 @@ states:
       - **Fail** → run `/e2e-fix` to diagnose the failure from the
         test-dir artifacts, fix the code, and re-run. Repeat until passing.
 
-      Update `./specs/<slug>/progress.md` with E2E result, attempt count, and notes.
+      #### Issue mode additional steps
+
+      If `source_mode == "issue"`:
+
+      1. Post E2E result as a `[from bot]` comment on the issue:
+         ```markdown
+         [from bot] **E2E Tests** ✅ (or ❌)
+
+         - Result: pass/fail
+         - Attempts: {count}
+         - Notes: {any relevant details}
+         ```
+         ```bash
+         gh issue comment {issue_number} --repo {owner}/{repo} --body "$comment"
+         ```
+
+      2. Check off "E2E tests" in the issue body's Plan section. Re-read the current
+         issue body before editing to avoid overwriting concurrent changes:
+         ```bash
+         gh api "repos/{owner}/{repo}/issues/{issue_number}" --jq .body > /tmp/issue_body.md
+         # Edit to change "- [ ] E2E tests" to "- [x] E2E tests"
+         gh issue edit {issue_number} --repo {owner}/{repo} --body-file /tmp/issue_body.md
+         ```
+
+      3. Push any fixes to remote:
+         ```bash
+         git push
+         ```
     transitions:
       e2e passed: review
       no e2e plan: review
@@ -223,15 +252,15 @@ states:
       git diff <base>...HEAD
       ```
 
-      Where `<base>` is the commit before the first implementation step (check `./specs/<slug>/progress.md`
-      for the earliest commit hash, then use its parent).
+      Where `<base>` is the commit before the first implementation step (use `git log`
+      to find the earliest implementation commit, then use its parent).
 
       ### 2. Review (parallel sub-agents + aggregator)
 
       Dispatch three review sub-agents **in parallel**, each reviewing `git diff <base>...HEAD`:
 
       **Sub-agent A — Spec Compliance**
-      > Read ./specs/<slug>/design.md and ./specs/<slug>/progress.md.
+      > Read ./specs/<slug>/design.md.
       > Check: Does the implementation match design.md? Missing or extra functionality?
       > Flag any spec deviations.
 
@@ -252,13 +281,34 @@ states:
       > Deduplicate overlapping findings. Resolve conflicting severities (use higher).
       > Produce a single report: verdict (PASS/FAIL), issues by severity, total counts.
 
-      Write the merged report to `./specs/<slug>/review-round-N.md`.
+      Remember the merged report for this round (round N).
+
+      #### Issue mode additional steps
+
+      If `source_mode == "issue"`, post the review report as a `[from bot]` comment:
+      ```markdown
+      [from bot] **Code Review (Round {n})**
+
+      **Verdict**: PASS/FAIL
+
+      🔴 Major ({count}):
+      - {issue description}
+
+      🟠 Medium ({count}):
+      - {issue description}
+
+      🟡 Minor ({count}):
+      - {issue description}
+      ```
+      ```bash
+      gh issue comment {issue_number} --repo {owner}/{repo} --body "$comment"
+      ```
 
       ### 3. Fix (sub-agent, if needed)
 
       If there are major or medium issues, dispatch a fix sub-agent:
 
-      > Fix the issues in ./specs/<slug>/review-round-N.md.
+      > Fix the issues from review round N.
       > Read ./specs/<slug>/design.md for intended architecture.
       >
       > You MUST fix all 🔴 Major issues.
@@ -285,8 +335,6 @@ states:
       >
       > 1. Looks good — proceed
       > 2. I'll handle the rest manually — proceed
-
-      Update `./specs/<slug>/progress.md` with review summary.
     transitions:
       user approves: checkpoint
 
@@ -296,8 +344,8 @@ states:
 
       Review has completed. Present the current status to the user:
       - Steps completed (from plan.md)
-      - E2E test result (from e2e-report.md, if exists)
-      - Review result (from latest review-round-N.md)
+      - E2E test result (from the E2E test state, if run)
+      - Review result (from the latest review round)
       - Any unresolved issues
 
       Ask the user (in user's language):
@@ -314,11 +362,11 @@ states:
 
       All steps from plan.md have been implemented, tested, and committed.
 
-      Write `./specs/<slug>/implementation-summary.md` with:
+      Prepare an implementation summary (do NOT write it to a file) with:
       1. **Overview** — one paragraph describing what was built
       2. **Steps completed** — table of all steps with status and commit hash
       3. **Test summary** — total tests written, all passing, coverage notes
-      4. **E2E result** — pass/fail, attempt count, and notes (from progress.md; omit if no e2e)
+      4. **E2E result** — pass/fail, attempt count, and notes (omit if no e2e)
       5. **Files created/modified** — list of key files with one-line descriptions
       6. **How to run** — commands to run the project and tests
       7. **Remaining work** — any manual testing, deployment, documentation, or known limitations
@@ -337,30 +385,56 @@ states:
          git push
          ```
 
-      2. Post the implementation summary as a `[from bot]` comment on the issue.
-         The comment should include the full content of `./specs/<slug>/implementation-summary.md`
-         prefixed with `[from bot]` and a note about the branch:
-         ```
-         [from bot] ## implementation-summary.md
+      2. Post the implementation summary as a `[from bot]` comment on the issue:
+         ```markdown
+         [from bot] ## Implementation Summary
 
-         {full content of implementation-summary.md}
+         {summary content}
 
          ---
          **Branch**: `{branch_name}`
-         Ready for PR — run `/pr` to create a pull request.
+         Ready for PR.
+         ```
+         ```bash
+         gh issue comment {issue_number} --repo {owner}/{repo} --body "$comment"
          ```
 
-      3. Write `./specs/<slug>/source-issue` containing the issue reference
-         (e.g., `owner/repo#42`) so that pr-lifecycle can link the PR to the issue.
-
-      4. Update the issue body's Summary section (added by issue-bot) to reflect e2e results.
+      3. Update the issue body's Summary section (added by issue-bot) to reflect e2e results.
          Re-read the current issue body, then update the `### E2E Testing` subsection with
          the actual result (pass/fail, attempt count). If the section doesn't exist, add it.
+         ```bash
+         gh api "repos/{owner}/{repo}/issues/{issue_number}" --jq .body > /tmp/issue_body.md
+         # Edit the E2E Testing subsection
+         gh issue edit {issue_number} --repo {owner}/{repo} --body-file /tmp/issue_body.md
+         ```
 
-      5. Remove `doing` label and add `done` label to the issue:
+      4. Remove `doing` label and add `done` label to the issue:
          ```bash
          gh issue edit {issue_number} --repo {owner}/{repo} --remove-label doing
          gh label create done --repo {owner}/{repo} --description "Implementation complete" --color 0E8A16 2>/dev/null || true
          gh issue edit {issue_number} --repo {owner}/{repo} --add-label done
+         ```
+
+      5. Post a handoff comment offering to chain to PR-lifecycle:
+         ```markdown
+         [from bot] Implementation complete! What's next?
+
+         1. **Create PR** — I'll run PR-lifecycle to create and monitor a pull request
+         2. **Create PR (auto)** — Create PR and auto-monitor CI/reviews
+         3. **Done for now** — I'll leave the issue labeled `done` for later
+         ```
+         ```bash
+         gh issue comment {issue_number} --repo {owner}/{repo} --body "$comment"
+         ```
+
+         Wait for user response:
+         - Option 1 or 2: invoke `/pr --source-issue {owner}/{repo}#{issue_number}`
+           (option 2 passes the auto flag for unattended monitoring)
+         - Option 3: end workflow
+
+         If the `auto` flag was set when spec-to-code was started (e.g., from issue-bot
+         option 2), skip the prompt and auto-chain to PR-lifecycle immediately:
+         ```
+         /pr --source-issue {owner}/{repo}#{issue_number}
          ```
     transitions: {}
