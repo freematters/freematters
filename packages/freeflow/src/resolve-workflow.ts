@@ -15,15 +15,10 @@ function searchDirs(): string[] {
   ];
 }
 
-const WORKFLOW_EXTENSIONS = [
-  ".workflow.yaml",
-  ".workflow.yml",
-  ".fsm.yaml",
-  ".fsm.yml",
-] as const;
-
 function hasWorkflowExtension(name: string): boolean {
-  return WORKFLOW_EXTENSIONS.some((ext) => name.endsWith(ext));
+  return [".workflow.yaml", ".workflow.yml", ".fsm.yaml", ".fsm.yml"].some((ext) =>
+    name.endsWith(ext),
+  );
 }
 
 /**
@@ -49,20 +44,23 @@ export function resolveWorkflow(input: string): string {
         context: { fsmPath: input },
       });
     }
-    // Bare name with extension — not supported in new format
-  } else {
-    // Try as a direct path (e.g. user passed a full path without extension)
-    const abs = resolve(input);
-    if (existsSync(abs)) return abs;
+    // Bare name with extension — not supported in directory format
+    const bareName = input.replace(/\.(workflow|fsm)\.ya?ml$/, "");
+    throw new CliError(
+      "WORKFLOW_NOT_FOUND",
+      `Flat filename format is no longer supported. Use the bare workflow name instead (e.g. "${bareName}").`,
+      { context: { fsmPath: input } },
+    );
   }
 
-  // Use input as directory name for search
-  const baseName = input;
+  // Try as a direct path (e.g. user passed a full path without extension)
+  const abs = resolve(input);
+  if (existsSync(abs)) return abs;
 
   // Search directories
   const dirs = searchDirs();
   for (const dir of dirs) {
-    const found = probeDir(dir, baseName);
+    const found = probeDir(dir, input);
     if (found) return found;
   }
 

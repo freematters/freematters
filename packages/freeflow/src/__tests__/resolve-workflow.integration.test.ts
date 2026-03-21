@@ -52,19 +52,6 @@ describe("resolve-workflow + loadFsm integration", () => {
     }
   });
 
-  test("old flat format by name returns WORKFLOW_NOT_FOUND", () => {
-    // Place a flat-format file in the temp dir
-    writeFileSync(join(tmp, "flat-test.workflow.yaml"), MINIMAL_FSM, "utf-8");
-    // Searching by bare name "flat-test" should NOT find the flat file
-    // (it would need <name>/workflow.yaml format)
-    expect(() => resolveWorkflow("flat-test")).toThrow(CliError);
-    try {
-      resolveWorkflow("flat-test");
-    } catch (e) {
-      expect((e as CliError).code).toBe("WORKFLOW_NOT_FOUND");
-    }
-  });
-
   test("direct path to flat-format file still works", () => {
     const flatPath = join(tmp, "flat-test.workflow.yaml");
     writeFileSync(flatPath, MINIMAL_FSM, "utf-8");
@@ -72,6 +59,19 @@ describe("resolve-workflow + loadFsm integration", () => {
     expect(resolved).toBe(flatPath);
     const fsm = loadFsm(resolved);
     expect(fsm.version).toBe(1);
+  });
+
+  test("bare name with workflow extension throws with helpful message", () => {
+    // "spec-gen.workflow.yaml" without path separators should be rejected early
+    expect(() => resolveWorkflow("spec-gen.workflow.yaml")).toThrow(CliError);
+    try {
+      resolveWorkflow("spec-gen.workflow.yaml");
+    } catch (e) {
+      const err = e as CliError;
+      expect(err.code).toBe("WORKFLOW_NOT_FOUND");
+      expect(err.message).toContain("Flat filename format is no longer supported");
+      expect(err.message).toContain("spec-gen");
+    }
   });
 });
 
@@ -124,6 +124,32 @@ states:
     expect(fsm.guide).toBe("Project-local version");
     expect(fsm.states.start.prompt).toContain("PROJECT-LOCAL");
   });
+
+  test("old flat format in project-local search dir is NOT found by name", () => {
+    // Place a flat-format file inside the project-local search dir
+    // (this is the dir that resolveWorkflow actually searches)
+    const searchDir = join(tmp, ".freeflow", "workflows");
+    writeFileSync(
+      join(searchDir, "flat-in-search.workflow.yaml"),
+      MINIMAL_FSM,
+      "utf-8",
+    );
+    // Searching by bare name should not find it — only <name>/workflow.yaml format works
+    expect(() => resolveWorkflow("flat-in-search")).toThrow(CliError);
+    try {
+      resolveWorkflow("flat-in-search");
+    } catch (e) {
+      expect((e as CliError).code).toBe("WORKFLOW_NOT_FOUND");
+    }
+  });
+
+  // Note: user-global search path (~/.freeflow/workflows/) sits between project-local
+  // and bundled in priority. We cannot test it in integration tests without writing to
+  // the real home directory (~/.freeflow/workflows/), which would cause side effects.
+  // The search order is verified by inspecting searchDirs() which returns:
+  //   [".freeflow/workflows", "~/.freeflow/workflows", "<package>/workflows"]
+  // The project-local > bundled test above confirms the search loop works correctly,
+  // and user-global uses the same probeDir() mechanism at index 1.
 });
 
 // ─── Validate all bundled workflows ─────────────────────────────

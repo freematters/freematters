@@ -117,6 +117,14 @@ states:
       Do not raise issues that are already covered by existing threads.
       Use semantic comparison — same issue phrased differently still counts as duplicate.
 
+      ## Derive SCRIPT_DIR
+
+      The review agent prompts reference `$SCRIPT_DIR` for agent instruction files.
+      Derive it from the workflow YAML path:
+      ```bash
+      SCRIPT_DIR="$(dirname "$(readlink -f "$(fflow current --run-id <run_id> -j | jq -r '.data.fsm_path')")")"
+      ```
+
       ## Concurrent subagent review
 
       Use the Agent tool to **launch 3 subagents concurrently** (all in a single message).
