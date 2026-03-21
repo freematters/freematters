@@ -10,7 +10,7 @@ graph LR
 ## Checklist
 
 - [x] Step 1: Workflow Composition Engine
-- [ ] Step 2: Integration Tests
+- [x] Step 2: Integration Tests
 
 ---
 
