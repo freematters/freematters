@@ -1,0 +1,14 @@
+version: 1.2
+initial: setup
+states:
+  setup:
+    prompt: "Setup the project."
+    transitions:
+      ready: build
+  build:
+    workflow: ./child-simple.workflow.yaml
+    transitions:
+      completed: done
+  done:
+    prompt: "All done."
+    transitions: {}

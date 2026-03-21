@@ -1,0 +1,10 @@
+version: 1.2
+initial: start
+states:
+  start:
+    workflow: ./compose-circular-a.workflow.yaml
+    transitions:
+      completed: done
+  done:
+    prompt: "Done."
+    transitions: {}

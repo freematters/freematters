@@ -1,0 +1,12 @@
+version: 1
+initial: start
+states:
+  start:
+    prompt: "Base child start."
+    todos:
+      - "Base todo A"
+    transitions:
+      next: done
+  done:
+    prompt: "Base child done."
+    transitions: {}

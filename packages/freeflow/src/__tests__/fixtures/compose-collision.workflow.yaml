@@ -1,0 +1,18 @@
+version: 1.2
+initial: setup
+states:
+  setup:
+    prompt: "Setup."
+    transitions:
+      next: build
+  build:
+    workflow: ./child-simple.workflow.yaml
+    transitions:
+      completed: done
+  build/create:
+    prompt: "This collides with the expanded child state."
+    transitions:
+      next: done
+  done:
+    prompt: "Done."
+    transitions: {}

@@ -1,0 +1,10 @@
+version: 1
+initial: step-one
+states:
+  step-one:
+    prompt: "Do step one."
+    transitions:
+      next: done
+  done:
+    prompt: "Child done."
+    transitions: {}

@@ -1,0 +1,14 @@
+version: 1.2
+initial: first
+states:
+  first:
+    workflow: ./child-simple.workflow.yaml
+    transitions:
+      completed: second
+  second:
+    workflow: ./child-no-guide.workflow.yaml
+    transitions:
+      completed: done
+  done:
+    prompt: "All done."
+    transitions: {}

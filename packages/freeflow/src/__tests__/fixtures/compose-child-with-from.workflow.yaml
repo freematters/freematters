@@ -1,0 +1,10 @@
+version: 1.2
+initial: phase
+states:
+  phase:
+    workflow: ./child-with-from.workflow.yaml
+    transitions:
+      completed: done
+  done:
+    prompt: "Compose with from done."
+    transitions: {}

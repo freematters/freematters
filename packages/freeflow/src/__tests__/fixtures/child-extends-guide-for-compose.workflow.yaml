@@ -1,0 +1,14 @@
+version: 1
+extends_guide: ./base-with-guide.workflow.yaml
+guide: |
+  {{base}}
+  Extra child rules for compose.
+initial: step
+states:
+  step:
+    prompt: "Do the step."
+    transitions:
+      next: done
+  done:
+    prompt: "Guided child done."
+    transitions: {}
