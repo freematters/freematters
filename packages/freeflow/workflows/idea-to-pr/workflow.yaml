@@ -1,0 +1,105 @@
+# Flow:
+#
+#   spec (spec-gen) → decide
+#                    /   |   \
+#              auto  step  stop
+#                |    |      |
+#            implement       done
+#          (spec-to-code)
+#                |
+#            confirm-pr
+#           (auto skips)
+#              /    \
+#         submit-pr  done
+#       (pr-lifecycle)
+#              |
+#            done
+
+version: 1.2
+guide: |
+  Idea-to-PR — end-to-end pipeline from rough idea to merged pull request.
+  Composes spec-gen, spec-to-code, and pr-lifecycle into a single workflow.
+
+  ## Mode selection
+
+  After the spec is complete, the user chooses a mode:
+  - **Full auto**: spec-to-code runs in fast-forward mode (no intermediate approvals),
+    then pr-lifecycle starts automatically. No human gates between phases.
+  - **Step by step**: the agent pauses between phases to confirm before proceeding.
+  - **Stop here**: the workflow ends after the spec is generated.
+
+  Remember the user's mode choice — it determines behavior in later states.
+
+  ## Fast-forward propagation
+
+  When the user chose "full auto" mode:
+  - In spec-to-code's setup state, select "fast forward" when prompted.
+  - In confirm-pr, transition directly to submit-pr without asking.
+
+initial: spec
+
+states:
+  spec:
+    workflow: ../spec-gen/workflow.yaml
+    transitions:
+      completed: decide
+
+  decide:
+    prompt: |
+      ## Choose Next Step
+
+      The spec is complete. Read `summary.md` from the spec directory and present
+      a brief overview of what was generated.
+
+      Ask the user how they'd like to proceed:
+
+      1. **Full auto** — implement the spec and submit a PR without any human approvals.
+         Spec-to-code will run in fast-forward mode and pr-lifecycle will start automatically.
+      2. **Step by step** — proceed to implementation, but pause before creating the PR.
+      3. **Stop here** — keep the spec artifacts and end the workflow.
+
+      Remember the user's choice — later states check it.
+    transitions:
+      full auto: implement
+      step by step: implement
+      stop here: done
+
+  implement:
+    workflow: ../spec-to-code/workflow.yaml
+    transitions:
+      completed: confirm-pr
+
+  confirm-pr:
+    prompt: |
+      ## Ready for PR
+
+      Implementation is complete. Read `./specs/<slug>/implementation-summary.md`
+      and present the key results.
+
+      **Full auto mode**: Transition directly to submit-pr without asking the user.
+
+      **Step by step mode**: Present the implementation summary and ask:
+
+      1. **Submit PR** — create a pull request and monitor it until merged
+      2. **Stop here** — end the workflow, I'll handle the PR myself
+    transitions:
+      submit pr: submit-pr
+      stop here: done
+
+  submit-pr:
+    workflow: ../pr-lifecycle/workflow.yaml
+    transitions:
+      completed: done
+
+  done:
+    prompt: |
+      ## Workflow Complete
+
+      Present a final summary of what was accomplished:
+      - Phases completed (spec only / spec + implementation / spec + implementation + PR)
+      - Key artifacts produced (list files in specs/<slug>/)
+      - Final status (PR URL if applicable)
+
+      If the workflow stopped early, suggest the next manual step the user can take
+      (e.g., "run /spec-to-code to implement" or "run /pr to create a pull request").
+    transitions: {}
