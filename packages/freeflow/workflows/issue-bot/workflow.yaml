@@ -16,7 +16,7 @@
 #                         /    \
 #                   e2e-gen  design (revision)
 #                      |
-#                    done
+#                    done ── (chains to spec-to-code via slash command)
 
 version: 1
 guide: |
@@ -622,7 +622,8 @@ states:
     prompt: |
       ## Done — Finalize Spec Issue
 
-      Finalize the issue by adding the label, completing the status checklist, and posting a summary.
+      Finalize the issue by adding the label, completing the status checklist, ensuring the
+      plan checklist is correct, posting a summary, and offering to chain to spec-to-code.
 
       Steps:
       1. Add the `spec-ready` label to the issue:
@@ -651,11 +652,30 @@ states:
          - [x] spec-ready
          ```
 
-      3. Compile a list of all artifact comments posted during the workflow. For each artifact,
+      3. **Plan checklist verification**: Re-read the current issue body. Ensure the `## Plan`
+         section contains checkboxes (`- [ ]`) for every step from the `## plan.md` artifact
+         comment. The plan state already adds a Plan section to the issue body, but you MUST
+         verify it is complete and well-formed.
+
+         Additionally, if `e2e.md` was generated (check `artifact_comment_ids` for `e2e.md`),
+         ensure the Plan section includes a final `- [ ] E2E tests` checkbox. If it is missing,
+         re-read the issue body and append it to the Plan section:
+         ```
+         ## Plan
+
+         - [ ] Step 1: {title}
+         - [ ] Step 2: {title}
+         ...
+         - [ ] E2E tests
+         ```
+
+         This checklist is what spec-to-code will check off during implementation.
+
+      4. Compile a list of all artifact comments posted during the workflow. For each artifact,
          include its filename and a link to the comment (using the issue comment URL format:
          `https://github.com/{owner}/{repo}/issues/{n}#issuecomment-{comment_id}`).
 
-      4. Update the issue body to append a summary section after the Status section. Re-read
+      5. Update the issue body to append a summary section after the Status section. Re-read
          the current issue body first, then add:
          ```markdown
          ## Summary
@@ -670,7 +690,7 @@ states:
          If no e2e: state that e2e testing was not included in this spec.}
          ```
 
-      5. Post a summary comment on the issue:
+      6. Post a summary comment on the issue:
          ```bash
          gh issue comment {n} --repo {repo} --body "## Spec Complete!
 
@@ -691,8 +711,44 @@ states:
          Use the plan checklist in the issue body to track implementation progress."
          ```
 
-      6. Report completion to the user: display the issue URL and confirm the spec is ready.
+      7. **Handoff comment**: Post a comment offering to chain to spec-to-code:
+         ```bash
+         gh issue comment {n} --repo {repo} --body "[bot reply] Spec is ready! What would you like to do?
+
+         1. **Start implementation** — I'll run spec-to-code on this issue
+         2. **Start implementation (auto)** — Run spec-to-code AND auto-chain to PR monitoring
+         3. **Done for now** — I'll leave the issue labeled spec-ready for later
+
+         Reply with your choice (1, 2, or 3)."
+         ```
+
+      8. **Poll for user reply**: Use the polling script from the guide to wait for the
+         user's response on the issue. Filter for comments from the issue creator only.
+
+      9. **Handle the user's choice**:
+         - **Option 1 (Start implementation)**: Post a comment confirming:
+           ```bash
+           gh issue comment {n} --repo {repo} --body "[bot reply] Starting implementation! Invoking spec-to-code..."
+           ```
+           Report to the user that you will now chain to spec-to-code.
+           Then invoke `/spec-to-code {repo}#{issue_number}` to start implementation.
+           The workflow ends here — spec-to-code takes over.
+         - **Option 2 (Start implementation with auto)**: Post a comment confirming:
+           ```bash
+           gh issue comment {n} --repo {repo} --body "[bot reply] Starting implementation (auto mode)! Invoking spec-to-code with auto-chain to PR monitoring..."
+           ```
+           Report to the user that you will now chain to spec-to-code in auto mode.
+           Then invoke `/spec-to-code {repo}#{issue_number} --auto` to start implementation.
+           The --auto flag means spec-to-code will automatically chain to PR-lifecycle
+           without prompting. The workflow ends here — spec-to-code takes over.
+         - **Option 3 (Done for now)**: Post a closing comment:
+           ```bash
+           gh issue comment {n} --repo {repo} --body "[bot reply] No problem! The issue is labeled \`spec-ready\` and ready for implementation whenever you are.
+
+           To start later, run: \`/spec-to-code {repo}#{issue_number}\`"
+           ```
+           Report completion to the user: display the issue URL and confirm the spec is ready.
+           The workflow ends here.
 
       The issue is left **open** — it serves as the living spec for implementation.
-      This is the terminal state. The workflow ends here.
     transitions: {}
