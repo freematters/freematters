@@ -68,13 +68,9 @@ async function readFilter(): Promise<FilterConfig | null> {
   }
 }
 
-function isSenderAllowed(
-  filter: FilterConfig | null,
-  sender: string,
-): boolean {
+function isSenderAllowed(filter: FilterConfig | null, sender: string): boolean {
   if (!filter) return true;
-  if (filter.ignoreFrom.length > 0 && filter.ignoreFrom.includes(sender))
-    return false;
+  if (filter.ignoreFrom.length > 0 && filter.ignoreFrom.includes(sender)) return false;
   if (filter.allowFrom.length > 0) return filter.allowFrom.includes(sender);
   return true;
 }
