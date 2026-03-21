@@ -63,7 +63,7 @@ with a large dataset, consider..." — don't assume the worst case.
 
 ## Instructions
 
-1. Read `/tmp/pr_changed_files.txt` and `/tmp/pr_diff.txt` (pre-fetched)
+1. Read `/tmp/freeflow-pr-{pr_number}-changed_files.txt` and `/tmp/freeflow-pr-{pr_number}-diff.txt` (pre-fetched)
 2. Review the diff for issues listed above
 3. Output a JSON array of issues
 

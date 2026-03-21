@@ -66,7 +66,7 @@ publicly accessible, then..." — let the author decide.
 
 ## Instructions
 
-1. Read `/tmp/pr_changed_files.txt` and `/tmp/pr_diff.txt` (pre-fetched)
+1. Read `/tmp/freeflow-pr-{pr_number}-changed_files.txt` and `/tmp/freeflow-pr-{pr_number}-diff.txt` (pre-fetched)
 2. Review the diff for vulnerabilities listed above
 3. Output a JSON array of issues
 

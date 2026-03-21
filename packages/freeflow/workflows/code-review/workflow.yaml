@@ -21,6 +21,11 @@ states:
 
       Collect all data needed for the PR review.
 
+      First, clean up any stale spec files from previous runs:
+      ```bash
+      rm -f /tmp/freeflow-pr-*-diff.txt /tmp/freeflow-pr-*-changed_files.txt /tmp/freeflow-pr-*-review_payload.json /tmp/freeflow-pr-*-summary.md
+      ```
+
       ## 1. Verify authentication
 
       ```bash
@@ -44,10 +49,10 @@ states:
 
       **a) Save the full diff and changed files list to temp files:**
       ```bash
-      gh pr diff > /tmp/pr_diff.txt
+      gh pr diff > /tmp/freeflow-pr-{pr_number}-diff.txt
       ```
       ```bash
-      gh pr diff --name-only > /tmp/pr_changed_files.txt
+      gh pr diff --name-only > /tmp/freeflow-pr-{pr_number}-changed_files.txt
       ```
 
       **b) Fetch existing review threads** via GraphQL:
@@ -137,8 +142,8 @@ states:
       Read your review instructions from: $SCRIPT_DIR/agents/{agent}.md
 
       Steps:
-      1. Read `/tmp/pr_changed_files.txt` to get the changed files list
-      2. Read `/tmp/pr_diff.txt` to get the full diff
+      1. Read `/tmp/freeflow-pr-{pr_number}-changed_files.txt` to get the changed files list
+      2. Read `/tmp/freeflow-pr-{pr_number}-diff.txt` to get the full diff
       3. Review against your instructions
 
       Existing unresolved review threads (do NOT raise issues already covered here):
@@ -240,7 +245,7 @@ states:
 
       ```bash
       gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-        --input /tmp/review_payload.json
+        --input /tmp/freeflow-pr-{pr_number}-review_payload.json
       ```
 
       Payload:
@@ -307,13 +312,13 @@ states:
       If a summary comment was found in init (by `<!-- code-review -->` marker), update it:
       ```bash
       gh api repos/{owner}/{repo}/issues/comments/{comment_id} \
-        -X PATCH -f body="$(cat /tmp/summary.md)"
+        -X PATCH -f body="$(cat /tmp/freeflow-pr-{pr_number}-summary.md)"
       ```
 
       Otherwise, create a new one:
       ```bash
       gh api repos/{owner}/{repo}/issues/{pr_number}/comments \
-        -f body="$(cat /tmp/summary.md)"
+        -f body="$(cat /tmp/freeflow-pr-{pr_number}-summary.md)"
       ```
 
       ## Error handling
