@@ -145,13 +145,20 @@ function resolveRefs(
       };
     }
 
-    // Merge todos: child overrides base (not concatenation)
+    // Merge todos: child overrides base; append_todos appends to inherited
     if (state.todos === undefined) {
       if (baseState.todos !== undefined) {
         state.todos = [...baseState.todos];
       }
     }
     // If child defines todos explicitly (even empty), it replaces base todos entirely
+
+    // append_todos: append items after resolved todos (base or overridden)
+    if (state.append_todos !== undefined && Array.isArray(state.append_todos)) {
+      const base = Array.isArray(state.todos) ? state.todos : [];
+      state.todos = [...base, ...(state.append_todos as unknown[])];
+      state.append_todos = undefined;
+    }
 
     // Remove from field after merge
     state.from = undefined;

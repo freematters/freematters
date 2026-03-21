@@ -89,6 +89,20 @@ describe("loadFsm — from ref: todos inherit", () => {
   });
 });
 
+// --- append_todos → appends to inherited base todos ---
+
+describe("loadFsm — from ref: append_todos", () => {
+  test("appends to inherited base todos", () => {
+    const fsm = loadFsm(fixture("child-append-todos.workflow.yaml"));
+    expect(fsm.states.start.todos).toEqual([
+      "Base todo 1",
+      "Base todo 2",
+      "Appended todo 1",
+      "Appended todo 2",
+    ]);
+  });
+});
+
 // --- Circular reference → SCHEMA_INVALID ---
 
 describe("loadFsm — from ref: circular reference", () => {
