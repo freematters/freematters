@@ -68,32 +68,96 @@ Start a bundled workflow by name:
 
 ## How It Works
 
-A workflow is a YAML file that defines states, transitions, and per-state prompts:
+A workflow is a YAML file that defines states, transitions, and per-state prompts. The agent sees the current state's prompt and available transitions — it reasons freely within each state, but can only move where the FSM allows.
+
+### Example 1: Bug fix (simple, linear)
 
 ```yaml
 version: 1
-guide: "Code review workflow"
-initial: analyze
+guide: "Fix a bug with a test-first approach"
+initial: reproduce
 states:
-  analyze:
-    prompt: "Read the diff and identify issues."
+  reproduce:
+    prompt: "Write a failing test that reproduces the bug."
     transitions:
-      found_issues: feedback
-      looks_good: done
-  feedback:
-    prompt: "Post review comments on each issue."
+      test written: fix
+  fix:
+    prompt: "Fix the code to make the test pass. Run the full test suite."
     transitions:
-      next: done
+      tests pass: done
+      tests fail: fix
   done:
-    prompt: "Summarize the review."
+    prompt: "Summarize what was wrong and how you fixed it."
     transitions: {}
 ```
 
-The runtime works through three mechanisms:
+### Example 2: Code review (branching)
 
-1. **Skills** invoke the CLI — `/fflow:start` loads the YAML, validates the schema, and enters the initial state. The agent sees a state card with the current prompt and available transitions.
-2. **CLI enforces transitions** — when the agent calls `fflow goto feedback --on found_issues`, the CLI validates the transition against the YAML before committing it. Illegal transitions are rejected.
-3. **Hooks inject reminders** — a PostToolUse hook runs `fflow current` every 5 tool calls, re-injecting the current state card into the agent's context. This counteracts context drift in long conversations.
+```yaml
+version: 1
+guide: "Review a PR for bugs, security, and style"
+initial: analyze
+states:
+  analyze:
+    prompt: |
+      Read the full diff. Categorize each issue as blocker, major, or minor.
+      If no issues found, transition directly to done.
+    transitions:
+      found issues: feedback
+      looks good: done
+  feedback:
+    prompt: |
+      Post a review comment for each issue. Use GitHub review threads.
+      Request changes if any blockers exist, otherwise approve.
+    transitions:
+      review posted: done
+  done:
+    prompt: "Post a summary comment with issue counts by severity."
+    transitions: {}
+```
+
+### Example 3: Feature implementation (multi-phase with iteration)
+
+```yaml
+version: 1
+guide: "Implement a feature from spec to merged PR"
+initial: plan
+states:
+  plan:
+    prompt: |
+      Read the spec. Break the work into incremental steps.
+      Write a plan.md with checkboxes for each step.
+    transitions:
+      plan ready: implement
+  implement:
+    prompt: |
+      Work through plan.md one checkbox at a time.
+      Write tests before implementation. Run tests after each change.
+      Check off each item as you complete it.
+    transitions:
+      all done: verify
+      blocked: plan
+  verify:
+    prompt: |
+      Run the full test suite, linter, and type checker.
+      Fix any failures before proceeding.
+    transitions:
+      all pass: pr
+      failures: implement
+  pr:
+    prompt: "Create a PR with a summary of changes and test plan."
+    transitions:
+      pr created: done
+  done:
+    prompt: "Report the PR URL."
+    transitions: {}
+```
+
+### Three mechanisms enforce the workflow
+
+1. **Skills invoke the CLI** — `/fflow:start` loads the YAML, validates the schema, and enters the initial state. The agent sees a state card with the current prompt and available transitions.
+2. **CLI enforces transitions** — `fflow goto fix --on "test written"` validates the transition against the YAML before committing. Illegal transitions are rejected.
+3. **Hooks inject reminders** — a PostToolUse hook runs `fflow current` every 5 tool calls, re-injecting the state card into the agent's context. This counteracts context drift in long conversations.
 
 All state changes are recorded as an append-only event log (JSONL), with a snapshot for fast reads. Runs are isolated by ID with directory-based file locking for concurrent safety.
 
