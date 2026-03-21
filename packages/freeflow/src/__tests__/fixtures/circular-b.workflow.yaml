@@ -1,0 +1,9 @@
+version: 1
+guide: "Circular B"
+initial: start
+states:
+  start:
+    from: "./circular-a.workflow.yaml#start"
+  done:
+    prompt: "Done."
+    transitions: {}

@@ -1,0 +1,16 @@
+version: 1
+guide: "Child with base prompt"
+initial: start
+states:
+  start:
+    from: "./base.workflow.yaml#start"
+    prompt: |
+      {{base}}
+      Extra child instructions.
+  review:
+    prompt: "Child review."
+    transitions:
+      approved: done
+  done:
+    prompt: "Done."
+    transitions: {}

@@ -1,0 +1,19 @@
+version: 1
+guide: "Base workflow guide"
+initial: start
+states:
+  start:
+    prompt: "Base start prompt."
+    todos:
+      - "Base todo 1"
+      - "Base todo 2"
+    transitions:
+      next: review
+  review:
+    prompt: "Base review prompt."
+    transitions:
+      approved: done
+      rejected: start
+  done:
+    prompt: "Base done."
+    transitions: {}

@@ -1,0 +1,13 @@
+version: 1
+guide: "Child workflow"
+initial: start
+states:
+  start:
+    from: "./base.workflow.yaml#start"
+  review:
+    prompt: "Child review."
+    transitions:
+      approved: done
+  done:
+    prompt: "Done."
+    transitions: {}

@@ -1,0 +1,9 @@
+version: 1
+guide: "Missing workflow ref"
+initial: start
+states:
+  start:
+    from: "./nonexistent.workflow.yaml#start"
+  done:
+    prompt: "Done."
+    transitions: {}

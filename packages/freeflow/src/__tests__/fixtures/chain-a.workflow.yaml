@@ -1,0 +1,11 @@
+version: 1
+guide: "Chain A"
+initial: start
+states:
+  start:
+    from: "./chain-b.workflow.yaml#start"
+    todos:
+      - "A todo"
+  done:
+    prompt: "Done."
+    transitions: {}
