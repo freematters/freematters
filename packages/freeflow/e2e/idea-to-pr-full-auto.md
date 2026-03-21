@@ -51,7 +51,7 @@ The executor should:
 
     Let the workflow run automatically from there — spec-to-code will implement and pr-lifecycle will create a PR.
 
-    IMPORTANT: You are running from /home/ubuntu/Code/freematters
+    IMPORTANT: You are running from the freematters monorepo root
 
 ## Steps
 

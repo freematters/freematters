@@ -280,7 +280,7 @@ states:
       Integration Testing section that are relevant to this step (where
       dependencies are available). Add unit tests for complex single-module
       logic. Clearly list each test case so the implementing agent knows
-      exactly what to cover. Avoid heavy mocking internal services. Avoid testing 
+      exactly what to cover. Avoid heavy mocking internal services. Avoid testing
       internal details.
       ```
 
