@@ -9,7 +9,7 @@ graph LR
 
 ## Checklist
 - [x] Step 1: Update download_spec.py — remove slugify, require --slug
-- [ ] Step 2: Update workflow YAML — concise slug instruction
+- [x] Step 2: Update workflow YAML — concise slug instruction
 
 ---
 
