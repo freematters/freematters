@@ -59,7 +59,7 @@ guide: |
 
   ### Reply Prefix
 
-  Every issue comment you post MUST be prefixed with `[bot reply]` so users can easily
+  Every issue comment you post MUST be prefixed with `[from bot]` so users can easily
   distinguish bot replies from human comments.
 
   ### Creator-Only Filtering

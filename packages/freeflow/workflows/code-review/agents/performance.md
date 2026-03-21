@@ -63,7 +63,7 @@ with a large dataset, consider..." — don't assume the worst case.
 
 ## Design compliance
 
-If `/tmp/pr_design.md` exists, also check:
+If `/tmp/freeflow-pr-{pr_number}-design.md` exists, also check:
 - **Performance requirements** — Does the design specify performance expectations (scale,
   throughput, latency) that the implementation doesn't meet?
 - **Architectural choices** — Does the design specify patterns (caching, batching, async)
@@ -71,12 +71,12 @@ If `/tmp/pr_design.md` exists, also check:
 
 Flag design-performance deviations as **major** severity.
 
-If `/tmp/pr_design.md` does not exist, skip design-compliance checks entirely.
+If `/tmp/freeflow-pr-{pr_number}-design.md` does not exist, skip design-compliance checks entirely.
 
 ## Instructions
 
-1. Read `/tmp/pr_changed_files.txt` and `/tmp/pr_diff.txt` (pre-fetched)
-2. If `/tmp/pr_design.md` exists, read it for performance-related design requirements
+1. Read `/tmp/freeflow-pr-{pr_number}-changed_files.txt` and `/tmp/freeflow-pr-{pr_number}-diff.txt` (pre-fetched)
+2. If `/tmp/freeflow-pr-{pr_number}-design.md` exists, read it for performance-related design requirements
 3. Review the diff for issues listed above (and design compliance if spec exists)
 4. Output a JSON array of issues
 

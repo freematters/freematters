@@ -61,22 +61,22 @@ Acknowledge trade-offs when they exist.
 
 ## Design compliance
 
-If `/tmp/pr_design.md` exists, also check:
+If `/tmp/freeflow-pr-{pr_number}-design.md` exists, also check:
 - **Design alignment** — Does the implementation match what the design describes? Flag deviations
   where the code takes a different approach than specified (different data flow, missing components,
   extra abstractions not in the design).
 - **Missing pieces** — Are there parts of the design that the PR claims to implement but doesn't?
-  Cross-reference with `/tmp/pr_plan.md` if it exists.
+  Cross-reference with `/tmp/freeflow-pr-{pr_number}-plan.md` if it exists.
 
 Flag design deviations as **major** severity. If the deviation looks intentional (e.g., a simpler
 approach that achieves the same goal), note it but suggest the author update the design doc.
 
-If `/tmp/pr_design.md` does not exist, skip design-compliance checks entirely.
+If `/tmp/freeflow-pr-{pr_number}-design.md` does not exist, skip design-compliance checks entirely.
 
 ## Instructions
 
-1. Read `/tmp/pr_changed_files.txt` and `/tmp/pr_diff.txt` (pre-fetched)
-2. If `/tmp/pr_design.md` exists, read it (and `/tmp/pr_plan.md` if present) for design context
+1. Read `/tmp/freeflow-pr-{pr_number}-changed_files.txt` and `/tmp/freeflow-pr-{pr_number}-diff.txt` (pre-fetched)
+2. If `/tmp/freeflow-pr-{pr_number}-design.md` exists, read it (and `/tmp/freeflow-pr-{pr_number}-plan.md` if present) for design context
 3. Review the diff against the principles above (and design compliance if spec exists)
 4. Output a JSON array of issues
 

@@ -17,6 +17,7 @@ guide: |
   Spec-to-Code. Implements a spec into working code, one plan.md step at a time.
 
   Input: `./specs/<slug>/` directory (local) or `owner/repo#N` issue reference.
+  Optional: `--auto` flag for unattended mode (auto-chains to PR-lifecycle on completion).
   design.md is the source of truth. Each step → sub-agent → commit.
 
   Testing: integration-first (system boundaries, real dependencies). Unit tests only
@@ -40,6 +41,10 @@ states:
       - If yes → **issue mode**. Remember `source_mode = "issue"`, parse `owner`, `repo`, `issue_number`.
         Derive `slug` from the issue title (lowercase, strip `feat:`/`fix:` prefixes, replace non-alphanumeric with hyphens).
       - If no → **local mode**. Remember `source_mode = "local"`. The argument is the spec directory path.
+
+      Check if `--auto` flag is present in the arguments. If yes, remember `auto_mode = true`.
+      This flag enables unattended operation: spec-to-code will auto-chain to PR-lifecycle
+      without prompting the user at the done state.
 
       ### 2. Load spec
 
@@ -197,7 +202,11 @@ states:
 
       All implementation steps are complete. Run E2E tests to verify the feature works end-to-end.
 
-      Read `./specs/<slug>/e2e.md`. If it does not exist, skip directly to review.
+      If `./specs/<slug>/e2e.md` exists, you MUST run the e2e tests. Do NOT skip them
+      for any reason (complexity, environment concerns, etc.). If the tests fail, fix
+      and re-run until they pass.
+
+      If `./specs/<slug>/e2e.md` does not exist, skip directly to review.
 
       ### Run the test
 

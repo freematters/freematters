@@ -21,6 +21,11 @@ states:
 
       Collect all data needed for the PR review.
 
+      First, clean up any stale spec files from previous runs:
+      ```bash
+      rm -f /tmp/freeflow-pr-*-diff.txt /tmp/freeflow-pr-*-changed_files.txt /tmp/freeflow-pr-*-review_payload.json /tmp/freeflow-pr-*-summary.md
+      ```
+
       ## 1. Verify authentication
 
       ```bash
@@ -51,7 +56,7 @@ states:
          gh api repos/{owner}/{repo}/issues/{issue_number}/comments --paginate
          ```
       2. Look for comments containing `## design.md` and `## plan.md` markers (these are spec artifacts posted by issue-bot).
-      3. For each found artifact, extract the content after the `## design.md` or `## plan.md` heading and write to `/tmp/pr_design.md` and `/tmp/pr_plan.md` respectively.
+      3. For each found artifact, extract the content after the `## design.md` or `## plan.md` heading and write to `/tmp/freeflow-pr-{pr_number}-design.md` and `/tmp/freeflow-pr-{pr_number}-plan.md` respectively.
       4. If the issue reference uses `owner/repo#N` format (cross-repo), use that owner/repo instead.
 
       If no linked issue is found, skip this step — code review proceeds without spec context.
@@ -63,10 +68,10 @@ states:
 
       **a) Save the full diff and changed files list to temp files:**
       ```bash
-      gh pr diff > /tmp/pr_diff.txt
+      gh pr diff > /tmp/freeflow-pr-{pr_number}-diff.txt
       ```
       ```bash
-      gh pr diff --name-only > /tmp/pr_changed_files.txt
+      gh pr diff --name-only > /tmp/freeflow-pr-{pr_number}-changed_files.txt
       ```
 
       **b) Fetch existing review threads** via GraphQL:
@@ -156,10 +161,10 @@ states:
       Read your review instructions from: $SCRIPT_DIR/agents/{agent}.md
 
       Steps:
-      1. Read `/tmp/pr_changed_files.txt` to get the changed files list
-      2. Read `/tmp/pr_diff.txt` to get the full diff
-      3. If `/tmp/pr_design.md` exists, read it for design context
-      4. If `/tmp/pr_plan.md` exists, read it for implementation plan context
+      1. Read `/tmp/freeflow-pr-{pr_number}-changed_files.txt` to get the changed files list
+      2. Read `/tmp/freeflow-pr-{pr_number}-diff.txt` to get the full diff
+      3. If `/tmp/freeflow-pr-{pr_number}-design.md` exists, read it for design context
+      4. If `/tmp/freeflow-pr-{pr_number}-plan.md` exists, read it for implementation plan context
       5. Review against your instructions (including design-compliance if spec files exist)
 
       Existing unresolved review threads (do NOT raise issues already covered here):
@@ -261,7 +266,7 @@ states:
 
       ```bash
       gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-        --input /tmp/review_payload.json
+        --input /tmp/freeflow-pr-{pr_number}-review_payload.json
       ```
 
       Payload:
@@ -300,7 +305,7 @@ states:
 
       ## Spec Context
 
-      [If `/tmp/pr_design.md` was found: "Linked to issue #N — design-compliance checked."
+      [If `/tmp/freeflow-pr-{pr_number}-design.md` was found: "Linked to issue #N — design-compliance checked."
        If no linked issue or no spec found: "No linked spec found — design-compliance checks skipped."]
 
       ## Key Files
@@ -333,13 +338,13 @@ states:
       If a summary comment was found in init (by `<!-- code-review -->` marker), update it:
       ```bash
       gh api repos/{owner}/{repo}/issues/comments/{comment_id} \
-        -X PATCH -f body="$(cat /tmp/summary.md)"
+        -X PATCH -f body="$(cat /tmp/freeflow-pr-{pr_number}-summary.md)"
       ```
 
       Otherwise, create a new one:
       ```bash
       gh api repos/{owner}/{repo}/issues/{pr_number}/comments \
-        -f body="$(cat /tmp/summary.md)"
+        -f body="$(cat /tmp/freeflow-pr-{pr_number}-summary.md)"
       ```
 
       ## Error handling
