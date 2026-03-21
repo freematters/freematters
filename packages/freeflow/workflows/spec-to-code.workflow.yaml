@@ -223,25 +223,33 @@ states:
       Where `<base>` is the commit before the first implementation step (check `./specs/<slug>/progress.md`
       for the earliest commit hash, then use its parent).
 
-      ### 2. Review (sub-agent)
+      ### 2. Review (parallel sub-agents + aggregator)
 
-      Dispatch a review sub-agent:
+      Dispatch three review sub-agents **in parallel**, each reviewing `git diff <base>...HEAD`:
 
-      > Review `git diff <base>...HEAD` against ./specs/<slug>/design.md.
-      > Check for:
-      > - Spec compliance — missing or extra functionality, spec deviations
-      > - Code quality — readability, duplication, YAGNI/KISS violations, idiomatic patterns
-      > - Correctness & security — edge cases, bugs, injection risks, secrets handling
-      > - Run the full test suite and linter
-      >
-      > Classify each issue:
-      > - 🔴 **Major** — must fix (bugs, security, spec violations)
-      > - 🟠 **Medium** — should fix (YAGNI/KISS, poor error handling, architectural issues)
-      > - 🟡 **Minor** — nice to fix but not blocking (style, naming)
-      >
-      > Produce a review report with verdict (PASS/FAIL), issues by severity, and total counts.
+      **Sub-agent A — Spec Compliance**
+      > Read ./specs/<slug>/design.md and ./specs/<slug>/progress.md.
+      > Check: Does the implementation match design.md? Missing or extra functionality?
+      > Flag any spec deviations.
 
-      Write the report to `./specs/<slug>/review-round-N.md`.
+      **Sub-agent B — Code Quality**
+      > Review for: readability, duplication, YAGNI/KISS violations, idiomatic patterns.
+
+      **Sub-agent C — Correctness & Security**
+      > Review for: edge cases, bugs, injection risks, secrets handling.
+      > Run the full test suite and linter.
+
+      Each sub-agent classifies issues as:
+      - 🔴 **Major** — must fix (bugs, security, spec violations)
+      - 🟠 **Medium** — should fix (YAGNI/KISS, poor error handling, architectural issues)
+      - 🟡 **Minor** — nice to fix but not blocking (style, naming)
+
+      Then dispatch an **aggregator sub-agent** to combine the three reports:
+
+      > Deduplicate overlapping findings. Resolve conflicting severities (use higher).
+      > Produce a single report: verdict (PASS/FAIL), issues by severity, total counts.
+
+      Write the merged report to `./specs/<slug>/review-round-N.md`.
 
       ### 3. Fix (sub-agent, if needed)
 
