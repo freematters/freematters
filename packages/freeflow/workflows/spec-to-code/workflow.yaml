@@ -429,6 +429,8 @@ states:
 
          Wait for user response:
          - Option 1 or 2: invoke `/pr --source-issue {owner}/{repo}#{issue_number}`
+           The `--source-issue` parameter passes the issue reference so PR-lifecycle can add
+           `Closes #N` to the PR description, linking it to the source issue.
            (option 2 passes the auto flag for unattended monitoring)
          - Option 3: end workflow
 
