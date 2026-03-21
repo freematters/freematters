@@ -267,6 +267,12 @@ function resolveWorkflowStates(
     if (state.prompt !== undefined) {
       fail(`state "${stateName}": "workflow" states cannot have "prompt"`);
     }
+    if (state.todos !== undefined) {
+      fail(`state "${stateName}": "workflow" states cannot have "todos"`);
+    }
+    if (state.append_todos !== undefined) {
+      fail(`state "${stateName}": "workflow" states cannot have "append_todos"`);
+    }
     if (state.transitions === undefined || state.transitions === null) {
       fail(`state "${stateName}": "workflow" states must have "transitions"`);
     }

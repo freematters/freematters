@@ -86,11 +86,46 @@ describe("STATE_NAME_RE — slash-separated names", () => {
     expect(fsm.states["build/done"]).toBeDefined();
   });
 
-  test("rejects foo//bar and /foo via composed workflows", () => {
-    // Tested via the regex directly — we export STATE_NAME_RE indirectly through validation
-    // A state named with double slash or leading slash would fail validation
-    // We test this by verifying the regex pattern in the loaded FSM
-    // The regex is internal, so we test via the validation path
+  test("rejects foo//bar state name", () => {
+    try {
+      loadFsm(fixture("compose-bad-name-double-slash.workflow.yaml"));
+      expect.fail("Expected error");
+    } catch (e) {
+      expect(e).toBeInstanceOf(FsmError);
+      expect((e as FsmError).code).toBe("SCHEMA_INVALID");
+    }
+  });
+
+  test("rejects /foo state name", () => {
+    try {
+      loadFsm(fixture("compose-bad-name-leading-slash.workflow.yaml"));
+      expect.fail("Expected error");
+    } catch (e) {
+      expect(e).toBeInstanceOf(FsmError);
+      expect((e as FsmError).code).toBe("SCHEMA_INVALID");
+    }
+  });
+
+  test("rejects workflow state with todos", () => {
+    try {
+      loadFsm(fixture("compose-workflow-todos.workflow.yaml"));
+      expect.fail("Expected error");
+    } catch (e) {
+      expect(e).toBeInstanceOf(FsmError);
+      expect((e as FsmError).code).toBe("SCHEMA_INVALID");
+      expect((e as FsmError).message).toMatch(/cannot have "todos"/);
+    }
+  });
+
+  test("rejects workflow state with append_todos", () => {
+    try {
+      loadFsm(fixture("compose-workflow-append-todos.workflow.yaml"));
+      expect.fail("Expected error");
+    } catch (e) {
+      expect(e).toBeInstanceOf(FsmError);
+      expect((e as FsmError).code).toBe("SCHEMA_INVALID");
+      expect((e as FsmError).message).toMatch(/cannot have "append_todos"/);
+    }
   });
 });
 

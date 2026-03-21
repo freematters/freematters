@@ -1,0 +1,10 @@
+version: 1.2
+initial: foo//bar
+states:
+  foo//bar:
+    prompt: "Bad name."
+    transitions:
+      next: done
+  done:
+    prompt: "Done."
+    transitions: {}
