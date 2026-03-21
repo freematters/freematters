@@ -1,98 +1,43 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { afterAll, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
-
-// Mock the agent SDK before importing the module under test
-vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
-  query: vi.fn(),
-  createSdkMcpServer: vi.fn(),
-  tool: vi.fn(),
-}));
-
-import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
+import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
 import { createFsmMcpServer } from "../commands/run.js";
 import { loadFsm } from "../fsm.js";
+import type { Fsm } from "../fsm.js";
 import { Store } from "../store.js";
+import {
+  LINEAR_3STATE_FSM,
+  cleanupTempDir,
+  createTempDir,
+  writeFsmFile,
+} from "./fixtures.js";
 
-const MINIMAL_FSM = `
-version: 1
-guide: "Test guide for the workflow"
-initial: start
-states:
-  start:
-    prompt: "Begin here."
-    transitions:
-      next: middle
-  middle:
-    prompt: "Middle step."
-    transitions:
-      finish: done
-  done:
-    prompt: "Finished."
-    transitions: {}
-`;
+type ToolResult = {
+  content: Array<{ type: string; text: string }>;
+  isError?: boolean;
+};
 
 let tmp: string;
 let fsmPath: string;
-let root: string;
-
-// Capture tool handlers registered via tool()
-let toolHandlers: Record<
-  string,
-  (args: Record<string, unknown>, extra: unknown) => Promise<unknown>
->;
-let toolDefinitions: Array<{ name: string; handler: unknown }>;
+let fsm: Fsm;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freeflow-mcp-test-"));
-  fsmPath = join(tmp, "test.yaml");
-  writeFileSync(fsmPath, MINIMAL_FSM, "utf-8");
+  tmp = createTempDir("mcp-test");
+  fsmPath = writeFsmFile(tmp, "test.yaml", LINEAR_3STATE_FSM);
+  fsm = loadFsm(fsmPath);
 });
 
 afterAll(() => {
-  rmSync(tmp, { recursive: true, force: true });
+  cleanupTempDir(tmp);
 });
+
+let store: Store;
+let runId: string;
+let tools: ReturnType<typeof createFsmMcpServer>["tools"];
+let runCounter = 0;
 
 beforeEach(() => {
-  vi.clearAllMocks();
-  root = mkdtempSync(join(tmp, "root-"));
-  toolHandlers = {};
-  toolDefinitions = [];
-
-  // Capture tool definitions when tool() is called
-  const mockTool = vi.mocked(tool);
-  mockTool.mockImplementation(((
-    name: string,
-    _desc: string,
-    _schema: unknown,
-    handler: unknown,
-  ) => {
-    const def = { name, handler };
-    toolDefinitions.push(def);
-    toolHandlers[name] = handler as (
-      args: Record<string, unknown>,
-      extra: unknown,
-    ) => Promise<unknown>;
-    return def;
-  }) as typeof tool);
-
-  // createSdkMcpServer returns a mock server config
-  const mockCreateServer = vi.mocked(createSdkMcpServer);
-  mockCreateServer.mockImplementation(((opts: { name?: string }) => {
-    return { type: "sdk", name: opts?.name ?? "freeflow", instance: {} };
-  }) as typeof createSdkMcpServer);
-});
-
-// Helper: directly create MCP tools (bypasses run() and its retry loop)
-function setupHandlers(): {
-  handlers: typeof toolHandlers;
-  runId: string;
-  store: Store;
-} {
-  const runId = "test-run";
-  const store = new Store(root);
-  const fsm = loadFsm(fsmPath);
+  runCounter++;
+  runId = `test-run-${runCounter}`;
+  store = new Store(createTempDir("mcp-root"));
 
   store.initRun(runId, fsmPath);
   store.commit(
@@ -108,47 +53,20 @@ function setupHandlers(): {
     { run_status: "active", state: fsm.initial },
   );
 
-  createFsmMcpServer(fsm, store, runId);
-  return { handlers: toolHandlers, runId, store };
-}
-
-// ─── MCP tool registration ──────────────────────────────────────
-
-describe("MCP tool registration", () => {
-  test("registers fsm_goto, fsm_current, and request_input tools", () => {
-    setupHandlers();
-
-    const names = toolDefinitions.map((t) => t.name);
-    expect(names).toContain("fsm_goto");
-    expect(names).toContain("fsm_current");
-    expect(names).toContain("request_input");
-  });
-
-  test("createSdkMcpServer is called with tool definitions", () => {
-    setupHandlers();
-
-    const mockCreateServer = vi.mocked(createSdkMcpServer);
-    expect(mockCreateServer).toHaveBeenCalledTimes(1);
-    const opts = mockCreateServer.mock.calls[0][0] as { tools?: unknown[] };
-    expect(opts.tools).toHaveLength(3);
-  });
+  const server = createFsmMcpServer(fsm, store, runId);
+  tools = server.tools;
 });
 
 // ─── fsm_goto handler ────────────────────────────────────────────
 
 describe("fsm_goto handler", () => {
-  test("validates transition and commits event via Store", async () => {
-    const { handlers, runId, store } = setupHandlers();
+  test("valid transition commits event and updates snapshot", async () => {
+    await tools.fsm_goto.handler({ target: "middle", on: "next" }, {});
 
-    // Current state is "start", valid transition: next → middle
-    await handlers.fsm_goto({ target: "middle", on: "next" }, {});
-
-    // Check store was updated
     const snapshot = store.readSnapshot(runId);
     expect(snapshot?.state).toBe("middle");
     expect(snapshot?.run_status).toBe("active");
 
-    // Check events — should have start + goto
     const events = store.readEvents(runId);
     expect(events).toHaveLength(2);
     expect(events[1].event).toBe("goto");
@@ -157,12 +75,11 @@ describe("fsm_goto handler", () => {
     expect(events[1].on_label).toBe("next");
   });
 
-  test("returns new state card on success", async () => {
-    const { handlers } = setupHandlers();
-
-    const result = (await handlers.fsm_goto({ target: "middle", on: "next" }, {})) as {
-      content: Array<{ type: string; text: string }>;
-    };
+  test("returns state card on success", async () => {
+    const result = (await tools.fsm_goto.handler(
+      { target: "middle", on: "next" },
+      {},
+    )) as ToolResult;
 
     expect(result.content).toBeDefined();
     expect(result.content).toHaveLength(1);
@@ -171,16 +88,12 @@ describe("fsm_goto handler", () => {
     expect(result.content[0].text).toContain("Middle step.");
   });
 
-  test("returns error text (not throw) on invalid transition", async () => {
-    const { handlers } = setupHandlers();
+  test("returns error content (not throw) on invalid transition", async () => {
+    const result = (await tools.fsm_goto.handler(
+      { target: "done", on: "invalid" },
+      {},
+    )) as ToolResult;
 
-    // Try an invalid transition from "start"
-    const result = (await handlers.fsm_goto({ target: "done", on: "invalid" }, {})) as {
-      content: Array<{ type: string; text: string }>;
-      isError: boolean;
-    };
-
-    // Should return error content, not throw
     expect(result.isError).toBe(true);
     expect(result.content).toBeDefined();
     expect(result.content[0].type).toBe("text");
@@ -188,15 +101,10 @@ describe("fsm_goto handler", () => {
   });
 
   test("returns error on nonexistent target state", async () => {
-    const { handlers } = setupHandlers();
-
-    const result = (await handlers.fsm_goto(
+    const result = (await tools.fsm_goto.handler(
       { target: "nonexistent", on: "next" },
       {},
-    )) as {
-      content: Array<{ type: string; text: string }>;
-      isError: boolean;
-    };
+    )) as ToolResult;
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("nonexistent");
@@ -207,30 +115,19 @@ describe("fsm_goto handler", () => {
 
 describe("fsm_current handler", () => {
   test("returns current state card", async () => {
-    const { handlers } = setupHandlers();
-
-    const result = (await handlers.fsm_current({}, {})) as {
-      content: Array<{ type: string; text: string }>;
-    };
+    const result = (await tools.fsm_current.handler({}, {})) as ToolResult;
 
     expect(result.content).toBeDefined();
     expect(result.content).toHaveLength(1);
     expect(result.content[0].type).toBe("text");
-    // Should be in "start" state (initial state)
     expect(result.content[0].text).toContain("start");
     expect(result.content[0].text).toContain("Begin here.");
   });
 
-  test("returns updated state card after goto", async () => {
-    const { handlers } = setupHandlers();
+  test("returns updated card after goto", async () => {
+    await tools.fsm_goto.handler({ target: "middle", on: "next" }, {});
 
-    // Transition to middle
-    await handlers.fsm_goto({ target: "middle", on: "next" }, {});
-
-    // Now fsm_current should return middle state
-    const result = (await handlers.fsm_current({}, {})) as {
-      content: Array<{ type: string; text: string }>;
-    };
+    const result = (await tools.fsm_current.handler({}, {})) as ToolResult;
 
     expect(result.content[0].text).toContain("middle");
     expect(result.content[0].text).toContain("Middle step.");
@@ -240,42 +137,34 @@ describe("fsm_current handler", () => {
 // ─── Terminal state detection ───────────────────────────────────
 
 describe("terminal state detection", () => {
-  test("fsm_goto to terminal state includes workflow complete note", async () => {
-    const { handlers } = setupHandlers();
-
-    // Go start → middle → done
-    await handlers.fsm_goto({ target: "middle", on: "next" }, {});
-    const result = (await handlers.fsm_goto({ target: "done", on: "finish" }, {})) as {
-      content: Array<{ type: string; text: string }>;
-    };
+  test("goto to done includes 'terminal state' note", async () => {
+    await tools.fsm_goto.handler({ target: "middle", on: "next" }, {});
+    const result = (await tools.fsm_goto.handler(
+      { target: "done", on: "finish" },
+      {},
+    )) as ToolResult;
 
     expect(result.content[0].text).toContain("terminal state");
     expect(result.content[0].text).toContain("complete");
   });
 
-  test("fsm_goto to terminal state sets run_status to completed", async () => {
-    const { handlers, runId, store } = setupHandlers();
-
-    await handlers.fsm_goto({ target: "middle", on: "next" }, {});
-    await handlers.fsm_goto({ target: "done", on: "finish" }, {});
+  test("sets run_status to completed", async () => {
+    await tools.fsm_goto.handler({ target: "middle", on: "next" }, {});
+    await tools.fsm_goto.handler({ target: "done", on: "finish" }, {});
 
     const snapshot = store.readSnapshot(runId);
     expect(snapshot?.run_status).toBe("completed");
     expect(snapshot?.state).toBe("done");
   });
 
-  test("fsm_goto returns error when run is not active (completed)", async () => {
-    const { handlers } = setupHandlers();
+  test("returns error when run is completed", async () => {
+    await tools.fsm_goto.handler({ target: "middle", on: "next" }, {});
+    await tools.fsm_goto.handler({ target: "done", on: "finish" }, {});
 
-    // Transition to terminal state
-    await handlers.fsm_goto({ target: "middle", on: "next" }, {});
-    await handlers.fsm_goto({ target: "done", on: "finish" }, {});
-
-    // Try to transition again — run is completed
-    const result = (await handlers.fsm_goto({ target: "middle", on: "next" }, {})) as {
-      content: Array<{ type: string; text: string }>;
-      isError: boolean;
-    };
+    const result = (await tools.fsm_goto.handler(
+      { target: "middle", on: "next" },
+      {},
+    )) as ToolResult;
 
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("not active");

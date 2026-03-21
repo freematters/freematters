@@ -271,10 +271,18 @@ export function createFsmMcpServer(
     }
   });
 
-  return createSdkMcpServer({
+  const server = createSdkMcpServer({
     name: "freeflow",
     version: "1.0.0",
     tools: [fsmGoto, fsmCurrent, requestInput],
+  });
+
+  return Object.assign(server, {
+    tools: {
+      fsm_goto: fsmGoto,
+      fsm_current: fsmCurrent,
+      request_input: requestInput,
+    },
   });
 }
 

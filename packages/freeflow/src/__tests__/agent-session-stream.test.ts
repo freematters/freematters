@@ -1,48 +1,79 @@
 /**
  * Unit tests for AgentSession.stream() interface.
  *
- * Mocks MultiTurnSession to control the SDK messages fed into
- * AgentSession, then verifies TurnEvent yield behavior.
+ * Mocks only the external SDK boundary (@anthropic-ai/claude-agent-sdk query())
+ * and lets the real MultiTurnSession + AgentSession run.
  */
 
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type { TurnEvent } from "../e2e/agent-session.js";
 
-// Controllable mock for MultiTurnSession.
-// mockStreamFn allows per-test override of stream() behavior.
-let mockMessages: Array<Record<string, unknown>> = [];
-let mockSendFn: ReturnType<typeof vi.fn>;
-let mockStreamFn: (() => AsyncGenerator<Record<string, unknown>>) | null = null;
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-vi.mock("../e2e/multi-turn-session.js", () => {
-  return {
-    MultiTurnSession: class {
-      sessionId: string | null = null;
-      send = vi.fn((...args: unknown[]) => mockSendFn?.(...args));
-      async *stream() {
-        if (mockStreamFn) {
-          yield* mockStreamFn();
-          return;
-        }
-        for (const msg of mockMessages) {
-          yield msg;
-          if (msg.type === "result") return;
-        }
+type SDKMsg = Record<string, unknown>;
+
+/** Build a mock query() return value: async iterable with close(). */
+function makeQueryResult(messages: SDKMsg[]) {
+  let closed = false;
+  const closeFn = vi.fn(() => {
+    closed = true;
+  });
+
+  const iterable = {
+    async *[Symbol.asyncIterator]() {
+      for (const msg of messages) {
+        if (closed) return;
+        yield msg;
       }
-      close = vi.fn();
     },
+    close: closeFn,
   };
-});
+  return iterable;
+}
+
+/** Build a query result from an async generator (for hanging streams). */
+function makeQueryResultFromGenerator(gen: () => AsyncGenerator<SDKMsg>) {
+  let closed = false;
+  const closeFn = vi.fn(() => {
+    closed = true;
+  });
+
+  const iterable = {
+    [Symbol.asyncIterator]: gen,
+    close: closeFn,
+  };
+  return iterable;
+}
+
+// ---------------------------------------------------------------------------
+// Mocks — only external boundaries
+// ---------------------------------------------------------------------------
+
+let mockQueryReturn: ReturnType<typeof makeQueryResult>;
+
+vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
+  query: vi.fn(() => mockQueryReturn),
+}));
+
+// Avoid filesystem access from session-log
+vi.mock("../session-log.js", () => ({
+  getSessionDir: vi.fn(() => "/tmp/fake-session-dir"),
+}));
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  mockMessages = [];
-  mockSendFn = vi.fn();
-  mockStreamFn = null;
+  vi.clearAllMocks();
 });
 
 describe("AgentSession.stream()", () => {
   test("yields text events from assistant messages", async () => {
-    mockMessages = [
+    mockQueryReturn = makeQueryResult([
+      { type: "system", subtype: "init", session_id: "sess-1" },
       {
         type: "assistant",
         message: {
@@ -52,8 +83,8 @@ describe("AgentSession.stream()", () => {
           ],
         },
       },
-      { type: "result", is_error: false, result: "done" },
-    ];
+      { type: "result", is_error: false, result: "done", session_id: "sess-1" },
+    ]);
 
     const { AgentSession } = await import("../e2e/agent-session.js");
     const session = new AgentSession();
@@ -72,15 +103,16 @@ describe("AgentSession.stream()", () => {
   });
 
   test("yields tool_use events from assistant messages", async () => {
-    mockMessages = [
+    mockQueryReturn = makeQueryResult([
+      { type: "system", subtype: "init", session_id: "sess-2" },
       {
         type: "assistant",
         message: {
           content: [{ type: "tool_use", name: "Read", input: { file: "foo.ts" } }],
         },
       },
-      { type: "result", is_error: false },
-    ];
+      { type: "result", is_error: false, session_id: "sess-2" },
+    ]);
 
     const { AgentSession } = await import("../e2e/agent-session.js");
     const session = new AgentSession();
@@ -98,7 +130,15 @@ describe("AgentSession.stream()", () => {
   });
 
   test("yields error event from error result messages", async () => {
-    mockMessages = [{ type: "result", is_error: true, result: "Something went wrong" }];
+    mockQueryReturn = makeQueryResult([
+      { type: "system", subtype: "init", session_id: "sess-3" },
+      {
+        type: "result",
+        is_error: true,
+        result: "Something went wrong",
+        session_id: "sess-3",
+      },
+    ]);
 
     const { AgentSession } = await import("../e2e/agent-session.js");
     const session = new AgentSession();
@@ -114,7 +154,8 @@ describe("AgentSession.stream()", () => {
   });
 
   test("skips empty/whitespace text blocks", async () => {
-    mockMessages = [
+    mockQueryReturn = makeQueryResult([
+      { type: "system", subtype: "init", session_id: "sess-4" },
       {
         type: "assistant",
         message: {
@@ -125,8 +166,8 @@ describe("AgentSession.stream()", () => {
           ],
         },
       },
-      { type: "result", is_error: false },
-    ];
+      { type: "result", is_error: false, session_id: "sess-4" },
+    ]);
 
     const { AgentSession } = await import("../e2e/agent-session.js");
     const session = new AgentSession();
@@ -142,15 +183,16 @@ describe("AgentSession.stream()", () => {
   });
 
   test("silently ignores user and rate_limit_event messages", async () => {
-    mockMessages = [
+    mockQueryReturn = makeQueryResult([
+      { type: "system", subtype: "init", session_id: "sess-5" },
       { type: "user", message: { role: "user", content: [] } },
       { type: "rate_limit_event" },
       {
         type: "assistant",
         message: { content: [{ type: "text", text: "reply" }] },
       },
-      { type: "result", is_error: false },
-    ];
+      { type: "result", is_error: false, session_id: "sess-5" },
+    ]);
 
     const { AgentSession } = await import("../e2e/agent-session.js");
     const session = new AgentSession();
@@ -166,15 +208,19 @@ describe("AgentSession.stream()", () => {
   });
 
   test("yields timeout event when deadline is exceeded", async () => {
-    // Override stream to yield one message then hang forever
-    mockStreamFn = async function* () {
+    mockQueryReturn = makeQueryResultFromGenerator(async function* () {
+      yield {
+        type: "system",
+        subtype: "init",
+        session_id: "sess-6",
+      };
       yield {
         type: "assistant",
         message: { content: [{ type: "text", text: "partial" }] },
       };
       // Never complete — simulate a hanging agent
       await new Promise(() => {});
-    };
+    });
 
     const { AgentSession } = await import("../e2e/agent-session.js");
     const session = new AgentSession();
@@ -190,7 +236,8 @@ describe("AgentSession.stream()", () => {
   });
 
   test("wait() accumulates stream events into TurnResult", async () => {
-    mockMessages = [
+    mockQueryReturn = makeQueryResult([
+      { type: "system", subtype: "init", session_id: "sess-7" },
       {
         type: "assistant",
         message: {
@@ -204,8 +251,8 @@ describe("AgentSession.stream()", () => {
         type: "assistant",
         message: { content: [{ type: "text", text: "Line 2" }] },
       },
-      { type: "result", is_error: false },
-    ];
+      { type: "result", is_error: false, session_id: "sess-7" },
+    ]);
 
     const toolUses: string[] = [];
     const { AgentSession } = await import("../e2e/agent-session.js");
@@ -222,10 +269,15 @@ describe("AgentSession.stream()", () => {
   });
 
   test("yields result text as fallback when no prior content was emitted", async () => {
-    // Simulates unknown skill errors where only a result message is sent
-    mockMessages = [
-      { type: "result", is_error: false, result: "Unknown skill: nonexistent" },
-    ];
+    mockQueryReturn = makeQueryResult([
+      { type: "system", subtype: "init", session_id: "sess-8" },
+      {
+        type: "result",
+        is_error: false,
+        result: "Unknown skill: nonexistent",
+        session_id: "sess-8",
+      },
+    ]);
 
     const { AgentSession } = await import("../e2e/agent-session.js");
     const session = new AgentSession();
@@ -241,13 +293,14 @@ describe("AgentSession.stream()", () => {
   });
 
   test("does not yield result text when prior content was already emitted", async () => {
-    mockMessages = [
+    mockQueryReturn = makeQueryResult([
+      { type: "system", subtype: "init", session_id: "sess-9" },
       {
         type: "assistant",
         message: { content: [{ type: "text", text: "Hello" }] },
       },
-      { type: "result", is_error: false, result: "done" },
-    ];
+      { type: "result", is_error: false, result: "done", session_id: "sess-9" },
+    ]);
 
     const { AgentSession } = await import("../e2e/agent-session.js");
     const session = new AgentSession();

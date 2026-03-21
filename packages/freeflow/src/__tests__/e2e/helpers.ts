@@ -20,12 +20,17 @@ export function readJsonl<T>(filePath: string): T[] {
  */
 export function runCli(
   args: string,
-  opts: { expectFail?: boolean; env?: Record<string, string | undefined> } = {},
+  opts: {
+    expectFail?: boolean;
+    env?: Record<string, string | undefined>;
+    root?: string;
+  } = {},
 ): { stdout: string; stderr: string; exitCode: number } {
+  const fullArgs = opts.root ? `${args} --root ${opts.root}` : args;
   try {
-    const stdout = execFileSync("node", [CLI, ...args.split(/\s+/)], {
+    const stdout = execFileSync("node", [CLI, ...fullArgs.split(/\s+/)], {
       encoding: "utf-8",
-      env: { ...process.env, ...opts.env },
+      env: { ...process.env, FREEFLOW_ROOT: undefined, ...opts.env },
     });
     return { stdout, stderr: "", exitCode: 0 };
   } catch (err: unknown) {
@@ -37,4 +42,20 @@ export function runCli(
     }
     return { stdout: e.stdout ?? "", stderr: e.stderr ?? "", exitCode: e.status };
   }
+}
+
+/**
+ * Run the fflow CLI and parse JSON output.
+ */
+export function runCliJson(
+  args: string,
+  opts: {
+    expectFail?: boolean;
+    env?: Record<string, string | undefined>;
+    root?: string;
+  } = {},
+): { envelope: Record<string, unknown>; exitCode: number } {
+  const { stdout, stderr, exitCode } = runCli(`${args} -j`, opts);
+  const raw = stdout || stderr;
+  return { envelope: JSON.parse(raw), exitCode };
 }

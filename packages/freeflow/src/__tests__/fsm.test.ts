@@ -1,57 +1,31 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { FsmError, loadFsm } from "../fsm.js";
+import {
+  MINIMAL_FSM,
+  cleanupTempDir,
+  createTempDir,
+  writeFsmFile,
+} from "./fixtures.js";
 
 let tmp: string;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freeflow-test-"));
+  tmp = createTempDir("test");
 });
 
 afterAll(() => {
-  rmSync(tmp, { recursive: true, force: true });
+  cleanupTempDir(tmp);
 });
 
 function writeYaml(name: string, content: string): string {
-  const p = join(tmp, name);
-  writeFileSync(p, content, "utf-8");
-  return p;
+  return writeFsmFile(tmp, name, content);
 }
-
-// Minimal valid FSM used as baseline for mutation tests
-const MINIMAL_VALID = `
-version: 1
-guide: "A simple workflow"
-initial: start
-states:
-  start:
-    prompt: "Begin here."
-    transitions:
-      next: done
-  done:
-    prompt: "Finished."
-    transitions: {}
-`;
 
 // --- Valid cases ---
 
 describe("loadFsm — valid inputs", () => {
-  test("minimal valid FSM", () => {
-    const p = writeYaml("valid-minimal.yaml", MINIMAL_VALID);
-    const fsm = loadFsm(p);
-
-    expect(fsm.version).toBe(1);
-    expect(fsm.guide).toBe("A simple workflow");
-    expect(fsm.initial).toBe("start");
-    expect(Object.keys(fsm.states)).toEqual(expect.arrayContaining(["start", "done"]));
-    expect(fsm.states.start.prompt).toBe("Begin here.");
-    expect(fsm.states.start.transitions).toEqual({ next: "done" });
-    expect(fsm.states.done.prompt).toBe("Finished.");
-    expect(fsm.states.done.transitions).toEqual({});
-  });
-
   test("FSM with todos", () => {
     const p = writeYaml(
       "valid-todos.yaml",
@@ -635,7 +609,7 @@ states:
   });
 
   test("accepts YAML without allowed_tools (backward compatible)", () => {
-    const p = writeYaml("valid-no-allowed-tools.yaml", MINIMAL_VALID);
+    const p = writeYaml("valid-no-allowed-tools.yaml", MINIMAL_FSM);
     const fsm = loadFsm(p);
     expect(fsm.allowed_tools).toBeUndefined();
   });

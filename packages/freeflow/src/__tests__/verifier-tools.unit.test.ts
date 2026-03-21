@@ -1,12 +1,11 @@
 /**
- * Tests that the verifier's `wait` tool streams events from the embedded
- * AgentSession rather than blocking for the full turn.
+ * Unit tests for verifier MCP tools.
  *
- * Verifies that:
- * - Each text event is logged to the DualStreamLogger as it arrives
- * - Tool use events are logged in verbose mode
- * - Timeout events are handled correctly
- * - The final result contains all accumulated text
+ * - Streaming: verifies that each text event is logged to the DualStreamLogger
+ *   as it arrives, tool use events are logged in verbose mode, timeout/error
+ *   events are handled correctly, and the final result contains accumulated text.
+ * - embeddedSessionId: verifies that the getter reflects the embedded agent's
+ *   session_id after closeSession().
  */
 
 import { beforeEach, describe, expect, test, vi } from "vitest";
@@ -137,5 +136,25 @@ describe("verifier wait tool streaming", () => {
 
     const content = JSON.parse((result.content as Array<{ text: string }>)[0].text);
     expect(content.output).toBe("[error] Something failed");
+  });
+});
+
+describe("embeddedSessionId management", () => {
+  test("embeddedSessionId reflects session_id after closeSession", async () => {
+    const { createVerifierMcpServer } = await import("../e2e/verifier-tools.js");
+    const server = createVerifierMcpServer();
+
+    // Before any agent: null
+    expect(server.embeddedSessionId).toBeNull();
+
+    // Start an agent via the run_agent tool
+    const runAgentTool = server.tools.runAgent;
+    await runAgentTool.handler({ prompt: "test", model: undefined }, {});
+
+    // Close the session — should capture the embedded agent's session_id
+    server.closeSession();
+
+    // This is the bug: Object.assign flattens the getter, so this returns null
+    expect(server.embeddedSessionId).toBe("test-session-id");
   });
 });
