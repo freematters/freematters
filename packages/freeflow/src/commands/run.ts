@@ -72,12 +72,46 @@ function buildSystemPrompt(fsm: Fsm): string {
     .replace("{{FSM_GUIDE}}", fsm.guide ?? "No guide provided.");
 }
 
+/** MCP tool result shape returned by FSM tool handlers. */
+export type McpToolResult = {
+  isError?: true;
+  content: Array<{ type: "text"; text: string }>;
+};
+
+/** Handler function type for FSM MCP tools. */
+export type FsmToolHandler = (
+  args: Record<string, unknown>,
+  extra?: unknown,
+) => Promise<McpToolResult>;
+
+/**
+ * Create raw FSM tool handler functions (for direct testing).
+ * These are the same handlers registered via the SDK tool() wrapper.
+ */
+export function createFsmTools(
+  fsm: Fsm,
+  store: Store,
+  runId: string,
+  logFn: (msg: string, color?: string) => void = () => {},
+): {
+  fsm_goto: FsmToolHandler;
+  fsm_current: FsmToolHandler;
+  request_input: FsmToolHandler;
+} {
+  return {
+    fsm_goto: fsmGotoHandler(fsm, store, runId, logFn),
+    fsm_current: fsmCurrentHandler(fsm, store, runId),
+    request_input: requestInputHandler(fsm, store, runId),
+  };
+}
+
 export function createFsmMcpServer(
   fsm: Fsm,
   store: Store,
   runId: string,
   logFn: (msg: string, color?: string) => void = () => {},
 ) {
+  const tools = createFsmTools(fsm, store, runId, logFn);
   const fsmGoto = tool(
     "fsm_goto",
     "Transition FSM to a new state",
@@ -85,109 +119,7 @@ export function createFsmMcpServer(
       target: z.string().describe("Target state name"),
       on: z.string().describe("Transition label"),
     },
-    async (args) => {
-      try {
-        // Validate target state exists
-        if (!(args.target in fsm.states)) {
-          return {
-            isError: true as const,
-            content: [
-              {
-                type: "text" as const,
-                text: `Error: target state "${args.target}" does not exist in FSM`,
-              },
-            ],
-          };
-        }
-
-        return store.withLock(runId, () => {
-          const snapshot = store.readSnapshot(runId);
-          if (!snapshot) {
-            return {
-              isError: true as const,
-              content: [
-                {
-                  type: "text" as const,
-                  text: "Error: run has no snapshot",
-                },
-              ],
-            };
-          }
-
-          if (snapshot.run_status !== "active") {
-            return {
-              isError: true as const,
-              content: [
-                {
-                  type: "text" as const,
-                  text: `Error: run is ${snapshot.run_status}, not active`,
-                },
-              ],
-            };
-          }
-
-          const currentState = fsm.states[snapshot.state];
-          const expectedTarget = currentState.transitions[args.on];
-
-          if (expectedTarget !== args.target) {
-            const entries = Object.entries(currentState.transitions);
-            const labels = entries.map(([l, t]) => `  ${l} → ${t}`).join("\n");
-            return {
-              isError: true as const,
-              content: [
-                {
-                  type: "text" as const,
-                  text: `Error: no transition "${args.on}" → "${args.target}" from state "${snapshot.state}"\nAvailable transitions:\n${labels}`,
-                },
-              ],
-            };
-          }
-
-          const targetState = fsm.states[args.target];
-          const isTerminal = Object.keys(targetState.transitions).length === 0;
-          const newStatus: RunStatus = isTerminal ? "completed" : "active";
-
-          logFn(
-            `fsm_goto: ${snapshot.state} —[${args.on}]→ ${args.target}${isTerminal ? " (terminal)" : ""}`,
-            c.green,
-          );
-
-          store.commit(
-            runId,
-            {
-              event: "goto",
-              from_state: snapshot.state,
-              to_state: args.target,
-              on_label: args.on,
-              actor: "agent",
-              reason: isTerminal ? "done_auto" : null,
-            },
-            { run_status: newStatus, state: args.target },
-            { lockHeld: true },
-          );
-
-          const card = stateCardFromFsm(args.target, targetState);
-          let text = formatStateCard(card);
-          if (isTerminal) {
-            text += "\n\nThis is a terminal state. The workflow is complete.";
-          }
-
-          return {
-            content: [{ type: "text" as const, text }],
-          };
-        });
-      } catch (err: unknown) {
-        return {
-          isError: true as const,
-          content: [
-            {
-              type: "text" as const,
-              text: `Error: ${err instanceof Error ? err.message : String(err)}`,
-            },
-          ],
-        };
-      }
-    },
+    tools.fsm_goto,
   );
 
   const requestInput = tool(
@@ -196,49 +128,179 @@ export function createFsmMcpServer(
     {
       prompt: z.string().describe("Prompt message shown to the user"),
     },
-    async (args) => {
-      try {
-        // Refuse input when workflow is in a terminal (done) state
-        const snapshot = store.readSnapshot(runId);
-        if (snapshot) {
-          const currentFsmState = fsm.states[snapshot.state];
-          if (
-            snapshot.run_status !== "active" ||
-            !currentFsmState ||
-            Object.keys(currentFsmState.transitions).length === 0
-          ) {
-            return {
-              isError: true as const,
-              content: [
-                {
-                  type: "text" as const,
-                  text: `Workflow is in terminal state "${snapshot.state}". Cannot request user input. Complete the state instructions and exit.`,
-                },
-              ],
-            };
-          }
-        }
+    tools.request_input,
+  );
 
-        process.stderr.write(`${c.yellow}${args.prompt}${c.reset}\n`);
-        const answer = await promptUser(`${c.green}> ${c.reset}`);
-        return {
-          content: [{ type: "text" as const, text: answer }],
-        };
-      } catch (err: unknown) {
+  const fsmCurrent = tool(
+    "fsm_current",
+    "Get current FSM state card",
+    {},
+    tools.fsm_current,
+  );
+
+  return createSdkMcpServer({
+    name: "freeflow",
+    version: "1.0.0",
+    tools: [fsmGoto, fsmCurrent, requestInput],
+  });
+}
+
+function fsmGotoHandler(
+  fsm: Fsm,
+  store: Store,
+  runId: string,
+  logFn: (msg: string, color?: string) => void = () => {},
+): FsmToolHandler {
+  return async (rawArgs) => {
+    const args = rawArgs as { target: string; on: string };
+    try {
+      if (!(args.target in fsm.states)) {
         return {
           isError: true as const,
           content: [
             {
               type: "text" as const,
-              text: `Error reading input: ${err instanceof Error ? err.message : String(err)}`,
+              text: `Error: target state "${args.target}" does not exist in FSM`,
             },
           ],
         };
       }
-    },
-  );
 
-  const fsmCurrent = tool("fsm_current", "Get current FSM state card", {}, async () => {
+      return store.withLock(runId, () => {
+        const snapshot = store.readSnapshot(runId);
+        if (!snapshot) {
+          return {
+            isError: true as const,
+            content: [
+              {
+                type: "text" as const,
+                text: "Error: run has no snapshot",
+              },
+            ],
+          };
+        }
+
+        if (snapshot.run_status !== "active") {
+          return {
+            isError: true as const,
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: run is ${snapshot.run_status}, not active`,
+              },
+            ],
+          };
+        }
+
+        const currentState = fsm.states[snapshot.state];
+        const expectedTarget = currentState.transitions[args.on];
+
+        if (expectedTarget !== args.target) {
+          const entries = Object.entries(currentState.transitions);
+          const labels = entries.map(([l, t]) => `  ${l} → ${t}`).join("\n");
+          return {
+            isError: true as const,
+            content: [
+              {
+                type: "text" as const,
+                text: `Error: no transition "${args.on}" → "${args.target}" from state "${snapshot.state}"\nAvailable transitions:\n${labels}`,
+              },
+            ],
+          };
+        }
+
+        const targetState = fsm.states[args.target];
+        const isTerminal = Object.keys(targetState.transitions).length === 0;
+        const newStatus: RunStatus = isTerminal ? "completed" : "active";
+
+        logFn(
+          `fsm_goto: ${snapshot.state} —[${args.on}]→ ${args.target}${isTerminal ? " (terminal)" : ""}`,
+          c.green,
+        );
+
+        store.commit(
+          runId,
+          {
+            event: "goto",
+            from_state: snapshot.state,
+            to_state: args.target,
+            on_label: args.on,
+            actor: "agent",
+            reason: isTerminal ? "done_auto" : null,
+          },
+          { run_status: newStatus, state: args.target },
+          { lockHeld: true },
+        );
+
+        const card = stateCardFromFsm(args.target, targetState);
+        let text = formatStateCard(card);
+        if (isTerminal) {
+          text += "\n\nThis is a terminal state. The workflow is complete.";
+        }
+
+        return {
+          content: [{ type: "text" as const, text }],
+        };
+      });
+    } catch (err: unknown) {
+      return {
+        isError: true as const,
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: ${err instanceof Error ? err.message : String(err)}`,
+          },
+        ],
+      };
+    }
+  };
+}
+
+function requestInputHandler(fsm: Fsm, store: Store, runId: string): FsmToolHandler {
+  return async (rawArgs) => {
+    const args = rawArgs as { prompt: string };
+    try {
+      const snapshot = store.readSnapshot(runId);
+      if (snapshot) {
+        const currentFsmState = fsm.states[snapshot.state];
+        if (
+          snapshot.run_status !== "active" ||
+          !currentFsmState ||
+          Object.keys(currentFsmState.transitions).length === 0
+        ) {
+          return {
+            isError: true as const,
+            content: [
+              {
+                type: "text" as const,
+                text: `Workflow is in terminal state "${snapshot.state}". Cannot request user input. Complete the state instructions and exit.`,
+              },
+            ],
+          };
+        }
+      }
+
+      process.stderr.write(`${c.yellow}${args.prompt}${c.reset}\n`);
+      const answer = await promptUser(`${c.green}> ${c.reset}`);
+      return {
+        content: [{ type: "text" as const, text: answer }],
+      };
+    } catch (err: unknown) {
+      return {
+        isError: true as const,
+        content: [
+          {
+            type: "text" as const,
+            text: `Error reading input: ${err instanceof Error ? err.message : String(err)}`,
+          },
+        ],
+      };
+    }
+  };
+}
+
+function fsmCurrentHandler(fsm: Fsm, store: Store, runId: string): FsmToolHandler {
+  return async () => {
     try {
       const snapshot = store.readSnapshot(runId);
       if (!snapshot) {
@@ -269,13 +331,7 @@ export function createFsmMcpServer(
         ],
       };
     }
-  });
-
-  return createSdkMcpServer({
-    name: "freeflow",
-    version: "1.0.0",
-    tools: [fsmGoto, fsmCurrent, requestInput],
-  });
+  };
 }
 
 const MCP_TOOL_NAMES = [

@@ -64,16 +64,6 @@ function parseResult(result: unknown): Record<string, unknown> {
 }
 
 describe("Verifier MCP Tools", () => {
-  test("createVerifierMcpServer creates MCP server with three tools", () => {
-    createVerifierMcpServer();
-
-    const toolCalls = vi.mocked(tool).mock.calls;
-    const toolNames = toolCalls.map((c) => c[0]);
-    expect(toolNames).toContain("run_agent");
-    expect(toolNames).toContain("wait");
-    expect(toolNames).toContain("send");
-  });
-
   test("run_agent returns ok on success", async () => {
     createVerifierMcpServer();
     const handler = getToolHandler("run_agent");

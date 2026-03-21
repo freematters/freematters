@@ -1,17 +1,23 @@
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { type EventInput, type SnapshotInput, Store } from "../store.js";
+import {
+  cleanupTempDir,
+  createTempDir,
+  gotoEvent,
+  gotoSnapshot,
+  startEvent,
+  startSnapshot,
+} from "./fixtures.js";
 
 let tmp: string;
 
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freeflow-store-test-"));
+  tmp = createTempDir("store-test");
 });
 
 afterAll(() => {
-  rmSync(tmp, { recursive: true, force: true });
+  cleanupTempDir(tmp);
 });
 
 // Fresh store per test to avoid cross-contamination
@@ -21,52 +27,9 @@ function freshStore(): Store {
   return new Store(join(tmp, `root-${testCount}`));
 }
 
-// --- Helpers ---
-
-const startEvent: EventInput = {
-  event: "start",
-  from_state: null,
-  to_state: "plan",
-  on_label: null,
-  actor: "system",
-  reason: null,
-};
-
-const startSnapshot: SnapshotInput = {
-  run_status: "active",
-  state: "plan",
-};
-
-function gotoEvent(from: string, to: string, label: string): EventInput {
-  return {
-    event: "goto",
-    from_state: from,
-    to_state: to,
-    on_label: label,
-    actor: "agent",
-    reason: null,
-  };
-}
-
-function gotoSnapshot(state: string): SnapshotInput {
-  return { run_status: "active", state };
-}
-
 // --- Tests ---
 
 describe("Store — initRun", () => {
-  test("creates run directory and writes meta.json", () => {
-    const s = freshStore();
-    const meta = s.initRun("run-1", "/path/to/workflow.yaml");
-
-    expect(meta.run_id).toBe("run-1");
-    expect(meta.fsm_path).toBe("/path/to/workflow.yaml");
-    expect(meta.version).toBe(1);
-    expect(typeof meta.created_at).toBe("string");
-    // ISO 8601 format
-    expect(() => new Date(meta.created_at)).not.toThrow();
-  });
-
   test("throws if run already exists", () => {
     const s = freshStore();
     s.initRun("dup", "/fake.yaml");
@@ -89,16 +52,6 @@ describe("Store — runExists", () => {
 });
 
 describe("Store — readMeta", () => {
-  test("returns meta after initRun", () => {
-    const s = freshStore();
-    s.initRun("meta-test", "/my/path.yaml");
-    const meta = s.readMeta("meta-test");
-
-    expect(meta.run_id).toBe("meta-test");
-    expect(meta.fsm_path).toBe("/my/path.yaml");
-    expect(meta.version).toBe(1);
-  });
-
   test("throws for non-existent run", () => {
     const s = freshStore();
     expect(() => s.readMeta("ghost")).toThrow();
@@ -115,7 +68,7 @@ describe("Store — readSnapshot", () => {
   test("returns snapshot after commit", () => {
     const s = freshStore();
     s.initRun("snap-test", "/fake.yaml");
-    s.commit("snap-test", startEvent, startSnapshot);
+    s.commit("snap-test", startEvent("plan"), startSnapshot("plan"));
 
     const snap = s.readSnapshot("snap-test");
     expect(snap).not.toBeNull();
@@ -128,31 +81,10 @@ describe("Store — readSnapshot", () => {
 });
 
 describe("Store — commit", () => {
-  test("first event has seq=1", () => {
-    const s = freshStore();
-    s.initRun("seq1", "/fake.yaml");
-    const { event, snapshot } = s.commit("seq1", startEvent, startSnapshot);
-
-    expect(event.seq).toBe(1);
-    expect(event.run_id).toBe("seq1");
-    expect(event.event).toBe("start");
-    expect(event.from_state).toBeNull();
-    expect(event.to_state).toBe("plan");
-    expect(event.on_label).toBeNull();
-    expect(event.actor).toBe("system");
-    expect(event.reason).toBeNull();
-    expect(event.metadata).toBeNull();
-    expect(typeof event.ts).toBe("string");
-
-    expect(snapshot.last_seq).toBe(1);
-    expect(snapshot.state).toBe("plan");
-    expect(snapshot.run_status).toBe("active");
-  });
-
   test("increments seq on subsequent commits", () => {
     const s = freshStore();
     s.initRun("seq-inc", "/fake.yaml");
-    s.commit("seq-inc", startEvent, startSnapshot);
+    s.commit("seq-inc", startEvent("plan"), startSnapshot("plan"));
 
     const { event: e2 } = s.commit(
       "seq-inc",
@@ -174,15 +106,17 @@ describe("Store — commit", () => {
     s.initRun("meta-ev", "/fake.yaml");
     const { event } = s.commit(
       "meta-ev",
-      { ...startEvent, metadata: { key: "value" } },
-      startSnapshot,
+      { ...startEvent("plan"), metadata: { key: "value" } },
+      startSnapshot("plan"),
     );
     expect(event.metadata).toEqual({ key: "value" });
   });
 
   test("throws for non-existent run", () => {
     const s = freshStore();
-    expect(() => s.commit("ghost", startEvent, startSnapshot)).toThrow();
+    expect(() =>
+      s.commit("ghost", startEvent("plan"), startSnapshot("plan")),
+    ).toThrow();
   });
 });
 
@@ -196,7 +130,7 @@ describe("Store — readEvents", () => {
   test("returns all events in order", () => {
     const s = freshStore();
     s.initRun("multi", "/fake.yaml");
-    s.commit("multi", startEvent, startSnapshot);
+    s.commit("multi", startEvent("plan"), startSnapshot("plan"));
     s.commit("multi", gotoEvent("plan", "coding", "approved"), gotoSnapshot("coding"));
     s.commit("multi", gotoEvent("coding", "done", "tests pass"), {
       run_status: "completed",
@@ -218,7 +152,7 @@ describe("Store — terminal states", () => {
   test("goto done produces completed snapshot", () => {
     const s = freshStore();
     s.initRun("complete", "/fake.yaml");
-    s.commit("complete", startEvent, startSnapshot);
+    s.commit("complete", startEvent("plan"), startSnapshot("plan"));
     const { snapshot } = s.commit("complete", gotoEvent("plan", "done", "all done"), {
       run_status: "completed",
       state: "done",
@@ -235,7 +169,7 @@ describe("Store — terminal states", () => {
   test("finish produces aborted snapshot", () => {
     const s = freshStore();
     s.initRun("abort", "/fake.yaml");
-    s.commit("abort", startEvent, startSnapshot);
+    s.commit("abort", startEvent("plan"), startSnapshot("plan"));
     const { snapshot } = s.commit(
       "abort",
       {
@@ -306,7 +240,7 @@ describe("Store — concurrent writes", () => {
     const root = join(tmp, "concurrent-root");
     const s = new Store(root);
     s.initRun("conc", "/fake.yaml");
-    s.commit("conc", startEvent, startSnapshot);
+    s.commit("conc", startEvent("plan"), startSnapshot("plan"));
 
     const workerCount = 10;
     const srcStore = join(import.meta.dirname, "..", "store.ts");

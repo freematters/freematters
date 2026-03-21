@@ -1,66 +1,32 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { handlePostToolUse } from "../../hooks/post-tool-use.js";
 import { Store } from "../../store.js";
+import {
+  PLANNING_FSM,
+  cleanupTempDir,
+  createTempDir,
+  setupActiveRun,
+  setupRun,
+  writeFsmFile,
+} from "../fixtures.js";
 
 let tmp: string;
 let fsmPath: string;
 
-const MINIMAL_FSM = `
-version: 1
-guide: "Test workflow"
-initial: plan
-states:
-  plan:
-    prompt: "Plan the work."
-    todos:
-      - "Write spec"
-    transitions:
-      approved: execute
-  execute:
-    prompt: "Do the work."
-    transitions:
-      complete: done
-  done:
-    prompt: "Finished."
-    transitions: {}
-`;
-
 beforeAll(() => {
-  tmp = mkdtempSync(join(tmpdir(), "freeflow-hook-test-"));
-  fsmPath = join(tmp, "workflow.yaml");
-  writeFileSync(fsmPath, MINIMAL_FSM, "utf-8");
+  tmp = createTempDir("hook-test");
+  fsmPath = writeFsmFile(tmp, "workflow.yaml", PLANNING_FSM);
 });
 
 afterAll(() => {
-  rmSync(tmp, { recursive: true, force: true });
+  cleanupTempDir(tmp);
 });
 
 let testCount = 0;
 function freshRoot(): string {
   testCount++;
   return join(tmp, `root-${testCount}`);
-}
-
-function setupActiveRun(root: string, runId: string): Store {
-  const store = new Store(root);
-  store.initRun(runId, fsmPath);
-  store.commit(
-    runId,
-    {
-      event: "start",
-      from_state: null,
-      to_state: "plan",
-      on_label: null,
-      actor: "system",
-      reason: null,
-    },
-    { run_status: "active", state: "plan" },
-  );
-  store.bindSession("test-session", runId);
-  return store;
 }
 
 function makeInput(overrides: Record<string, unknown> = {}) {
@@ -84,20 +50,7 @@ describe("handlePostToolUse — no active run", () => {
 describe("handlePostToolUse — auto-detect fflow start", () => {
   test("binds session from fflow start command", () => {
     const root = freshRoot();
-    const store = new Store(root);
-    store.initRun("auto-run", fsmPath);
-    store.commit(
-      "auto-run",
-      {
-        event: "start",
-        from_state: null,
-        to_state: "plan",
-        on_label: null,
-        actor: "system",
-        reason: null,
-      },
-      { run_status: "active", state: "plan" },
-    );
+    const store = setupRun(root, "auto-run", fsmPath, "plan");
 
     const input = makeInput({
       tool_name: "Bash",
@@ -118,7 +71,7 @@ describe("handlePostToolUse — auto-detect fflow start", () => {
 describe("handlePostToolUse — auto-detect fflow finish", () => {
   test("unbinds session on fflow finish", () => {
     const root = freshRoot();
-    const store = setupActiveRun(root, "finish-run");
+    const store = setupActiveRun(root, "finish-run", fsmPath, "test-session", "plan");
 
     const input = makeInput({
       tool_name: "Bash",
@@ -137,7 +90,13 @@ describe("handlePostToolUse — auto-detect fflow finish", () => {
 describe("handlePostToolUse — auto-detect goto done", () => {
   test("unbinds session on fflow goto done", () => {
     const root = freshRoot();
-    const store = setupActiveRun(root, "goto-done-run");
+    const store = setupActiveRun(
+      root,
+      "goto-done-run",
+      fsmPath,
+      "test-session",
+      "plan",
+    );
 
     const input = makeInput({
       tool_name: "Bash",
@@ -156,7 +115,7 @@ describe("handlePostToolUse — auto-detect goto done", () => {
 describe("handlePostToolUse — counter and reminder", () => {
   test("emits reminder on every 5th call", () => {
     const root = freshRoot();
-    setupActiveRun(root, "counter-run");
+    setupActiveRun(root, "counter-run", fsmPath, "test-session", "plan");
 
     // Calls 1-4: no reminder
     for (let i = 0; i < 4; i++) {
@@ -175,7 +134,7 @@ describe("handlePostToolUse — counter and reminder", () => {
 
   test("emits reminder again on 10th call", () => {
     const root = freshRoot();
-    setupActiveRun(root, "counter-10");
+    setupActiveRun(root, "counter-10", fsmPath, "test-session", "plan");
 
     for (let i = 0; i < 9; i++) {
       handlePostToolUse(makeInput(), root);
