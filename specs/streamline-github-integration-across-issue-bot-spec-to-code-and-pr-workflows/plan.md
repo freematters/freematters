@@ -4,7 +4,7 @@
 - [x] Step 1: spec-to-code progress posting to issue
 - [x] Step 2: code-review spec fetching from linked issue
 - [x] Step 3: issue-bot done state: plan checklist + workflow chaining
-- [ ] Step 4: PR-lifecycle source issue as parameter
+- [x] Step 4: PR-lifecycle source issue as parameter
 
 ---
 
