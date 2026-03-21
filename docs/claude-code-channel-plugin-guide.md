@@ -717,6 +717,20 @@ The key security property: **approval only happens through the terminal** (trust
 
 ---
 
+## Real-World Example: `packages/channels/`
+
+This monorepo contains a working multi-channel package at `packages/channels/` that implements the patterns in this guide:
+
+- **Shared core** (`src/core/`): `createChannelServer` factory, `access.ts` for allowlist/pairing, `registerReplyTool` helper
+- **Three channels**: Slack (two-way chat bridge), Notion (one-way page change polling), GitHub Issues (two-way with comment tool)
+- **Skill templates** (`skills/_templates/`): configure and access templates with `{{PLACEHOLDER}}` variables, channel-specific overrides
+- **Build system** (`scripts/build-plugin.ts`): esbuild bundles core + channel into standalone `dist/<name>/` plugin directories
+- **Marketplace** (`marketplace.json`): each channel is a separate installable plugin
+
+See `docs/specs/2026-03-21-channels-package-design.md` for the full design spec.
+
+---
+
 ## References
 
 - [Channels Reference](https://code.claude.com/docs/en/channels-reference) — full channel contract
