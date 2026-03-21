@@ -14,7 +14,11 @@
     "check": "biome check --write ."
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1"
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@notionhq/client": "^5.14.0",
+    "@octokit/rest": "^22.0.1",
+    "@slack/socket-mode": "^2.0.6",
+    "@slack/web-api": "^7.15.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0",
