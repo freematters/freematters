@@ -120,11 +120,3 @@ Both `fflow run` and `fflow verify` print the Claude session ID to stderr on ses
 `fflow run` symlinks the Claude session JSONL log (`session.jsonl`) into the FSM run directory.
 `fflow verify` symlinks both the verifier's (`session.jsonl`) and embedded agent's (`embedded-session.jsonl`) Claude session logs into the verifier's FSM run directory.
 
-## Implementation Status
-
-| Milestone | Status |
-|-----------|--------|
-| M1-M6: Schema, storage, CLI, all commands | Done |
-| M7: PostToolUse reminder hook | Done |
-| M8: Skills (/fflow:create, /fflow:start, /fflow:e2e-run) | Done |
-| M9: E2E testing framework (gen, verify, verifier.workflow.yaml) | Done |
