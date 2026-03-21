@@ -61,11 +61,24 @@ Each finding should:
 If you're not sure about the scale or frequency, say so: "If this runs on every request
 with a large dataset, consider..." — don't assume the worst case.
 
+## Design compliance
+
+If `/tmp/pr_design.md` exists, also check:
+- **Performance requirements** — Does the design specify performance expectations (scale,
+  throughput, latency) that the implementation doesn't meet?
+- **Architectural choices** — Does the design specify patterns (caching, batching, async)
+  that the code omits or implements differently?
+
+Flag design-performance deviations as **major** severity.
+
+If `/tmp/pr_design.md` does not exist, skip design-compliance checks entirely.
+
 ## Instructions
 
 1. Read `/tmp/pr_changed_files.txt` and `/tmp/pr_diff.txt` (pre-fetched)
-2. Review the diff for issues listed above
-3. Output a JSON array of issues
+2. If `/tmp/pr_design.md` exists, read it for performance-related design requirements
+3. Review the diff for issues listed above (and design compliance if spec exists)
+4. Output a JSON array of issues
 
 ## Output Format
 

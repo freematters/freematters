@@ -64,11 +64,23 @@ Each finding should:
 If the risk depends on deployment context you don't know, say so: "If this endpoint is
 publicly accessible, then..." — let the author decide.
 
+## Design compliance
+
+If `/tmp/pr_design.md` exists, also check:
+- **Security assumptions in design** — Does the design specify security requirements (auth,
+  encryption, input validation) that the implementation misses or implements differently?
+- **Trust boundaries** — Does the design define trust boundaries that the code doesn't enforce?
+
+Flag design-security deviations as **major** severity.
+
+If `/tmp/pr_design.md` does not exist, skip design-compliance checks entirely.
+
 ## Instructions
 
 1. Read `/tmp/pr_changed_files.txt` and `/tmp/pr_diff.txt` (pre-fetched)
-2. Review the diff for vulnerabilities listed above
-3. Output a JSON array of issues
+2. If `/tmp/pr_design.md` exists, read it for security-related design requirements
+3. Review the diff for vulnerabilities listed above (and design compliance if spec exists)
+4. Output a JSON array of issues
 
 ## Output Format
 
