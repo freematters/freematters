@@ -8,8 +8,7 @@ Language: TypeScript (npm distribution). Node.js >= 18.
 
 ## Design Docs
 
-- [docs/design-primary.md](docs/design-primary.md) — authoritative v1 spec: runtime, CLI contracts, storage, integration
-- [docs/design-alternative.md](docs/design-alternative.md) — alternative design notes and hook details
+- [docs/design.md](docs/design.md) — design notes, runtime spec, CLI contracts, storage, hooks
 
 Read the design docs before making any changes.
 
