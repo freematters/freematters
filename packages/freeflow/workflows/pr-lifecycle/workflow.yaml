@@ -15,6 +15,11 @@ guide: |
   Automatically fix CI failures, rebase when needed, and address bot review blockers
   and `@bot` mentions.
 
+  ## Flags
+
+  - `--auto` — optional. If provided, pr-lifecycle runs in unattended mode without
+    prompting the user for decisions (auto-approve CI fixes, auto-rebase, etc.).
+
   ## Workflow directory
 
   `WF_DIR = ~/.freefsm/runs/<run_id>/`
@@ -67,6 +72,8 @@ states:
           (e.g., `owner/repo#42`) and add `Closes #N` or `Resolves owner/repo#N` to the
           PR description to link the PR to the source issue.
         - Create via `gh pr create`
+
+      If `--auto` flag was set, proceed without user confirmation.
 
       Record the PR URL and number — subsequent states will need them.
     transitions:

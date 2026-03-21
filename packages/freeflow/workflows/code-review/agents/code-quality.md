@@ -80,3 +80,10 @@ Acknowledge trade-offs when they exist.
 ```
 
 If no issues found, output `[]`.
+
+<!-- NOTE: this section is duplicated across all 3 agent files — keep in sync -->
+## Design compliance
+
+If a design spec file exists at `/tmp/freeflow-pr-{pr_number}-design.md`, also check
+whether the code changes align with the design. Flag deviations as major issues.
+If no design spec file is present, skip this section.

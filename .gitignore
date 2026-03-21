@@ -4,3 +4,4 @@ dist/
 .claude/worktrees/
 .fc-worktrees/
 docs/plans/
+specs/
