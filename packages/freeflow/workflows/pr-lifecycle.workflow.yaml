@@ -63,6 +63,9 @@ states:
         - Target branch: Use user-specified branch if provided, otherwise use the repo's default branch.
         - Compare against target branch and summarize changes as the description.
         - Use conventional commit format for the title.
+        - Check for `./specs/*/source-issue` — if it exists, read the issue reference
+          (e.g., `owner/repo#42`) and add `Closes #N` or `Resolves owner/repo#N` to the
+          PR description to link the PR to the source issue.
         - Create via `gh pr create`
 
       Record the PR URL and number — subsequent states will need them.
