@@ -27,7 +27,7 @@ Initialize a new workflow run from a workflow YAML file.
 fflow start <PATH> --run-id <workflow-name>-$(date)
 ```
 
-Never omit `--run-id`. The run ID is needed for all subsequent commands. PATH can be a workflow name (e.g. `pdd`), a filename (e.g. `pdd.workflow.yaml`), or a full path. The CLI resolves it automatically.
+Never omit `--run-id`. The run ID is needed for all subsequent commands. PATH can be a workflow name (e.g. `spec-gen`), a filename (e.g. `spec-gen.workflow.yaml`), or a full path. The CLI resolves it automatically.
 
 4. **Remember the run ID** — Store the `run_id` value for use in subsequent `fflow current --run-id <run-id>` and `fflow goto <state> --run-id <run-id> --on <transition-label>` calls within this conversation. The `run_id` will also be used in subsequent `fflow:current` and `fflow:finish` calls.
 

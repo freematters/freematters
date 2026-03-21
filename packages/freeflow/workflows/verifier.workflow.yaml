@@ -58,6 +58,14 @@ states:
          - Per-step verdicts with evidence
          - Any unexpected observations
          - Failure details with evidence for debugging
+         - **Debug artifacts** section with absolute paths to key files in the
+           run directory (available via `FREEFSM_RUN_DIR` env var or the run directory
+           printed to stderr at startup):
+           - `verifier-session.jsonl` — verifier (this agent's) full session log
+           - `executor-session.jsonl` — executor agent's full session log
+           - `<test-plan>.md` — copy of the test plan used for this run
+           - `events.jsonl` — FSM event history
+           - `snapshot.json` — final FSM state
       6. Output a final summary: overall verdict, steps passed/failed.
 
       If the test plan is invalid, write a FAIL report explaining the error.

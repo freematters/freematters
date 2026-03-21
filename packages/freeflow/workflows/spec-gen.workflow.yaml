@@ -1,4 +1,3 @@
-# Credit: State machine inspired by ralph-orchestrator's prompts.
 #
 # Flow:
 #
@@ -9,16 +8,14 @@
 #     design ← → requirements (gaps)
 #       |
 #      plan ← → design (revision)
-#     /    \
-#   e2e     skip
-#     \    /
+#       |
 #     done
 #
-#   Fast forward: requirements → design → plan → done (skip e2e, no intermediate approvals)
+#   Fast forward: requirements → design → plan → done (no intermediate approvals)
 
 version: 1
 guide: |
-  Plan-Driven Development (PDD) workflow. Inspired by ralph-orchestrator.
+  Spec-Gen workflow. Generates a complete specification from a rough idea.
   Produces a complete spec directory (./specs/<slug>/) through interactive requirements gathering,
   research, design, and implementation planning. No code is written — output is pure documentation.
 
@@ -43,7 +40,7 @@ guide: |
     - research/*.md         — per-topic research findings
     - design.md             — architecture, components, data models, acceptance criteria
     - plan.md               — numbered incremental implementation steps
-    - e2e.md    — E2E test infrastructure, scenario, and debugging guide (optional)
+    - e2e.md                — verifier–executor test plan for freefsm verify (if not skipped)
     - summary.md            — artifact listing and next steps
 
 initial: create-structure
@@ -94,6 +91,10 @@ states:
       - You MUST NOT pre-populate or assume answers.
       - You MUST focus on: ambiguities, trade-offs, edge cases, non-functional constraints
         (performance, security, compatibility), success criteria, and verification methods.
+      - You MUST include questions about end-to-end testing as part of requirements:
+        how will we verify this feature works end-to-end? What are the key user scenarios
+        to test? What infrastructure is needed (test fixtures, services, env setup)?
+        E2E test expectations are requirements, not an afterthought.
       - You MUST NOT ask obvious questions — the user's rough idea already conveys basic intent.
         Read the rough-idea.md first to understand what's already been stated.
       - When the user seems unsure, suggest concrete options rather than leaving it open-ended.
@@ -158,6 +159,22 @@ states:
 
       Create `./specs/<slug>/design.md` — a standalone, comprehensive design document.
       "Standalone" means it MUST be fully understandable without reading any other file.
+
+      ### Step 1: Design approaches (normal mode only)
+
+      Before writing the full design, present 2–4 high-level design approaches as a numbered list.
+      For each approach, include:
+      - **Name** — a short label (e.g., "Monolith", "Event-driven", "Plugin architecture")
+      - **Summary** — 2–3 sentences describing the approach
+      - **Trade-offs** — key pros and cons
+
+      Ask the user to choose one (or mix elements from multiple). Only proceed to the full
+      design document after the user has selected an approach.
+
+      **Fast forward mode**: Skip this step entirely — pick the most pragmatic approach yourself
+      and proceed directly to writing the full design.
+
+      ### Step 2: Full design document
 
       Required sections:
       1. **Overview** — one-paragraph summary of what we're building and why
@@ -239,6 +256,27 @@ states:
       Must be verifiable — not "it works" but "run X, observe Y".
       ```
 
+      ### E2E test plan (if not skipped in requirements)
+
+      Check `./specs/<slug>/requirements.md` for e2e testing decisions. If the user chose
+      to include e2e tests, create `./specs/<slug>/e2e.md` — a test plan following the
+      verifier–executor model (see `freefsm/docs/e2e-testing-design.md`).
+
+      The test plan is a structured markdown file executed by `freefsm verify`. It describes:
+
+      1. **Background** — what the executor agent should do and what behavior to expect
+      2. **Setup** — the prompt to launch the executor (e.g., a command to start a server,
+         run a CLI tool, or interact with the built feature), plus any prerequisites
+         (files to create, build steps, env setup)
+      3. **Steps** — numbered interactions between verifier and executor:
+         each step describes what to send to the executor and what to expect back.
+         Steps describe agent interactions via `wait()` and `send()`, NOT raw CLI commands.
+      4. **Expected Outcomes** — high-level success criteria
+      5. **Timeout Strategy** — suggested wait timeouts per phase
+
+      Also add a final step in plan.md's checklist: `- [ ] E2E: run freefsm verify on e2e.md`
+      with a corresponding step section that references the e2e test plan.
+
       Constraints:
       - You MUST NOT duplicate design details — reference design.md sections instead.
       - You MUST ensure each step results in working, demoable functionality.
@@ -250,7 +288,7 @@ states:
       - You MUST present the plan to the user and iterate on feedback until approved.
 
       **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT wait for user
-      approval. Complete the plan, then immediately transition to e2e-test-design (which will auto-skip).
+      approval. Complete the plan, then immediately transition to done.
 
       **Normal mode**: You MUST NOT proceed until the user explicitly approves the implementation plan.
     todos:
@@ -260,61 +298,8 @@ states:
       - Verify no orphaned code between steps
       - Get user approval on the plan
     transitions:
-      plan approved: e2e-test-design
+      plan approved: done
       needs design revision: design
-
-  e2e-test-design:
-    prompt: |
-      ## E2E Test Design (Optional)
-
-      The implementation plan is complete. Ask the user:
-
-      > Would you like to add an E2E test design? This will create a detailed end-to-end test plan
-      > that the spec-to-code workflow executes after implementation.
-      >
-      > 1. Yes — design E2E tests
-      > 2. Skip — proceed without E2E test design
-
-      **Fast forward mode**: If the user chose "fast forward" at requirements, skip e2e test design
-      and transition to done immediately.
-
-      If the user chooses to skip, transition to done immediately.
-
-      If the user chooses yes, create `./specs/<slug>/e2e.md` with these sections:
-
-      ### 1. E2E Infrastructure
-
-      Explore the project for existing E2E test infrastructure
-
-      Then document:
-      - **Existing infra**: What was found and how to integrate with it
-      - **Proposed setup** (if no existing infra): A minimal E2E setup appropriate for the project
-        type (e.g., shell script with assertions for CLI tools, Playwright for web apps,
-        HTTP client scripts for APIs, etc.)
-
-      ### 2. E2E Test Scenario
-
-      Define concrete steps to verify the feature end-to-end:
-      - Step-by-step actions with expected outputs
-
-      ### 3. How to Run
-
-      - Exact commands to execute the E2E tests
-      - Required environment setup (env vars, services, test data)
-
-      ### 4. Debugging Guide
-
-      - How to read E2E test output and identify which action failed.
-      - How to run individual actions in isolation for debugging
-      - How to inspect intermediate state (logs, database, files) during a failed run
-
-      Present the E2E test design to the user for approval before transitioning.
-
-      If user gets approved, refer to the e2e.md file in the plan.md's e2e-test-design section.
-    transitions:
-      e2e design approved: done
-      skip: done
-      needs revision: e2e-test-design
 
   done:
     prompt: |
@@ -328,12 +313,12 @@ states:
 
       Present the summary to the user.
 
-      All PDD artifacts are in `./specs/<slug>/`:
+      All spec-gen artifacts are in `./specs/<slug>/`:
       - `rough-idea.md` — original input
       - `requirements.md` — Q&A record
       - `research/*.md` — research findings
       - `design.md` — detailed design (authoritative spec)
       - `plan.md` — implementation plan
-      - `e2e.md` — E2E test design (if created)
+      - `e2e.md` — verifier–executor test plan (if not skipped)
       - `summary.md` — this summary
     transitions: {}

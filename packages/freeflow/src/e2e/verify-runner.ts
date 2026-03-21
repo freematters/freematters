@@ -1,5 +1,5 @@
-import { existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { copyFileSync, existsSync } from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import { formatToolArgs } from "../agent-log.js";
@@ -105,8 +105,14 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
   const verifierRunDir = args.root ? join(args.root, "runs", runId) : null;
 
   if (verifierRunDir && existsSync(verifierRunDir)) {
-    symlinkSessionLog(sessionId, verifierRunDir, "session.jsonl");
-    symlinkSessionLog(embeddedSessionId, verifierRunDir, "embedded-session.jsonl");
+    symlinkSessionLog(sessionId, verifierRunDir, "verifier-session.jsonl");
+    symlinkSessionLog(embeddedSessionId, verifierRunDir, "executor-session.jsonl");
+    // Copy the test plan into the run directory for self-contained debugging
+    try {
+      copyFileSync(resolve(planPath), join(verifierRunDir, basename(planPath)));
+    } catch {
+      // Best-effort — don't fail the run if copy fails
+    }
   }
 
   return { reportPath: existsSync(reportPath) ? reportPath : null };
