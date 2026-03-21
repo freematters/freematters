@@ -11,3 +11,9 @@
 - **What was built**: `extends_guide` top-level field — resolveExtendsGuide() loads base workflow guide, merges with local guide using `{{base}}` semantics
 - **Tests**: 6 new tests, all passing (130 total)
 - **Notes**: None
+
+## Step 3: Integration tests
+- **Files changed**: None — all 15 scenarios already covered
+- **What was built**: Verified all 15 integration test scenarios from design.md §7 are present (19 tests total including extends_guide edge cases)
+- **Tests**: 19 reuse tests, 130 total, all passing
+- **Notes**: Steps 1 and 2 already implemented complete coverage; no additional tests needed

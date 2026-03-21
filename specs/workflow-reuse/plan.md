@@ -3,7 +3,7 @@
 ## Checklist
 - [x] Step 1: Core ref resolution in `loadFsm`
 - [x] Step 2: `extends_guide` support
-- [ ] Step 3: Integration tests
+- [x] Step 3: Integration tests
 
 ---
 
