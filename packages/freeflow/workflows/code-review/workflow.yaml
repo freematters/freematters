@@ -38,7 +38,26 @@ states:
 
       Record owner, repo, PR number, base branch, head commit SHA, and URL for subsequent states.
 
-      ## 3. Fetch diff + API data (parallel)
+      ## 3. Fetch linked issue spec (if any)
+
+      Parse the PR body for a linked issue reference:
+      ```bash
+      gh pr view --json body -q '.body' | grep -oP '(?:Closes|Resolves|Fixes)\s+(?:[\w-]+/[\w-]+)?#(\d+)' | head -1
+      ```
+
+      If a match is found (extract the issue number):
+      1. Fetch comments from the linked issue:
+         ```bash
+         gh api repos/{owner}/{repo}/issues/{issue_number}/comments --paginate
+         ```
+      2. Look for comments containing `## design.md` and `## plan.md` markers (these are spec artifacts posted by issue-bot).
+      3. For each found artifact, extract the content after the `## design.md` or `## plan.md` heading and write to `/tmp/pr_design.md` and `/tmp/pr_plan.md` respectively.
+      4. If the issue reference uses `owner/repo#N` format (cross-repo), use that owner/repo instead.
+
+      If no linked issue is found, skip this step — code review proceeds without spec context.
+      Record whether spec files were found (for the summary comment later).
+
+      ## 4. Fetch diff + API data (parallel)
 
       Run these commands **in parallel** (all are independent):
 
@@ -139,7 +158,9 @@ states:
       Steps:
       1. Read `/tmp/pr_changed_files.txt` to get the changed files list
       2. Read `/tmp/pr_diff.txt` to get the full diff
-      3. Review against your instructions
+      3. If `/tmp/pr_design.md` exists, read it for design context
+      4. If `/tmp/pr_plan.md` exists, read it for implementation plan context
+      5. Review against your instructions (including design-compliance if spec files exist)
 
       Existing unresolved review threads (do NOT raise issues already covered here):
       {EXISTING_THREADS}
@@ -276,6 +297,11 @@ states:
       ## Changes Overview
 
       [2-3 sentences describing the PR's purpose and contribution]
+
+      ## Spec Context
+
+      [If `/tmp/pr_design.md` was found: "Linked to issue #N — design-compliance checked."
+       If no linked issue or no spec found: "No linked spec found — design-compliance checks skipped."]
 
       ## Key Files
 
