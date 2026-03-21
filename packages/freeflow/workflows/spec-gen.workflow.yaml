@@ -247,6 +247,7 @@ states:
 
       ## Dependency Graph
 
+      <!-- example: replace with actual steps and dependencies -->
       ```mermaid
       graph LR
         S1[Step 1: title] --> S3[Step 3: title]
