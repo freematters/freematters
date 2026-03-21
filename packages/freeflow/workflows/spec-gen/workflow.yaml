@@ -26,7 +26,8 @@ guide: |
     At each transition point, present the options and wait for the user's choice.
   - Iterative: The user can move between requirements and research at any time.
     You MUST always offer this option at state transitions.
-  - Record as you go: persist artifacts incrementally, not in batches.
+  - Record as you go: You MUST persist artifacts incrementally. You MUST NOT batch-write
+    content at the end of a phase.
   - Mermaid diagrams: Include diagrams for architectures, data flows, and component relationships
     in research and design documents.
   - Sources: Cite references and links in research documents when based on external materials.
@@ -82,7 +83,7 @@ states:
       Guide the user through questions to refine the rough idea into concrete requirements.
       Read rough-idea.md first to understand what's already been stated.
 
-      Follow this cycle for each question:
+      You MUST follow this cycle for each question:
       1. Formulate a question based on what's unclear, ambiguous, or underspecified
       2. Record the question by appending to requirements.md under a `### Q<index>: <question>` heading
          (index starts from 1)
@@ -91,11 +92,11 @@ states:
       5. Proceed to the next question
 
       Constraints:
-      - Ask ONE question at a time. Do NOT list multiple questions.
-      - Do NOT pre-populate or assume answers.
-      - Focus on: ambiguities, trade-offs, edge cases, non-functional constraints
+      - You MUST ask ONE question at a time. You MUST NOT list multiple questions in a single message.
+      - You MUST NOT pre-populate or assume answers.
+      - You MUST focus on: ambiguities, trade-offs, edge cases, non-functional constraints
         (performance, security, compatibility), success criteria, and verification methods.
-      - Do NOT ask obvious questions — the initial description already conveys basic intent.
+      - You MUST NOT ask obvious questions — the initial description already conveys basic intent.
       - When the user seems unsure, suggest concrete options rather than leaving it open-ended.
 
       Troubleshooting:
@@ -130,13 +131,13 @@ states:
       Process:
       1. Propose a research plan (2-4 topics) to the user. Incorporate their suggestions.
       2. For each topic, investigate and write findings to a separate research artifact.
-         Structure each with:
+         You MUST structure each with:
          - **Summary** — one-paragraph overview
          - **Key Findings** — numbered list of important discoveries
          - **Trade-offs** — pros/cons of different approaches
          - **Recommendations** — what you suggest and why
          - **References** — links, docs, or sources consulted
-         Include Mermaid diagrams when documenting architectures or data flows.
+         You MUST include Mermaid diagrams when documenting architectures or data flows.
       3. Periodically check in with the user to share findings and confirm direction.
       4. Summarize key findings before transitioning.
 
