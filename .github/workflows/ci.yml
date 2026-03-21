@@ -9,47 +9,35 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: freefsm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: freefsm/package-lock.json
       - run: npm ci
       - run: npx biome check .
 
   test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: freefsm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: freefsm/package-lock.json
       - run: npm ci
       - run: npm run build
       - run: npm test
 
   claude:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: freefsm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: freefsm/package-lock.json
       - name: Install Claude Code
         run: curl -fsSL https://claude.ai/install.sh | bash
       - run: npm ci
@@ -60,16 +48,12 @@ jobs:
 
   integration:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: freefsm
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: freefsm/package-lock.json
       - name: Install Claude Code
         run: curl -fsSL https://claude.ai/install.sh | bash
       - name: Install Codex

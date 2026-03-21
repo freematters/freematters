@@ -1,4 +1,7 @@
 node_modules/
 dist/
+*.tsbuildinfo
 .claude/worktrees/
 saves/
+.fc-worktrees/
+docs/plans/

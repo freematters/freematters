@@ -1,0 +1,117 @@
+version: 1
+guide: |
+  Debug a failed fflow e2e run. Analyze the run directory artifacts,
+  write a shell script that reproduces the failure, fix the code, and
+  verify with the real e2e runner.
+
+initial: diagnose
+
+states:
+  diagnose:
+    prompt: |
+      Dispatch a sub-agent to analyze the failed e2e run directory and diagnose the root cause.
+
+      The sub-agent should read these artifacts from the run directory:
+      - test-report.md (in --test-dir) — verifier verdict and per-step results
+      - session.jsonl — verifier's Claude session log (symlink in run dir)
+      - embedded-session.jsonl — embedded agent's session log (symlink in run dir)
+      - events.jsonl — FSM state transition history
+      - snapshot.json — final FSM state
+
+      The sub-agent should produce a concise diagnosis:
+      1. Which step failed and what was expected vs actual
+      2. The root cause — what code path or behavior is broken
+      3. Which source files are involved
+      4. The path of the original test plan (from the fflow verify invocation
+         in the session log, or from the test-report.md header) — needed later
+         for the verify state to re-run it
+
+      ## Hypothesis-driven debugging
+
+      If the sub-agent has a hypothesis but cannot confirm it from the artifacts alone,
+      it should add temporary debug logging (e.g. `process.stderr.write(...)` or
+      `console.error(...)`) to the suspect code paths. These logs will appear
+      in the session logs on the next real e2e run (verify state), letting you
+      confirm or reject the hypothesis from concrete evidence.
+
+      Mark debug lines clearly so they are easy to find and remove later:
+      ```typescript
+      process.stderr.write(`[e2e-debug] varName=${JSON.stringify(value)}\n`);
+      ```
+    transitions:
+      diagnosed: script
+
+  script:
+    prompt: |
+      Write (or update) a vitest integration test that reproduces the failure,
+      then run it to confirm it captures the bug.
+
+      First, read the embedded agent's session log (embedded-session.jsonl in
+      the run dir) to understand exactly what commands the agent ran, what tool
+      calls it made, and what output it produced. Use this to reconstruct the
+      concrete sequence of operations that led to the failure.
+
+      Writing the test:
+      - Write a vitest test file (not a shell script) — place it alongside
+        existing tests in `src/__tests__/`.
+      - The test should exercise the actual code path end-to-end. Mock only
+        what you cannot run in tests (e.g. Agent SDK query() for Claude sessions).
+        Everything else — CLI calls, filesystem, store — should be real.
+      - When mocking query(), make the mock simulate the real agent's side effects
+        (e.g. create run dirs via CLI) so the code under test sees realistic state.
+      - Do NOT write unit tests for individual helpers stitched together.
+        Call the real function (e.g. verifyCore()) and assert the end result.
+      - Use tmp dirs with cleanup for isolation. Set FREEFSM_ROOT to a tmp dir.
+
+      If returning from a failed verify, update the test to also cover the
+      new failure mode observed in the latest e2e run.
+
+      After writing, run it:
+      ```bash
+      npx vitest run src/__tests__/<test-file>.ts
+      ```
+
+      The test MUST fail to prove it reproduces the bug.
+      If it passes, edit until it captures the failure, then run again.
+      Only proceed once the test fails as expected.
+    transitions:
+      reproduced: fix
+
+  fix:
+    prompt: |
+      Fix the code so the reproduction test passes.
+      - Read the diagnosis and the test to understand what needs to change
+      - Make minimal, targeted fixes to the source code
+      - Run the test after each change to check progress
+      - Rebuild if needed (npm run build)
+
+      Iterate until the test passes.
+    transitions:
+      script passes: verify
+
+  verify:
+    prompt: |
+      Dispatch a sub-agent to run the original e2e test plan with `fflow verify`
+      to confirm the fix works end-to-end with the real agent runner.
+
+      After the run, check the `fflow verify` command's stdout/stderr output
+      for any `[e2e-debug]` lines from debug logging added in the diagnose
+      state. These appear in the terminal output, not in session JSONL logs.
+
+      Use this evidence to confirm or reject your hypothesis. Remove debug
+      lines once they've served their purpose (before transitioning to done).
+
+      If verification passes, the fix is confirmed — transition to done.
+      If verification fails, read the new test-report.md and any `[e2e-debug]`
+      output from the verify command to understand the remaining failure,
+      then go back to script to update the reproduction script with the new
+      failure mode.
+    transitions:
+      verified: done
+      not fixed: script
+
+  done:
+    prompt: |
+      The e2e failure has been fixed and verified.
+      Summarize: root cause, what was fixed, and which files changed.
+    transitions: {}

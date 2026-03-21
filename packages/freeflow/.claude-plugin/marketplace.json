@@ -1,0 +1,14 @@
+{
+  "name": "freeflow-local",
+  "owner": {
+    "name": "freematters"
+  },
+  "plugins": [
+    {
+      "name": "freeflow",
+      "description": "CLI-first workflow runtime for agent workflows",
+      "version": "0.1.0",
+      "source": "./"
+    }
+  ]
+}

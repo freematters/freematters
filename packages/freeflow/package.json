@@ -1,0 +1,49 @@
+{
+  "name": "@freematters/freeflow",
+  "version": "0.5.0",
+  "description": "CLI-first workflow runtime for agent workflows",
+  "type": "module",
+  "main": "dist/cli.js",
+  "bin": {
+    "fflow": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:claude": "vitest run --config vitest.claude.config.ts",
+    "test:watch": "vitest",
+    "fmt": "biome format --write .",
+    "lint": "biome lint .",
+    "check": "biome check --write ."
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.76",
+    "commander": "^14.0.3",
+    "js-yaml": "^4.1.0",
+    "marked": "^15.0.12",
+    "marked-terminal": "^7.3.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "@types/js-yaml": "^4.0.9",
+    "@types/marked-terminal": "^6.1.1",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.27.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "files": ["dist/", "prompts/", "workflows/", "skills/", "hooks/", ".claude-plugin/"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/freematters/freematters"
+  },
+  "license": "MIT"
+}

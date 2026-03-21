@@ -44,17 +44,15 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: freefsm/package-lock.json
 
-      - name: Install freefsm
-        working-directory: freefsm
-        run: npm ci && npm run build && npm link && echo "$(npm root -g)/.bin" >> $GITHUB_PATH
+      - name: Install freeflow
+        run: npm ci && npm run build && npm link -w packages/freeflow && echo "$(npm root -g)/.bin" >> $GITHUB_PATH
 
       - name: Install Claude Code
         run: curl -fsSL https://claude.ai/install.sh | bash
 
-      - name: Install freefsm plugin
-        run: freefsm install claude
+      - name: Install freeflow plugin
+        run: fflow install claude
 
       - name: Run code review
         timeout-minutes: 15
@@ -69,7 +67,7 @@ jobs:
           NEVER modify files, push commits, or approve the PR.
           Your ONLY task is to review code for bugs, security issues, and quality.
 
-          Use /freefsm:start freefsm/workflows/code-review.fsm.yaml to run the code review workflow.
+          Use /fflow:start packages/freeflow/workflows/code-review.workflow.yaml to run the code review workflow.
           Drive it to completion — do not stop between states.
           PROMPT
           )" \

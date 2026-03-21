@@ -1,17 +1,17 @@
-# Progress: FreeFSM E2E Testing Framework
+# Progress: FreeFlow E2E Testing Framework
 
 ## Status
 Started implementation on 2026-03-17.
-Branch: `issue-41-e2e-testability-freefsm`
-Issue: freematters/freematters#41
+Branch: `issue-41-e2e-testability-fflow`
+Issue: freematters/freeflow#41
 
 ## Step 1: CLI scaffolding and test plan parser
 - **Files changed**: `src/e2e/parser.ts` (new), `src/commands/e2e/verify.ts` (new), `src/commands/e2e/gen.ts` (new stub), `src/cli.ts` (added e2e command group), `src/__tests__/e2e/parser.test.ts` (new), `src/__tests__/e2e/cli.test.ts` (new)
-- **What was built**: Test plan markdown parser that extracts `## Setup`, `## Steps`, `## Expected Outcomes`, `## Cleanup` sections into typed `TestPlan` structure. Registered `freefsm e2e verify` and `freefsm e2e gen` as CLI subcommands with proper arg validation, `--test-dir` creation, JSON envelope output, and error handling.
+- **What was built**: Test plan markdown parser that extracts `## Setup`, `## Steps`, `## Expected Outcomes`, `## Cleanup` sections into typed `TestPlan` structure. Registered `fflow e2e verify` and `fflow e2e gen` as CLI subcommands with proper arg validation, `--test-dir` creation, JSON envelope output, and error handling.
 - **Tests**: 10 tests added (5 parser unit tests + 5 CLI integration tests), all passing. Full suite: 137 tests, 0 failures.
-- **Notes**: `freefsm e2e gen` is a stub (exits with "not yet implemented") — will be implemented in Step 5. Cleanup section is optional in test plans (not required by spec). Parser handles the step format `1. **Name**: Action` with `- Expected:` sub-items.
+- **Notes**: `fflow e2e gen` is a stub (exits with "not yet implemented") — will be implemented in Step 5. Cleanup section is optional in test plans (not required by spec). Parser handles the step format `1. **Name**: Action` with `- Expected:` sub-items.
 
-## Step 2: TranscriptLogger and `freefsm e2e verify` core loop
+## Step 2: TranscriptLogger and `fflow e2e verify` core loop
 - **Files changed**: `src/e2e/transcript-logger.ts` (new), `src/e2e/verify-runner.ts` (new), `src/commands/e2e/verify.ts` (updated to async + agent execution), `src/cli.ts` (async verify action + `--parse-only` flag), `src/__tests__/e2e/transcript-logger.test.ts` (new), `src/__tests__/e2e/verify-core.test.ts` (new), `src/__tests__/e2e/cli.test.ts` (updated for `--parse-only`)
 - **What was built**: TranscriptLogger class that writes timestamped entries to `transcript.jsonl` and raw API request/response pairs to `api.jsonl`. Core verification loop (`verifyCore`) that builds a system prompt from the parsed test plan, initializes an Agent SDK session with `bypassPermissions`, and streams all messages through the TranscriptLogger. The `processMessage` method handles `assistant` and `result` SDK message types. Added `--parse-only` flag to verify command to allow plan validation without agent execution.
 - **Tests**: 15 tests added (7 TranscriptLogger unit tests + 8 verify-core unit tests with mocked Agent SDK), all passing. Full suite: 152 tests, 0 failures.
@@ -23,20 +23,20 @@ Issue: freematters/freematters#41
 - **Tests**: 9 tests added (8 report-generator unit tests + 1 verify-core integration test), all passing. Full suite: 161 tests, 0 failures.
 - **Notes**: Steps without a judgment entry default to FAIL with "inconclusive" verdict (per design spec: "Agent judgment unclear → Default to FAIL with inconclusive verdict"). Verdict is determined by checking if the judgment content starts with "PASS". Duration is computed from first-to-last transcript entry timestamps per step. The `verifyCore` function now returns `VerifyCoreResult` (was `void`).
 
-## Step 4: `verifier.fsm.yaml` workflow
-- **Files changed**: `workflows/verifier.fsm.yaml` (new), `src/e2e/verify-runner.ts` (rewritten to use FSM-driven execution), `src/__tests__/e2e/verifier-workflow.test.ts` (new), `src/__tests__/e2e/verify-core.test.ts` (updated — adapted test for new FSM system prompt)
-- **What was built**: Created the `verifier.fsm.yaml` workflow with 5 states (setup, execute-steps, evaluate, report, done) that structures the verification agent through a linear FSM flow. Rewrote `verifyCore` to load the verifier workflow, initialize an FSM Store and run, create an FSM MCP server with `fsm_goto` and `fsm_current` tools, and launch the Agent SDK session with FSM-driven state management instead of raw Agent SDK calls. The test plan context is passed as part of the initial message alongside the setup state card.
+## Step 4: `verifier.workflow.yaml` workflow
+- **Files changed**: `workflows/verifier.workflow.yaml` (new), `src/e2e/verify-runner.ts` (rewritten to use FSM-driven execution), `src/__tests__/e2e/verifier-workflow.test.ts` (new), `src/__tests__/e2e/verify-core.test.ts` (updated — adapted test for new FSM system prompt)
+- **What was built**: Created the `verifier.workflow.yaml` workflow with 5 states (setup, execute-steps, evaluate, report, done) that structures the verification agent through a linear FSM flow. Rewrote `verifyCore` to load the verifier workflow, initialize an FSM Store and run, create an FSM MCP server with `fsm_goto` and `fsm_current` tools, and launch the Agent SDK session with FSM-driven state management instead of raw Agent SDK calls. The test plan context is passed as part of the initial message alongside the setup state card.
 - **Tests**: 16 tests added (11 schema validation + 5 FSM integration), all passing. Full suite: 177 tests, 0 failures.
 - **Notes**: The `buildVerifySystemPrompt` function is kept for backward compatibility but is no longer used by `verifyCore` — the system prompt now comes from the FSM `run-system.md` template. One existing test in `verify-core.test.ts` was updated to match the new behavior (test plan info moved from system prompt to initial message). The verifier MCP server does not include `request_input` tool since verification runs non-interactively.
 
-## Step 5: `freefsm e2e gen` command
+## Step 5: `fflow e2e gen` command
 - **Files changed**: `src/e2e/path-enumerator.ts` (new), `src/commands/e2e/gen.ts` (replaced stub with full implementation), `src/cli.ts` (made gen action async), `src/__tests__/e2e/path-enumerator.test.ts` (new), `src/__tests__/e2e/gen.test.ts` (new)
 - **What was built**: Path enumeration utility (`enumeratePaths`) that uses DFS to find all distinct acyclic paths from initial state to terminal states in an FSM. The `generateFromYaml` function loads an FSM YAML, enumerates paths, and generates a structured markdown test plan with Setup, Steps (one start + transitions per path), Expected Outcomes, and Cleanup sections. The gen command supports YAML mode (deterministic) and stubs prompt mode with a clear error. Generated plans are validated against the Step 1 parser before output. Supports `--output <file>` and `-j` JSON mode.
 - **Tests**: 11 tests added (6 path-enumerator unit tests + 5 gen unit tests), all passing. Full suite: 188 tests, 0 failures.
 - **Notes**: Prompt mode (free-text input for Claude agent generation) is stubbed with a `CliError` — only YAML mode is implemented as the primary use case. Cycles in FSMs are handled by not revisiting states within a single path. The generated test plan format matches the parser's expected format exactly (validated in tests).
 
-## Step 6: Dogfood — self-test freefsm with the e2e framework
+## Step 6: Dogfood — self-test fflow with the e2e framework
 - **Files changed**: `e2e/simple-workflow.md` (new), `e2e/error-handling.md` (new), `e2e/.gitignore` (new), `src/__tests__/e2e/dogfood.test.ts` (new), `package.json` (added `test:e2e` script)
-- **What was built**: Two structured e2e test plan markdown files that dogfood the framework against freefsm's own CLI — `simple-workflow.md` tests the basic start/goto/done lifecycle (4 steps), `error-handling.md` tests invalid transitions, missing states, and nonexistent runs (5 steps). Added `npm run test:e2e` script that runs parse-only validation on both plans. Added unit tests that verify test plans exist, parse correctly, pass CLI `--parse-only` verification, and that `freefsm e2e gen` round-trips through the parser.
+- **What was built**: Two structured e2e test plan markdown files that dogfood the framework against fflow's own CLI — `simple-workflow.md` tests the basic start/goto/done lifecycle (4 steps), `error-handling.md` tests invalid transitions, missing states, and nonexistent runs (5 steps). Added `npm run test:e2e` script that runs parse-only validation on both plans. Added unit tests that verify test plans exist, parse correctly, pass CLI `--parse-only` verification, and that `fflow e2e gen` round-trips through the parser.
 - **Tests**: 10 tests added, all passing. Full suite: 198 tests, 0 failures.
-- **Notes**: Tests focus on parse validation (`--parse-only`) rather than full agent execution to avoid API costs. The `test:e2e` npm script runs both plans through `freefsm e2e verify --parse-only`. The `e2e/results/` directory is gitignored since it contains ephemeral output from test runs.
+- **Notes**: Tests focus on parse validation (`--parse-only`) rather than full agent execution to avoid API costs. The `test:e2e` npm script runs both plans through `fflow e2e verify --parse-only`. The `e2e/results/` directory is gitignored since it contains ephemeral output from test runs.

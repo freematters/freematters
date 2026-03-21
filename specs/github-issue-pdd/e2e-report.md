@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-16
 **Issue**: https://github.com/freematters/testbed/issues/3
-**Run ID**: manual-e2e-20260316 (simulated, no freefsm runtime used)
+**Run ID**: manual-e2e-20260316 (simulated, no fflow runtime used)
 
 ## Results
 

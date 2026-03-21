@@ -1,13 +1,13 @@
 ---
 name: e2e-gen
-description: Use when writing or generating e2e agent test plans for freefsm verify — covers test plan format, parser rules, setup configuration, and how to describe agent interactions.
+description: Use when writing or generating e2e agent test plans for fflow verify — covers test plan format, parser rules, setup configuration, and how to describe agent interactions.
 ---
 
 # Writing E2E Agent Test Plans
 
 ## Overview
 
-`freefsm verify` tests **any Claude Code agent behavior** — FSM workflows, slash commands, MCP tools, multi-turn conversations, or any agent task. This skill covers how to write the structured markdown test plans that the verifier agent reads and executes.
+`fflow verify` tests **any Claude Code agent behavior** — FSM workflows, slash commands, MCP tools, multi-turn conversations, or any agent task. This skill covers how to write the structured markdown test plans that the verifier agent reads and executes.
 
 Test plans should be written to `./e2e/` by convention (e.g. `./e2e/my-feature.md`).
 
@@ -66,8 +66,8 @@ The Setup section tells the verifier how to launch the embedded agent. The key e
 
 ```markdown
 ## Setup
-- Agent prompt: `/freefsm:start path/to/workflow.fsm.yaml`
-- Ensure freefsm CLI is built: `npm run build` in `freefsm/`
+- Agent prompt: `/fflow:start path/to/workflow.workflow.yaml`
+- Ensure fflow CLI is built: `npm run build` in `fflow/`
 ```
 
 ### For Slash Command / Skill Tests
@@ -134,7 +134,7 @@ Steps tell the verifier how to interact with the embedded agent via `wait()` and
    - Expected: Agent acknowledges the name and transitions to "generate" state
 
 # Bad — describes CLI commands
-1. **Start the workflow**: Run `freefsm start my.fsm.yaml --run-id test`
+1. **Start the workflow**: Run `fflow start my.workflow.yaml --run-id test`
    - Expected: Exit code 0
 ```
 
@@ -162,7 +162,7 @@ From "start", the agent should transition to "done" via the "next" transition.
 The workflow completes when reaching "done" (terminal state with no transitions).
 
 ## Setup
-- Agent prompt: `/freefsm:start e2e/simple.fsm.yaml`
+- Agent prompt: `/fflow:start e2e/simple.workflow.yaml`
 
 ## Steps
 1. **Start workflow**: Wait for the embedded agent to initialize

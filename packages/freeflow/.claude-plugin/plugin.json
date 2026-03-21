@@ -1,0 +1,11 @@
+{
+  "name": "freeflow",
+  "version": "0.1.0",
+  "description": "CLI-first workflow runtime for agent workflows",
+  "author": {
+    "name": "freematters"
+  },
+  "repository": "https://github.com/freematters/freematters",
+  "license": "MIT",
+  "keywords": ["workflow", "agent", "state-machine"]
+}
