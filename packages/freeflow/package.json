@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "fmt": "biome format --write .",
     "lint": "biome lint .",
-    "check": "biome check --write ."
+    "check": "biome check --write .",
+    "version": "node scripts/sync-version.cjs && git add .claude-plugin/"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.76",
