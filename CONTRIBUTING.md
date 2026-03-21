@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in contributing to Freematters!
+Thanks for your interest in contributing to FreeFlow!
 
 ## Development Setup
 
@@ -9,7 +9,7 @@ git clone git@github.com:freematters/freematters.git
 cd freematters
 npm install
 npm run build
-npm link          # symlinks fflow to PATH (reflects changes immediately)
+npm link -w packages/freeflow  # symlinks fflow to PATH
 ```
 
 ## Workflow
@@ -31,11 +31,16 @@ npm run check
 
 ```
 freematters/
-├── src/             # TypeScript source
-├── skills/          # Claude Code / Codex skills
-├── hooks/           # Claude Code hooks
-├── workflows/       # Bundled workflow definitions
-└── docs/            # Design docs
+├── packages/
+│   └── freeflow/        # Workflow runtime package
+│       ├── src/           # TypeScript source
+│       ├── skills/        # Claude Code / Codex skills
+│       ├── hooks/         # Claude Code hooks
+│       ├── workflows/     # Bundled workflow definitions
+│       └── docs/          # Design docs
+├── biome.json           # Shared lint/format config
+├── tsconfig.base.json   # Shared TypeScript base config
+└── tsconfig.json        # Project references
 ```
 
 ## Code Style
@@ -46,7 +51,7 @@ freematters/
 
 ## Adding a Workflow
 
-Workflow YAML files go in `workflows/`. They must pass `fflow start` validation:
+Workflow YAML files go in `packages/freeflow/workflows/`. They must pass `fflow start` validation:
 
 - `version: 1`
 - `initial` state exists

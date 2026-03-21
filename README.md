@@ -39,7 +39,7 @@ fflow install codex
 git clone https://github.com/freematters/freematters.git
 cd freematters
 npm install && npm run build
-npm link
+npm link -w packages/freeflow
 
 fflow install claude
 ```
