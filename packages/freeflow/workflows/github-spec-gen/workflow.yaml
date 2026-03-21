@@ -297,6 +297,9 @@ states:
       Use minimize-and-repost for revisions per the guide.
 
       On approval, update the issue body status checklist: check off "design".
+    todos:
+      - Post design as issue comment (skip design approaches step)
+      - Get user approval via issue comment (skip in fast-forward mode)
 
   plan:
     from: "../spec-gen/workflow.yaml#plan"
@@ -321,6 +324,9 @@ states:
       Ask for feedback via comment (approve / request changes / design revision). Poll for reply.
       Use minimize-and-repost for revisions per the guide. Also update the issue body plan
       checklist when revising.
+    todos:
+      - Post plan as issue comment with plan checklist in issue body
+      - Get user approval via issue comment (skip in fast-forward mode)
 
   e2e-gen:
     from: "../spec-gen/workflow.yaml#e2e-gen"

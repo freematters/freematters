@@ -71,17 +71,12 @@ describe("loadFsm — from ref: transitions inherit", () => {
   });
 });
 
-// --- Todos append → local appended after base ---
+// --- Todos override → child replaces base ---
 
-describe("loadFsm — from ref: todos append", () => {
-  test("appends local todos after base todos", () => {
+describe("loadFsm — from ref: todos override", () => {
+  test("child todos replace base todos entirely", () => {
     const fsm = loadFsm(fixture("child-todos-append.workflow.yaml"));
-    expect(fsm.states.start.todos).toEqual([
-      "Base todo 1",
-      "Base todo 2",
-      "Child todo 1",
-      "Child todo 2",
-    ]);
+    expect(fsm.states.start.todos).toEqual(["Child todo 1", "Child todo 2"]);
   });
 });
 
@@ -120,9 +115,8 @@ describe("loadFsm — from ref: chain resolution", () => {
     // chain-a inherits prompt from chain-b (no prompt override)
     expect(fsm.states.start.prompt).toContain("Chain C start prompt.");
     expect(fsm.states.start.prompt).toContain("Chain B addition.");
-    // chain-a specifies todos ["A todo"], chain-b has no todos override so inherits chain-c ["C todo"]
-    // chain-a appends to chain-b's resolved todos
-    expect(fsm.states.start.todos).toEqual(["C todo", "A todo"]);
+    // chain-a specifies todos ["A todo"] which overrides chain-b's inherited ["C todo"]
+    expect(fsm.states.start.todos).toEqual(["A todo"]);
     // transitions inherited from chain-c via chain-b
     expect(fsm.states.start.transitions).toEqual({ next: "done" });
   });

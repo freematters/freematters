@@ -145,15 +145,13 @@ function resolveRefs(
       };
     }
 
-    // Merge todos
+    // Merge todos: child overrides base (not concatenation)
     if (state.todos === undefined) {
       if (baseState.todos !== undefined) {
         state.todos = [...baseState.todos];
       }
-    } else if (Array.isArray(state.todos)) {
-      const baseTodos = baseState.todos ?? [];
-      state.todos = [...baseTodos, ...(state.todos as unknown[])];
     }
+    // If child defines todos explicitly (even empty), it replaces base todos entirely
 
     // Remove from field after merge
     state.from = undefined;
