@@ -9,6 +9,7 @@ import { createVerifierMcpServer } from "./verifier-tools.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const VERIFIER_FSM = resolve(__dirname, "../../workflows/verifier/workflow.yaml");
+const FFLOW_BIN = resolve(__dirname, "../cli.js");
 
 export interface VerifyCoreArgs {
   planPath: string;
@@ -41,11 +42,14 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
 
   const runId = `verifier-${Date.now()}`;
   const prompt = [
-    `Run the e2e verifier workflow with: /fflow ${VERIFIER_FSM} --run-id ${runId}`,
+    `Run the e2e verifier workflow with: node ${FFLOW_BIN} start ${VERIFIER_FSM} --run-id ${runId}`,
     "",
     `Test plan file: ${resolve(planPath)}`,
     `Test output directory: ${resolve(testDir)}`,
     `Test report file: ${reportPath}`,
+    "",
+    `Use \`node ${FFLOW_BIN}\` for all fflow commands (start, goto, current).`,
+    "IMPORTANT: Do NOT invoke /e2e-run or /e2e-fix skills — you ARE the verifier. Using them would cause infinite recursion.",
   ].join("\n");
 
   const session = query({
@@ -54,6 +58,7 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
       permissionMode: "bypassPermissions",
       allowDangerouslySkipPermissions: true,
       settingSources: ["user", "project", "local"],
+      disallowedTools: ["AskUserQuestion", "EnterPlanMode", "ExitPlanMode"],
       mcpServers: {
         "freeflow-verifier": verifierServer,
       },
