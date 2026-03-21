@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json") as { version: string };
 import { Command } from "commander";
 import { current } from "./commands/current.js";
 import { verify } from "./commands/e2e/verify.js";
@@ -50,7 +54,7 @@ Example:
   $ fflow current --run-id my-run
   $ fflow finish --run-id my-run`,
   )
-  .version("0.1.0")
+  .version(version)
   .option("--root <path>", "storage root (default: ~/.freeflow/ or $FREEFLOW_ROOT)")
   .option("-j, --json", "output as JSON envelope")
   .configureOutput({
