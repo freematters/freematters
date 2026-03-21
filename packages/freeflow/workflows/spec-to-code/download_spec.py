@@ -2,7 +2,7 @@
 """Download spec artifacts from a GitHub issue into a local specs directory.
 
 Usage:
-    download_spec.py <owner> <repo> <issue_number> [--specs-dir <path>] [--slug <slug>]
+    download_spec.py <owner> <repo> <issue_number> --slug <slug> [--specs-dir <path>]
 
 Scans issue comments for artifact headers and saves them as local files:
     ## design.md         → <specs-dir>/<slug>/design.md
@@ -12,7 +12,6 @@ Scans issue comments for artifact headers and saves them as local files:
     ## research/<topic>  → <specs-dir>/<slug>/research/<topic>.md
 
 The header line is stripped — file content starts from the line after the header.
-If --slug is not provided, it is derived from the issue title.
 """
 
 import argparse
@@ -38,20 +37,6 @@ def gh_api(endpoint: str, jq: str | None = None, paginate: bool = False) -> str:
         print(f"gh api error: {result.stderr.strip()}", file=sys.stderr)
         sys.exit(1)
     return result.stdout.strip()
-
-
-def slugify(title: str) -> str:
-    """Derive a slug from an issue title.
-
-    Examples:
-        "feat: freefsm run" → "freefsm-run"
-        "Add E2E testability to FreeFSM" → "add-e2e-testability-to-freefsm"
-    """
-    # Remove common prefixes like "feat:", "fix:", "chore:", etc.
-    cleaned = re.sub(r"^(feat|fix|chore|docs|refactor|test|ci|perf|build|style)\s*:\s*", "", title, flags=re.IGNORECASE)
-    # Lowercase, replace non-alphanumeric with hyphens, collapse multiple hyphens
-    slug = re.sub(r"[^a-z0-9]+", "-", cleaned.lower()).strip("-")
-    return slug
 
 
 def parse_artifact_header(first_line: str) -> tuple[str, str] | None:
@@ -123,7 +108,7 @@ def main() -> None:
     parser.add_argument("repo", help="Repository name")
     parser.add_argument("issue_number", type=int, help="Issue number")
     parser.add_argument("--specs-dir", default="./specs", help="Base specs directory (default: ./specs)")
-    parser.add_argument("--slug", help="Override slug (default: derived from issue title)")
+    parser.add_argument("--slug", required=True, help="Slug for the spec directory")
     args = parser.parse_args()
 
     title, artifacts = download_artifacts(args.owner, args.repo, args.issue_number)
@@ -132,7 +117,7 @@ def main() -> None:
         print("Could not fetch issue title", file=sys.stderr)
         sys.exit(1)
 
-    slug = args.slug or slugify(title)
+    slug = args.slug
     specs_dir = Path(args.specs_dir) / slug
 
     if not artifacts:
