@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "vitest";
-import { createFsmMcpServer } from "../commands/run.js";
+import { createFsmTools } from "../commands/run.js";
 import { loadFsm } from "../fsm.js";
 import type { Fsm } from "../fsm.js";
 import { Store } from "../store.js";
@@ -31,7 +31,7 @@ afterAll(() => {
 
 let store: Store;
 let runId: string;
-let tools: ReturnType<typeof createFsmMcpServer>["tools"];
+let tools: ReturnType<typeof createFsmTools>;
 let runCounter = 0;
 
 beforeEach(() => {
@@ -53,15 +53,14 @@ beforeEach(() => {
     { run_status: "active", state: fsm.initial },
   );
 
-  const server = createFsmMcpServer(fsm, store, runId);
-  tools = server.tools;
+  tools = createFsmTools(fsm, store, runId);
 });
 
 // ─── fsm_goto handler ────────────────────────────────────────────
 
 describe("fsm_goto handler", () => {
   test("valid transition commits event and updates snapshot", async () => {
-    await tools.fsm_goto.handler({ target: "middle", on: "next" }, {});
+    await tools.fsm_goto({ target: "middle", on: "next" }, {});
 
     const snapshot = store.readSnapshot(runId);
     expect(snapshot?.state).toBe("middle");
@@ -76,7 +75,7 @@ describe("fsm_goto handler", () => {
   });
 
   test("returns state card on success", async () => {
-    const result = (await tools.fsm_goto.handler(
+    const result = (await tools.fsm_goto(
       { target: "middle", on: "next" },
       {},
     )) as ToolResult;
@@ -89,7 +88,7 @@ describe("fsm_goto handler", () => {
   });
 
   test("returns error content (not throw) on invalid transition", async () => {
-    const result = (await tools.fsm_goto.handler(
+    const result = (await tools.fsm_goto(
       { target: "done", on: "invalid" },
       {},
     )) as ToolResult;
@@ -101,7 +100,7 @@ describe("fsm_goto handler", () => {
   });
 
   test("returns error on nonexistent target state", async () => {
-    const result = (await tools.fsm_goto.handler(
+    const result = (await tools.fsm_goto(
       { target: "nonexistent", on: "next" },
       {},
     )) as ToolResult;
@@ -115,7 +114,7 @@ describe("fsm_goto handler", () => {
 
 describe("fsm_current handler", () => {
   test("returns current state card", async () => {
-    const result = (await tools.fsm_current.handler({}, {})) as ToolResult;
+    const result = (await tools.fsm_current({}, {})) as ToolResult;
 
     expect(result.content).toBeDefined();
     expect(result.content).toHaveLength(1);
@@ -125,9 +124,9 @@ describe("fsm_current handler", () => {
   });
 
   test("returns updated card after goto", async () => {
-    await tools.fsm_goto.handler({ target: "middle", on: "next" }, {});
+    await tools.fsm_goto({ target: "middle", on: "next" }, {});
 
-    const result = (await tools.fsm_current.handler({}, {})) as ToolResult;
+    const result = (await tools.fsm_current({}, {})) as ToolResult;
 
     expect(result.content[0].text).toContain("middle");
     expect(result.content[0].text).toContain("Middle step.");
@@ -138,8 +137,8 @@ describe("fsm_current handler", () => {
 
 describe("terminal state detection", () => {
   test("goto to done includes 'terminal state' note", async () => {
-    await tools.fsm_goto.handler({ target: "middle", on: "next" }, {});
-    const result = (await tools.fsm_goto.handler(
+    await tools.fsm_goto({ target: "middle", on: "next" }, {});
+    const result = (await tools.fsm_goto(
       { target: "done", on: "finish" },
       {},
     )) as ToolResult;
@@ -149,8 +148,8 @@ describe("terminal state detection", () => {
   });
 
   test("sets run_status to completed", async () => {
-    await tools.fsm_goto.handler({ target: "middle", on: "next" }, {});
-    await tools.fsm_goto.handler({ target: "done", on: "finish" }, {});
+    await tools.fsm_goto({ target: "middle", on: "next" }, {});
+    await tools.fsm_goto({ target: "done", on: "finish" }, {});
 
     const snapshot = store.readSnapshot(runId);
     expect(snapshot?.run_status).toBe("completed");
@@ -158,10 +157,10 @@ describe("terminal state detection", () => {
   });
 
   test("returns error when run is completed", async () => {
-    await tools.fsm_goto.handler({ target: "middle", on: "next" }, {});
-    await tools.fsm_goto.handler({ target: "done", on: "finish" }, {});
+    await tools.fsm_goto({ target: "middle", on: "next" }, {});
+    await tools.fsm_goto({ target: "done", on: "finish" }, {});
 
-    const result = (await tools.fsm_goto.handler(
+    const result = (await tools.fsm_goto(
       { target: "middle", on: "next" },
       {},
     )) as ToolResult;

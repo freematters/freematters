@@ -56,6 +56,8 @@ export function runCliJson(
   } = {},
 ): { envelope: Record<string, unknown>; exitCode: number } {
   const { stdout, stderr, exitCode } = runCli(`${args} -j`, opts);
-  const raw = stdout || stderr;
+  // Only fall back to stderr when expecting failure (JSON errors may go to stdout or stderr)
+  const raw = opts?.expectFail ? stdout || stderr : stdout;
+  if (!raw) throw new Error(`No stdout from command: fflow ${args}`);
   return { envelope: JSON.parse(raw), exitCode };
 }

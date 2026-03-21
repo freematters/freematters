@@ -118,11 +118,6 @@ export function freshStore(tmpDir: string): Store {
   return new Store(join(tmpDir, `root-${storeCounter}`));
 }
 
-/** Reset the store counter (call in beforeAll if needed). */
-export function resetStoreCounter(): void {
-  storeCounter = 0;
-}
-
 // ─── Event Builders ──────────────────────────────────────────────
 
 export function startEvent(toState: string): EventInput {

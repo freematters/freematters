@@ -35,14 +35,16 @@ function makeQueryResult(messages: SDKMsg[]) {
 
 /** Build a query result from an async generator (for hanging streams). */
 function makeQueryResultFromGenerator(gen: () => AsyncGenerator<SDKMsg>) {
-  let closed = false;
-  const closeFn = vi.fn(() => {
-    closed = true;
-  });
+  let generator: AsyncGenerator<SDKMsg> | null = null;
 
   const iterable = {
-    [Symbol.asyncIterator]: gen,
-    close: closeFn,
+    [Symbol.asyncIterator]() {
+      generator = gen();
+      return generator;
+    },
+    close: vi.fn(() => {
+      generator?.return(undefined);
+    }),
   };
   return iterable;
 }
