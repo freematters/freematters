@@ -350,17 +350,25 @@ states:
          Ready for PR — run `/pr` to create a pull request.
          ```
 
-      3. Write `./specs/<slug>/source-issue` containing the issue reference
-         (e.g., `owner/repo#42`) so that pr-lifecycle can link the PR to the issue.
-
-      4. Update the issue body's Summary section (added by issue-bot) to reflect e2e results.
+      3. Update the issue body's Summary section (added by issue-bot) to reflect e2e results.
          Re-read the current issue body, then update the `### E2E Testing` subsection with
          the actual result (pass/fail, attempt count). If the section doesn't exist, add it.
 
-      5. Remove `doing` label and add `done` label to the issue:
+      4. Remove `doing` label and add `done` label to the issue:
          ```bash
          gh issue edit {issue_number} --repo {owner}/{repo} --remove-label doing
          gh label create done --repo {owner}/{repo} --description "Implementation complete" --color 0E8A16 2>/dev/null || true
          gh issue edit {issue_number} --repo {owner}/{repo} --add-label done
          ```
+
+      5. Post a handoff comment offering to chain to PR-lifecycle:
+         ```
+         [from bot] Implementation complete! Ready to create a PR.
+
+         1. **Create PR** — I'll run pr-lifecycle to create and monitor the PR
+         2. **Done for now** — I'll leave the branch ready for a manual PR
+         ```
+         If the user chooses option 1, invoke `/pr --source-issue {owner}/{repo}#{issue_number}`.
+         The `--source-issue` parameter passes the issue reference so PR-lifecycle can add
+         `Closes #N` to the PR description, linking it to the source issue.
     transitions: {}
