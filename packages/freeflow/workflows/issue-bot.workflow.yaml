@@ -532,7 +532,9 @@ states:
 
          **Objective**: {what and why}
 
-         **Test Requirements**: {tests to write BEFORE implementation}
+         **Test Requirements**: {assign specific test cases from design.md's
+         Integration Testing section relevant to this step; add unit tests
+         for complex single-module logic}
 
          **Implementation Guidance**: {specific technical instructions, referencing design sections}
 
@@ -575,9 +577,10 @@ states:
 
       ### Integration test step
 
-      The plan MUST include a step for implementing the integration tests defined in
-      design.md's Integration Testing section. This step exercises cross-component
-      boundaries with real dependencies and should come after core functionality is built.
+      The plan MUST include a step for implementing the leftover integration tests
+      from design.md's Integration Testing section. Explicitly list which test cases
+      are NOT yet assigned to earlier steps. Do NOT re-test what individual steps
+      already cover.
 
       E2E testing is handled by the e2e-gen state after plan approval — do NOT add
       an e2e step to the plan.

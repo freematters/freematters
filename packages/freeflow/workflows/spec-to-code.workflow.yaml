@@ -126,10 +126,12 @@ states:
          > Before coding, explore existing code for patterns, conventions, and style.
          >
          > 1. Define the contract: inputs, expected outputs, side effects, error conditions.
-         > 2. Write failing tests (RED):
-         >    - Default to integration tests across system boundaries with real dependencies.
-         >    - Only mock true external boundaries (network, third-party APIs).
-         >    - Unit tests only for complex single-module logic.
+         > 2. Read this step's **Test Requirements** from plan.md — these are the
+         >    specific test cases assigned to this step. Write failing tests for them (RED).
+         >    You MAY add extra tests beyond the listed requirements if you discover
+         >    edge cases or complex logic that warrants coverage.
+         >    General rules: use real dependencies; only mock true external boundaries
+         >    (network, third-party APIs); unit tests for complex single-module logic.
          > 3. Write minimum implementation to pass (GREEN)
          > 4. Refactor — clean up, run linter/formatter
          > 5. Commit your work in the worktree: `feat(scope): step N - <step title>`

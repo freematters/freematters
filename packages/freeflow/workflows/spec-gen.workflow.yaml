@@ -192,8 +192,10 @@ states:
       5. **Data Models** — key data structures, schemas, state, and their relationships
       6. **Integration Testing** — define integration tests that cover system boundaries:
          cross-component interactions, data flow across modules, external API contracts.
-         Use real dependencies; only mock true external boundaries. These tests are
-         implemented during plan steps and run as part of the normal test suite.
+         Use real dependencies; only mock true external boundaries. Individual plan steps
+         may implement some of these tests when their dependencies are available; the
+         remaining tests are implemented in a dedicated integration test step after all
+         steps are complete.
       7. **E2E Testing** — describe key end-to-end scenarios, expected user-facing behaviors,
          and how to verify the feature works as a whole. This section is for human review;
          `/e2e-gen` will later convert it into an executable test plan.
@@ -267,16 +269,20 @@ states:
       **Implementation Guidance**: Specific technical instructions — what to create,
       modify, or wire up. Reference design.md sections where relevant.
 
-      **Test Requirements**: What tests to write BEFORE implementation (TDD).
-      Default to integration tests covering system boundaries; unit tests only
-      for complex single-module logic.
+      **Test Requirements**: Assign specific test cases from design.md's
+      Integration Testing section that are relevant to this step (where
+      dependencies are available). Add unit tests for complex single-module
+      logic. Clearly list each test case so the implementing agent knows
+      exactly what to cover.
       ```
 
       ### Integration test step
 
       If design.md has an Integration Testing section, the plan MUST include an
-      integration test step. Refer to design.md's section for what to test — do not
-      repeat it. The step only describes how to run and organize the tests.
+      integration test step as the final step. Explicitly list which test cases
+      from design.md's Integration Testing section are NOT yet assigned to
+      earlier steps — these are the leftover tests whose dependencies were not
+      available until now. Do NOT re-test what individual steps already cover.
 
       E2E testing is handled by the e2e-gen state after plan approval — do NOT add
       an e2e step to plan.md.
