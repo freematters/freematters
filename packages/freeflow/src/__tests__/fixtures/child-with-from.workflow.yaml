@@ -1,0 +1,11 @@
+version: 1.1
+initial: start
+states:
+  start:
+    from: "./child-with-from-base.workflow.yaml#start"
+    prompt: "{{base}} Extended with from."
+    append_todos:
+      - "Appended todo B"
+  done:
+    prompt: "Child with from done."
+    transitions: {}

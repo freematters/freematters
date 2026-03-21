@@ -1,0 +1,11 @@
+version: 1.2
+guide: "Parent-level guide."
+initial: sub
+states:
+  sub:
+    workflow: ./child-extends-guide-for-compose.workflow.yaml
+    transitions:
+      completed: done
+  done:
+    prompt: "All done with guide."
+    transitions: {}
