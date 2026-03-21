@@ -114,8 +114,18 @@ def main() -> None:
 
             has_user_comment = False
             for comment in new_comments:
-                # Skip bot replies entirely
-                if comment["body"].startswith("[bot reply]"):
+                # Skip bot replies and bot-posted artifact comments
+                body = comment["body"]
+                if body.startswith("[bot reply]") or body.startswith("[from bot]"):
+                    continue
+                if body.startswith("## ") and body.split("\n", 1)[0].rstrip() in (
+                    "## requirements.md",
+                    "## design.md",
+                    "## plan.md",
+                    "## e2e.md",
+                    "## Checkpoint Summary",
+                    "## Spec Complete!",
+                ) or body.startswith("## research/"):
                     continue
 
                 # React with 👀 to user comments
