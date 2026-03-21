@@ -38,7 +38,7 @@ states:
 
       Check if the argument matches `owner/repo#N` (regex: `[\w.-]+/[\w.-]+#\d+`).
       - If yes → **issue mode**. Remember `source_mode = "issue"`, parse `owner`, `repo`, `issue_number`.
-        Derive `slug` from the issue title (lowercase, strip `feat:`/`fix:` prefixes, replace non-alphanumeric with hyphens).
+        Derive a concise `slug` from the issue title — a short, meaningful identifier (lowercase, hyphen-separated).
       - If no → **local mode**. Remember `source_mode = "local"`. The argument is the spec directory path.
 
       ### 2. Load spec
