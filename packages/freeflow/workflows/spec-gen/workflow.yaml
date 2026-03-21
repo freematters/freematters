@@ -183,25 +183,30 @@ states:
       Required sections:
       1. **Overview** — one-paragraph summary of what we're building and why
       2. **Goal & Constraints** — derived from requirements and codebase exploration.
-         Goal: what the feature must achieve. Constraints: technical limits, compatibility
-         requirements, performance targets, security boundaries, and codebase conventions
-         that the implementation must respect.
+         Goal: list of feature requirements (what the implementation must deliver).
+         Constraints: list of MUST NOTs (boundaries the implementation must not violate).
       3. **Architecture Overview** — high-level structure with a Mermaid diagram
       4. **Components & Interfaces** — each component's responsibility, API surface,
          and how components interact
       5. **Data Models** — key data structures, schemas, state, and their relationships
-      6. **Error Handling** — failure modes, recovery strategies, and degradation behavior
-      7. **Integration Testing** — define integration tests that cover system boundaries:
-         cross-component interactions, data flow across modules, external API contracts.
-         Use real dependencies; only mock true external boundaries. Individual plan steps
-         may implement some of these tests when their dependencies are available; the
-         remaining tests are implemented in a dedicated integration test step after all
-         steps are complete.
-      8. **E2E Testing** — describe key end-to-end scenarios, expected user-facing behaviors,
-         and how to verify the feature works as a whole. This section is for human review;
-         `/e2e-gen` will later convert it into an executable test plan.
-      9. **Appendices** (optional) — technology choices with rationale, research findings summary,
-         alternative approaches considered and why they were rejected
+      6. **Integration Testing** — verify that modules interact correctly at their
+         boundaries. Scope: specific interface contracts between components. Mocking
+         external dependencies is acceptable but not internal. Format each test case as:
+         - **Given**: preconditions and setup
+         - **When**: the action or interaction under test
+         - **Then**: expected outcome
+      7. **E2E Testing** — describe key end-to-end scenarios as user journeys. Read
+         `@packages/freeflow/docs/e2e-testing-design.md` for the verifier–executor model.
+         Format each as a named scenario with numbered steps mixing user actions,
+         system responses, and verification points:
+         ```
+         **Scenario: <name>**
+         1. User does X
+         2. System shows Y
+         3. User does Z
+         4. **Verify:** expected side effect
+         ```
+      8. **Error Handling** — failure modes, recovery strategies, and degradation behavior
 
       Constraints:
       - You MUST derive Goal & Constraints from requirements and codebase exploration.
@@ -224,10 +229,9 @@ states:
       - Write Architecture Overview with Mermaid diagram
       - Write Components & Interfaces section
       - Write Data Models section
-      - Write Error Handling section
       - Write Integration Testing section
       - Write E2E Testing section
-      - Write Appendices (tech choices, research, alternatives)
+      - Write Error Handling section
       - Present to user and get explicit approval
     transitions:
       design approved: plan
@@ -276,7 +280,8 @@ states:
       Integration Testing section that are relevant to this step (where
       dependencies are available). Add unit tests for complex single-module
       logic. Clearly list each test case so the implementing agent knows
-      exactly what to cover.
+      exactly what to cover. Avoid heavy mocking internal services. Avoid testing
+      internal details.
       ```
 
       ### Integration test step
@@ -296,7 +301,6 @@ states:
       - Include **Depends on** for each step. Steps with no dependency on each other
         can be executed in parallel by the spec-to-code workflow.
       - You MUST NOT duplicate design details — reference design.md sections instead.
-      - You MUST ensure each step results in working functionality.
       - You MUST include test requirements BEFORE implementation guidance (TDD).
       - You MUST present the plan to the user and iterate on feedback until approved.
 
@@ -306,8 +310,6 @@ states:
       **Normal mode**: You MUST NOT proceed until the user explicitly approves the implementation plan.
     todos:
       - Draft implementation steps with TDD ordering
-      - Verify each step produces working functionality
-      - Verify no orphaned code between steps
       - Add integration test as final step (no e2e step — handled by e2e-gen state)
       - Get user approval on the plan
     transitions:
