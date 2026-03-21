@@ -8,6 +8,7 @@ import { registerReplyTool } from "../core/reply-tool.js";
 const CHANNEL_DIR = path.join(os.homedir(), ".claude", "channels", "github-issues");
 const STATE_FILE = path.join(CHANNEL_DIR, "state.json");
 const REPOS_FILE = path.join(CHANNEL_DIR, "repos.json");
+const FILTER_FILE = path.join(CHANNEL_DIR, "filter.json");
 
 export async function loadEnv(): Promise<Record<string, string>> {
   const envPath = path.join(CHANNEL_DIR, ".env");
@@ -51,6 +52,31 @@ async function readRepos(): Promise<string[]> {
   } catch {
     return [];
   }
+}
+
+interface FilterConfig {
+  allowFrom: string[];
+  ignoreFrom: string[];
+}
+
+async function readFilter(): Promise<FilterConfig | null> {
+  try {
+    const raw = await fs.readFile(FILTER_FILE, "utf-8");
+    return JSON.parse(raw) as FilterConfig;
+  } catch {
+    return null;
+  }
+}
+
+function isSenderAllowed(
+  filter: FilterConfig | null,
+  sender: string,
+): boolean {
+  if (!filter) return true;
+  if (filter.ignoreFrom.length > 0 && filter.ignoreFrom.includes(sender))
+    return false;
+  if (filter.allowFrom.length > 0) return filter.allowFrom.includes(sender);
+  return true;
 }
 
 export async function main(): Promise<void> {
@@ -117,6 +143,7 @@ export async function main(): Promise<void> {
     owner: string,
     repo: string,
     repoFull: string,
+    filter: FilterConfig | null,
   ): Promise<void> {
     const params: {
       owner: string;
@@ -139,6 +166,7 @@ export async function main(): Promise<void> {
 
     for (const issue of issues.reverse()) {
       if (state.lastEventTime && issue.updated_at <= state.lastEventTime) continue;
+      if (!isSenderAllowed(filter, issue.user?.login || "")) continue;
 
       await notify(
         `${issue.pull_request ? "PR" : "Issue"} #${issue.number}: ${issue.title}`,
@@ -162,6 +190,7 @@ export async function main(): Promise<void> {
     owner: string,
     repo: string,
     repoFull: string,
+    filter: FilterConfig | null,
   ): Promise<void> {
     const params: {
       owner: string;
@@ -191,6 +220,8 @@ export async function main(): Promise<void> {
       )
         continue;
 
+      if (!isSenderAllowed(filter, comment.user?.login || "")) continue;
+
       // Extract issue number from issue_url
       const issueMatch = comment.issue_url?.match(/\/issues\/(\d+)$/);
       const issueNumber = issueMatch ? issueMatch[1] : "unknown";
@@ -215,6 +246,7 @@ export async function main(): Promise<void> {
     owner: string,
     repo: string,
     repoFull: string,
+    filter: FilterConfig | null,
   ): Promise<void> {
     const params: {
       owner: string;
@@ -243,6 +275,8 @@ export async function main(): Promise<void> {
       )
         continue;
 
+      if (!isSenderAllowed(filter, comment.user?.login || "")) continue;
+
       // Extract PR number from pull_request_url
       const prMatch = comment.pull_request_url?.match(/\/pulls\/(\d+)$/);
       const prNumber = prMatch ? prMatch[1] : "unknown";
@@ -269,14 +303,16 @@ export async function main(): Promise<void> {
     const repos = await readRepos();
     if (repos.length === 0) return;
 
+    const filter = await readFilter();
+
     for (const repoFull of repos) {
       const [owner, repo] = repoFull.split("/");
       if (!owner || !repo) continue;
 
       try {
-        await pollIssues(owner, repo, repoFull);
-        await pollComments(owner, repo, repoFull);
-        await pollReviewComments(owner, repo, repoFull);
+        await pollIssues(owner, repo, repoFull, filter);
+        await pollComments(owner, repo, repoFull, filter);
+        await pollReviewComments(owner, repo, repoFull, filter);
       } catch (err) {
         console.error(`GitHub poll error for ${repoFull}:`, err);
       }
