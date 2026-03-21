@@ -1,7 +1,11 @@
-import { Client } from "@notionhq/client";
 import * as fs from "node:fs/promises";
-import * as path from "node:path";
 import * as os from "node:os";
+import * as path from "node:path";
+import { Client } from "@notionhq/client";
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+} from "@modelcontextprotocol/sdk/types.js";
 import { createChannelServer } from "../core/channel-server.js";
 
 const CHANNEL_DIR = path.join(os.homedir(), ".claude", "channels", "notion");
@@ -51,18 +55,96 @@ export async function main(): Promise<void> {
 
   const notion = new Client({ auth: token });
 
-  const { notify, connect } = createChannelServer({
+  const { server, notify, connect } = createChannelServer({
     name: "notion",
     version: "0.0.1",
     instructions: [
       'Notion page/database changes arrive as <channel source="notion" page_id="..." title="...">.',
-      "These are one-way notifications. Read them and act on the content — no reply expected.",
+      "Use the comment tool to add a comment to a page (pass page_id from the tag).",
+      "Use the append tool to append content blocks to a page.",
     ].join(" "),
+    twoWay: true,
+  });
+
+  // Register tools: comment and append
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: [
+      {
+        name: "comment",
+        description: "Add a comment to a Notion page",
+        inputSchema: {
+          type: "object" as const,
+          properties: {
+            page_id: {
+              type: "string",
+              description: "The Notion page ID to comment on",
+            },
+            text: {
+              type: "string",
+              description: "The comment text",
+            },
+          },
+          required: ["page_id", "text"],
+        },
+      },
+      {
+        name: "append",
+        description: "Append a paragraph to a Notion page",
+        inputSchema: {
+          type: "object" as const,
+          properties: {
+            page_id: {
+              type: "string",
+              description: "The Notion page ID to append to",
+            },
+            text: {
+              type: "string",
+              description: "The text content to append as a paragraph",
+            },
+          },
+          required: ["page_id", "text"],
+        },
+      },
+    ],
+  }));
+
+  server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    const { page_id, text } = req.params.arguments as {
+      page_id: string;
+      text: string;
+    };
+
+    if (req.params.name === "comment") {
+      await notion.comments.create({
+        parent: { page_id },
+        rich_text: [{ type: "text", text: { content: text } }],
+      });
+      return { content: [{ type: "text" as const, text: "comment added" }] };
+    }
+
+    if (req.params.name === "append") {
+      await notion.blocks.children.append({
+        block_id: page_id,
+        children: [
+          {
+            object: "block",
+            type: "paragraph",
+            paragraph: {
+              rich_text: [{ type: "text", text: { content: text } }],
+            },
+          },
+        ],
+      });
+      return { content: [{ type: "text" as const, text: "content appended" }] };
+    }
+
+    throw new Error(`unknown tool: ${req.params.name}`);
   });
 
   await connect();
 
-  const pollInterval = Number.parseInt(process.env.POLL_INTERVAL_MS || "", 10) || 30_000;
+  const pollInterval =
+    Number.parseInt(process.env.POLL_INTERVAL_MS || "", 10) || 30_000;
   const state = await readState();
 
   const poll = async () => {
