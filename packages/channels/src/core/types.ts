@@ -14,10 +14,7 @@ export interface ChannelServer {
 export interface AccessConfig {
   dmPolicy: "pairing" | "allowlist" | "disabled";
   allowFrom: string[];
-  groups: Record<
-    string,
-    { requireMention: boolean; allowFrom: string[] }
-  >;
+  groups: Record<string, { requireMention: boolean; allowFrom: string[] }>;
   pending: Record<
     string,
     {

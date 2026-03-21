@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bun scripts/build-plugin.ts",
-    "build:slack": "bun scripts/build-plugin.ts slack",
-    "build:notion": "bun scripts/build-plugin.ts notion",
-    "build:github-issues": "bun scripts/build-plugin.ts github-issues",
+    "build": "tsx scripts/build-plugin.ts",
+    "build:slack": "tsx scripts/build-plugin.ts slack",
+    "build:notion": "tsx scripts/build-plugin.ts notion",
+    "build:github-issues": "tsx scripts/build-plugin.ts github-issues",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -24,6 +24,7 @@
     "@biomejs/biome": "^1.9.0",
     "@types/node": "^22.0.0",
     "esbuild": "^0.27.3",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   },
