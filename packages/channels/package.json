@@ -1,0 +1,29 @@
+{
+  "name": "@freematters/channels",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun scripts/build-plugin.ts",
+    "build:slack": "bun scripts/build-plugin.ts slack",
+    "build:notion": "bun scripts/build-plugin.ts notion",
+    "build:github-issues": "bun scripts/build-plugin.ts github-issues",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "biome check --write ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.27.3",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
