@@ -112,15 +112,15 @@ export function createVerifierMcpServer(options?: VerifierMcpServerOptions) {
         } else if (event.type === "timeout") {
           const partial = output.join("\n---\n");
           if (partial) {
-            logger?.logEmbedded(`[timeout with partial output, ${output.length} text block(s)]`);
+            logger?.logEmbedded(
+              `[timeout with partial output, ${output.length} text block(s)]`,
+            );
           } else {
             logger?.logEmbedded("[timeout, no output]");
           }
           const result = { type: "timeout", output: partial || null };
           return {
-            content: [
-              { type: "text" as const, text: JSON.stringify(result) },
-            ],
+            content: [{ type: "text" as const, text: JSON.stringify(result) }],
           };
         }
       }
