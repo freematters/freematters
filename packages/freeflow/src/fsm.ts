@@ -156,7 +156,7 @@ function resolveRefs(
     }
 
     // Remove from field after merge
-    delete state.from;
+    state.from = undefined;
   }
 
   // --- extends_guide handling ---
@@ -208,7 +208,7 @@ function resolveExtendsGuide(
   // else: local guide without {{base}} → fully replace (no action needed)
 
   // Remove extends_guide field before validation
-  delete doc.extends_guide;
+  doc.extends_guide = undefined;
 }
 
 // --- Loader ---
