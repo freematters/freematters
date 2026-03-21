@@ -1,12 +1,12 @@
 version: 1
-guide: "Child with overridden todos"
+guide: "Child with append_todos"
 initial: start
 states:
   start:
     from: "./base.workflow.yaml#start"
-    todos:
-      - "Child todo 1"
-      - "Child todo 2"
+    append_todos:
+      - "Appended todo 1"
+      - "Appended todo 2"
   review:
     prompt: "Child review."
     transitions:

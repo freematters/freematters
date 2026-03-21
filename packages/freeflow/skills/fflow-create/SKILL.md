@@ -111,9 +111,53 @@ Default to agent-agnostic workflows:
 - Put universal rules in `guide`, not in state prompts.
 - Don't reference agent-specific tools or features in prompts unless necessary.
 
+## Workflow Reuse
+
+Workflows can reuse states and guides from other workflow YAMLs. When the user wants to
+build on an existing workflow or share structure across workflows, use these features.
+
+### State-level reuse (`from:`)
+
+A state can inherit from another workflow's state using `from: <workflow-path>#<state-name>`:
+
+```yaml
+states:
+  start:
+    from: "./base.workflow.yaml#start"
+```
+
+This copies the base state's `prompt`, `todos`, and `transitions` into the child state.
+The child can override any field alongside `from:`:
+
+- **prompt**: if child prompt contains `{{base}}`, it's replaced with the base prompt; otherwise the child prompt fully replaces it
+- **transitions**: child transitions are merged on top of base transitions (child wins on conflict)
+- **todos**: child todos fully replace base todos; omit to inherit base todos as-is
+- **append_todos**: appends items after inherited (or overridden) todos — use when you want to keep base todos and add more
+
+### Guide reuse (`extends_guide:`)
+
+A workflow can extend another workflow's `guide` field:
+
+```yaml
+extends_guide: ./base.workflow.yaml
+guide: |
+  {{base}}
+  Extra child rules.
+```
+
+If the child guide contains `{{base}}`, it's replaced with the base guide; otherwise the
+child guide fully replaces it. Omitting the local `guide` field inherits the base guide as-is.
+
+### Resolution rules
+
+- Paths are resolved relative to the referencing file
+- Circular references are detected at load time and raise `SCHEMA_INVALID`
+- Chained reuse (A → B → C) is supported
+- Reuse is resolved transparently — downstream commands see a fully flattened FSM
+
 ## Internal Validation Checklist (do not expose unless asked)
 
-- `version: 1`
+- `version: 1` or `version: 1.1` (use 1.1 when using `append_todos`)
 - `guide` is present and contains cross-cutting rules
 - one valid `initial` state exists
 - terminal `done` state exists with `transitions: {}`
@@ -123,3 +167,5 @@ Default to agent-agnostic workflows:
 - state names match `[A-Za-z_-][A-Za-z0-9_-]*`
 - if `todos` are used, they are non-empty unique strings
 - no state prompt repeats rules already in `guide`
+- if `from:` is used, the referenced workflow and state exist
+- if `extends_guide:` is used, the referenced workflow exists and has a `guide` field

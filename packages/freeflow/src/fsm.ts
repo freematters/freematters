@@ -145,14 +145,19 @@ function resolveRefs(
       };
     }
 
-    // Merge todos
+    // Merge todos: child overrides base; append_todos appends to inherited
     if (state.todos === undefined) {
       if (baseState.todos !== undefined) {
         state.todos = [...baseState.todos];
       }
-    } else if (Array.isArray(state.todos)) {
-      const baseTodos = baseState.todos ?? [];
-      state.todos = [...baseTodos, ...(state.todos as unknown[])];
+    }
+    // If child defines todos explicitly (even empty), it replaces base todos entirely
+
+    // append_todos: append items after resolved todos (base or overridden)
+    if (state.append_todos !== undefined && Array.isArray(state.append_todos)) {
+      const base = Array.isArray(state.todos) ? state.todos : [];
+      state.todos = [...base, ...(state.append_todos as unknown[])];
+      state.append_todos = undefined;
     }
 
     // Remove from field after merge
@@ -237,8 +242,8 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
   resolveExtendsGuide(obj, absPath, visited);
 
   // Top-level required fields
-  if (obj.version !== 1) {
-    fail(`"version" must be 1, got ${JSON.stringify(obj.version)}`);
+  if (obj.version !== 1 && obj.version !== 1.1) {
+    fail(`"version" must be 1 or 1.1, got ${JSON.stringify(obj.version)}`);
   }
 
   if (
@@ -386,7 +391,7 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
   }
 
   const fsm: Fsm = {
-    version: 1,
+    version: obj.version as number,
     initial: obj.initial as string,
     states,
   };
