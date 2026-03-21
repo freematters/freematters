@@ -46,8 +46,8 @@ Design principles:
 | `src/commands/finish.ts` | Abort run, commit finish event |
 | `src/hooks/post-tool-use.ts` | PostToolUse hook: auto-detect, counter, reminder |
 | `hooks/hooks.json` | Claude Code hook declarations |
-| `skills/create/SKILL.md` | /fflow:create — guided workflow YAML creation |
-| `skills/start/SKILL.md` | /fflow:start — initialize a workflow run |
+| `skills/fflow-create/SKILL.md` | /fflow-create — guided workflow YAML creation |
+| `skills/fflow/SKILL.md` | /fflow — initialize a workflow run |
 | `skills/e2e-run/SKILL.md` | /fflow:e2e-run — run e2e agent tests |
 | `src/e2e/multi-turn-session.ts` | V1 query() wrapper for multi-turn agent sessions |
 | `src/e2e/agent-session.ts` | High-level agent control with send/wait API |
@@ -72,7 +72,7 @@ Global: `--root <path>` overrides storage root (default `~/.freeflow/`, env `FRE
 
 ## Error Codes
 
-`SCHEMA_INVALID`, `RUN_EXISTS`, `RUN_NOT_FOUND`, `RUN_NOT_ACTIVE`, `STATE_NOT_FOUND`, `INVALID_TRANSITION`, `ARGS_INVALID`, `WORKFLOW_NOT_FOUND`, `WORKFLOW_AMBIGUOUS`
+`SCHEMA_INVALID`, `RUN_EXISTS`, `RUN_NOT_FOUND`, `RUN_NOT_ACTIVE`, `STATE_NOT_FOUND`, `INVALID_TRANSITION`, `ARGS_INVALID`, `WORKFLOW_NOT_FOUND`
 
 Exit codes: `0` success, `2` failure.
 

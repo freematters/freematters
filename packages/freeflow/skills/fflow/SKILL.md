@@ -1,5 +1,5 @@
 ---
-name: fflow:start
+name: fflow
 description: Use when the user wants to start or initialize a new workflow run. Runs `fflow start` with an auto-generated run ID and displays the initial state card.
 ---
 
@@ -9,11 +9,11 @@ Initialize a new workflow run from a workflow YAML file.
 
 ## Usage
 
-`/fflow:start PATH` — where PATH is the workflow YAML file to run.
+`/fflow PATH` — where PATH is the workflow YAML file to run.
 
 ## Process
 
-1. **Check for active run** — If there is a remembered `run_id` from a previous `/fflow:start` in this conversation, run `fflow current --run-id <run_id>`. If the current state is **not** `done`, prompt the user with question:
+1. **Check for active run** — If there is a remembered `run_id` from a previous `/fflow` in this conversation, run `fflow current --run-id <run_id>`. If the current state is **not** `done`, prompt the user with question:
    - "You have an active workflow `<run_id>` in state `<state>`. Abort it and start a new one?"
    - Options: "Abort and start new" / "Keep it, start new anyway"
    - If the user chooses to abort, run `fflow finish --run-id <run_id>` first, then clean up pending/in-progress tasks (set to `deleted`).
@@ -27,7 +27,7 @@ Initialize a new workflow run from a workflow YAML file.
 fflow start <PATH> --run-id <workflow-name>-$(date)
 ```
 
-Never omit `--run-id`. The run ID is needed for all subsequent commands. PATH can be a workflow name (e.g. `spec-gen`), a filename (e.g. `spec-gen.workflow.yaml`), or a full path. The CLI resolves it automatically.
+Never omit `--run-id`. The run ID is needed for all subsequent commands. PATH can be a workflow name (e.g. `spec-gen`) or a full path. The CLI resolves it automatically.
 
 4. **Remember the run ID** — Store the `run_id` value for use in subsequent `fflow current --run-id <run-id>` and `fflow goto <state> --run-id <run-id> --on <transition-label>` calls within this conversation. The `run_id` will also be used in subsequent `fflow:current` and `fflow:finish` calls.
 
@@ -46,4 +46,4 @@ If the exit code of any CLI is not 0, the cli will output the error message, fol
 ## Error Handling
 
 - **`RUN_EXISTS`** — The generated run_id is already taken. Generate a different slug and retry.
-- **`SCHEMA_INVALID`** — The YAML file has validation errors. Show the error message and suggest using `/fflow:create` to build a valid workflow.
+- **`SCHEMA_INVALID`** — The YAML file has validation errors. Show the error message and suggest using `/fflow-create` to build a valid workflow.

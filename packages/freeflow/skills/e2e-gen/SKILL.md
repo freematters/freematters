@@ -117,7 +117,7 @@ self-contained:
     Then transition through all states until done.
 
 # Bad — executor has no idea what to do
-- Executor prompt: `/fflow:start simple.workflow.yaml`
+- Executor prompt: `/fflow simple.workflow.yaml`
 ```
 
 For simple cases (skills, slash commands) a short prompt is fine. For complex software,
@@ -140,7 +140,7 @@ List anything the verifier needs to prepare before launching the executor:
 ```markdown
 ## Setup
 - Ensure fflow CLI is built: `npm run build` in `packages/freeflow/`
-- Executor prompt: `/fflow:start path/to/workflow.workflow.yaml`
+- Executor prompt: `/fflow path/to/workflow.workflow.yaml`
 ```
 
 #### CLI Tool Tests
@@ -254,7 +254,7 @@ From "start", the executor should transition to "done" via the "next" transition
 The workflow completes when reaching "done" (terminal state with no transitions).
 
 ## Setup
-- Executor prompt: `/fflow:start e2e/simple.workflow.yaml`
+- Executor prompt: `/fflow e2e/simple.workflow.yaml`
 
 ## Steps
 1. **Start workflow**: Wait for the executor to initialize

@@ -1,5 +1,5 @@
 ---
-name: fflow:create
+name: fflow-create
 description: Create FreeFlow workflow file.
 ---
 

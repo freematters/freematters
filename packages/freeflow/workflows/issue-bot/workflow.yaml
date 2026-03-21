@@ -38,7 +38,7 @@ guide: |
   The script is at `poll_issue.py` in the same directory as this workflow YAML.
   Find it via:
   ```bash
-  SCRIPT_DIR="$(dirname "$(readlink -f "$(freefsm current --run-id {run_id} -j | jq -r '.data.fsm_path')")")"
+  SCRIPT_DIR="$(dirname "$(readlink -f "$(fflow current --run-id {run_id} -j | jq -r '.data.fsm_path')")")"
   ```
 
   Run it:
