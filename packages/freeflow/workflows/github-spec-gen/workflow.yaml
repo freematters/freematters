@@ -1,4 +1,4 @@
-# Issue Bot — GitHub Issue-driven spec-gen workflow
+# GitHub Spec-Gen — GitHub Issue-driven spec-gen workflow
 #
 # Flow:
 #
@@ -20,7 +20,7 @@
 
 version: 1
 guide: |
-  Issue Bot — Spec generation via GitHub Issues.
+  GitHub Spec-Gen — Spec generation via GitHub Issues.
 
   This workflow drives a complete spec-gen process through GitHub issue comments. The bot creates
   a GitHub issue, then interacts with the user entirely via issue comments — gathering
@@ -402,6 +402,7 @@ states:
       more research: research
 
   design:
+    from: "../spec-gen/workflow.yaml#design"
     prompt: |
       ## Detailed Design
 
@@ -490,11 +491,9 @@ states:
       - Iterate on feedback until the user explicitly approves.
 
       You MUST NOT proceed to planning until the user explicitly approves the design via an issue comment.
-    transitions:
-      design approved: plan
-      gaps found: requirements
 
   plan:
+    from: "../spec-gen/workflow.yaml#plan"
     prompt: |
       ## Implementation Plan
 
@@ -595,11 +594,9 @@ states:
       - Include test requirements BEFORE implementation guidance (TDD).
 
       You MUST NOT proceed until the user explicitly approves the plan via an issue comment.
-    transitions:
-      plan approved: e2e-gen
-      needs design revision: design
 
   e2e-gen:
+    from: "../spec-gen/workflow.yaml#e2e-gen"
     prompt: |
       ## Generate E2E Test Plan
 
@@ -614,9 +611,6 @@ states:
            briefly describing how to run the e2e tests (`fflow verify e2e.md`) and what
            scenarios are covered. Also add `- [ ] e2e` to the Status checklist.
         3. Transition to done.
-    transitions:
-      e2e plan generated: done
-      no e2e in design: done
 
   done:
     prompt: |
