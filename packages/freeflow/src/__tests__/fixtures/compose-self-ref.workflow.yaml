@@ -1,0 +1,11 @@
+version: 1.2
+initial: build
+states:
+  build:
+    workflow: ./child-simple.workflow.yaml
+    transitions:
+      completed: done
+      retry: build
+  done:
+    prompt: "All done."
+    transitions: {}

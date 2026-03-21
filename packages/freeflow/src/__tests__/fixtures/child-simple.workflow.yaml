@@ -1,0 +1,16 @@
+version: 1
+guide: "Child guide for simple workflow."
+initial: create
+states:
+  create:
+    prompt: "Create something."
+    transitions:
+      next: review
+  review:
+    prompt: "Review what was created."
+    transitions:
+      approved: done
+      rejected: create
+  done:
+    prompt: "Child done."
+    transitions: {}

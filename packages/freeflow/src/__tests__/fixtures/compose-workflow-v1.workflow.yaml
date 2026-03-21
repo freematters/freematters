@@ -1,0 +1,10 @@
+version: 1
+initial: start
+states:
+  start:
+    workflow: ./child-simple.workflow.yaml
+    transitions:
+      completed: done
+  done:
+    prompt: "Done."
+    transitions: {}

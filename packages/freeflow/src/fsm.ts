@@ -9,6 +9,7 @@ export interface FsmState {
   prompt: string;
   todos?: string[];
   transitions: Record<string, string>;
+  guide?: string;
 }
 
 export interface Fsm {
@@ -31,7 +32,7 @@ export class FsmError extends Error {
 
 // --- Helpers ---
 
-const STATE_NAME_RE = /^[A-Za-z_-][A-Za-z0-9_-]*$/;
+const STATE_NAME_RE = /^[A-Za-z_-][A-Za-z0-9_-]*(\/[A-Za-z_-][A-Za-z0-9_-]*)*$/;
 
 function fail(message: string): never {
   throw new FsmError("SCHEMA_INVALID", message);
@@ -213,6 +214,168 @@ function resolveExtendsGuide(
   doc.extends_guide = undefined;
 }
 
+// --- Workflow Composition ---
+
+/**
+ * Resolve all `workflow:` states by expanding child workflows inline.
+ * Mutates the doc in place — replaces workflow states with namespaced child states.
+ */
+function resolveWorkflowStates(
+  doc: Record<string, unknown>,
+  currentPath: string,
+  visited: Set<string>,
+): void {
+  const rawStates = doc.states;
+  if (
+    rawStates === null ||
+    rawStates === undefined ||
+    typeof rawStates !== "object" ||
+    Array.isArray(rawStates)
+  ) {
+    return;
+  }
+
+  const states = rawStates as Record<string, unknown>;
+  const currentDir = dirname(currentPath);
+
+  // Collect workflow state names to expand (iterate a snapshot of keys)
+  const workflowStateNames: string[] = [];
+  for (const [name, rawState] of Object.entries(states)) {
+    if (
+      rawState !== null &&
+      rawState !== undefined &&
+      typeof rawState === "object" &&
+      !Array.isArray(rawState) &&
+      (rawState as Record<string, unknown>).workflow !== undefined
+    ) {
+      workflowStateNames.push(name);
+    }
+  }
+
+  if (workflowStateNames.length === 0) return;
+
+  // Track which workflow states map to their child initial states (for transition rewriting)
+  const workflowEntryPoints: Record<string, string> = {};
+
+  for (const stateName of workflowStateNames) {
+    const state = states[stateName] as Record<string, unknown>;
+
+    // Pre-validation
+    if (state.from !== undefined) {
+      fail(`state "${stateName}": "workflow" and "from" are mutually exclusive`);
+    }
+    if (state.prompt !== undefined) {
+      fail(`state "${stateName}": "workflow" states cannot have "prompt"`);
+    }
+    if (state.transitions === undefined || state.transitions === null) {
+      fail(`state "${stateName}": "workflow" states must have "transitions"`);
+    }
+    if (doc.version !== 1.2) {
+      fail(`state "${stateName}": "workflow" requires version 1.2 or higher`);
+    }
+
+    const workflowRef = state.workflow as string;
+
+    // Resolve the workflow path
+    const resolvedRef = workflowRef.startsWith(".")
+      ? resolve(currentDir, workflowRef)
+      : workflowRef;
+    const childPath = resolveWorkflow(resolvedRef);
+
+    // Cycle detection
+    if (visited.has(childPath)) {
+      const chain = [...visited, childPath].join(" \u2192 ");
+      fail(`circular reference detected: ${chain}`);
+    }
+
+    // Load child FSM (recursively expands nested workflow: states)
+    const childFsm = loadFsmInternal(childPath, new Set([...visited]));
+
+    // Check for namespace collisions
+    for (const childStateName of Object.keys(childFsm.states)) {
+      const expandedName = `${stateName}/${childStateName}`;
+      if (expandedName in states) {
+        fail(`state "${expandedName}" conflicts with existing state name`);
+      }
+    }
+
+    // Collect parent transitions (these become the child done state's exits)
+    const parentTransitions = state.transitions as Record<string, unknown>;
+
+    // Expand child states into parent
+    for (const [childStateName, childState] of Object.entries(childFsm.states)) {
+      const expandedName = `${stateName}/${childStateName}`;
+
+      // Build the expanded state object
+      const expandedState: Record<string, unknown> = {
+        prompt: childState.prompt,
+      };
+
+      if (childState.todos !== undefined) {
+        expandedState.todos = [...childState.todos];
+      }
+
+      if (childStateName === "done") {
+        // Done state: replace transitions with parent's declared transitions
+        expandedState.transitions = { ...parentTransitions };
+      } else {
+        // Non-done state: prefix all transition targets
+        const rewrittenTransitions: Record<string, string> = {};
+        for (const [label, target] of Object.entries(childState.transitions)) {
+          rewrittenTransitions[label] = `${stateName}/${target}`;
+        }
+        expandedState.transitions = rewrittenTransitions;
+      }
+
+      // Apply child guide as per-state guide override
+      if (childFsm.guide) {
+        expandedState.guide = childFsm.guide;
+      }
+
+      states[expandedName] = expandedState;
+    }
+
+    // Track the entry point for this workflow state
+    workflowEntryPoints[stateName] = `${stateName}/${childFsm.initial}`;
+
+    // Update initial if it pointed to this workflow state
+    if (doc.initial === stateName) {
+      doc.initial = workflowEntryPoints[stateName];
+    }
+
+    // Remove the original workflow state
+    delete states[stateName];
+  }
+
+  // Post-pass: rewrite any transition targets that point to removed workflow states
+  // (e.g., one workflow state's done transitions target another workflow state)
+  for (const rawState of Object.values(states)) {
+    if (
+      rawState === null ||
+      rawState === undefined ||
+      typeof rawState !== "object" ||
+      Array.isArray(rawState)
+    ) {
+      continue;
+    }
+    const st = rawState as Record<string, unknown>;
+    if (
+      st.transitions === undefined ||
+      st.transitions === null ||
+      typeof st.transitions !== "object" ||
+      Array.isArray(st.transitions)
+    ) {
+      continue;
+    }
+    const transitions = st.transitions as Record<string, string>;
+    for (const [label, target] of Object.entries(transitions)) {
+      if (target in workflowEntryPoints) {
+        transitions[label] = workflowEntryPoints[target];
+      }
+    }
+  }
+}
+
 // --- Loader ---
 
 export function loadFsm(path: string): Fsm {
@@ -237,13 +400,14 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
 
   const obj = doc as Record<string, unknown>;
 
-  // Resolve from: refs and extends_guide before validation
+  // Resolve workflow: states, from: refs, and extends_guide before validation
+  resolveWorkflowStates(obj, absPath, visited);
   resolveRefs(obj, absPath, visited);
   resolveExtendsGuide(obj, absPath, visited);
 
   // Top-level required fields
-  if (obj.version !== 1 && obj.version !== 1.1) {
-    fail(`"version" must be 1 or 1.1, got ${JSON.stringify(obj.version)}`);
+  if (obj.version !== 1 && obj.version !== 1.1 && obj.version !== 1.2) {
+    fail(`"version" must be 1, 1.1, or 1.2, got ${JSON.stringify(obj.version)}`);
   }
 
   if (
@@ -365,9 +529,9 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
       transitions[label] = target;
     }
 
-    // Empty transitions only allowed for "done"
+    // Empty transitions only allowed for "done" (including namespaced done like "parent/done")
     const transitionCount = Object.keys(transitions).length;
-    if (name === "done") {
+    if (name === "done" || name.endsWith("/done")) {
       // done can have empty transitions (ok either way)
     } else if (transitionCount === 0) {
       fail(`state "${name}": non-done states must have at least one transition`);
@@ -376,6 +540,9 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
     states[name] = { prompt: s.prompt as string, transitions };
     if (todos !== undefined) {
       states[name].todos = todos;
+    }
+    if (typeof s.guide === "string" && s.guide.length > 0) {
+      states[name].guide = s.guide;
     }
   }
 

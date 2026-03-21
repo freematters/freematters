@@ -9,22 +9,35 @@ export interface StateCard {
   prompt: string;
   todos: string[] | null;
   transitions: Record<string, string>;
+  guide?: string;
 }
 
 export function stateCardFromFsm(stateName: string, fsmState: FsmState): StateCard {
-  return {
+  const card: StateCard = {
     state: stateName,
     prompt: fsmState.prompt,
     todos: fsmState.todos ?? null,
     transitions: fsmState.transitions,
   };
+  if (fsmState.guide) {
+    card.guide = fsmState.guide;
+  }
+  return card;
 }
 
 const TODO_HEADER =
   "You MUST create a task for each of these items and complete them in order:";
 
-export function formatStateCard(card: StateCard): string {
+export function formatStateCard(card: StateCard, fsmGuide?: string): string {
   const lines: string[] = [];
+
+  // State-level guide takes precedence over FSM-level guide
+  const guide = card.guide ?? fsmGuide;
+  if (guide) {
+    lines.push(guide);
+    lines.push("");
+  }
+
   lines.push(`You are in **${card.state}** state.`);
   lines.push("");
   lines.push("Your instructions:");
@@ -61,10 +74,17 @@ export function formatStateCard(card: StateCard): string {
 
 const REMINDER_PROMPT_MAX = 200;
 
-export function formatReminder(card: StateCard): string {
+export function formatReminder(card: StateCard, fsmGuide?: string): string {
   const lines: string[] = [];
   lines.push(`[FSM Reminder] State: ${card.state}`);
   lines.push("");
+
+  // State-level guide takes precedence over FSM-level guide
+  const guide = card.guide ?? fsmGuide;
+  if (guide) {
+    lines.push(guide);
+    lines.push("");
+  }
 
   let prompt = card.prompt.trim();
   if (prompt.length > REMINDER_PROMPT_MAX) {

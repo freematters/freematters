@@ -1,0 +1,14 @@
+version: 1.2
+initial: mid-start
+states:
+  mid-start:
+    prompt: "Mid start."
+    transitions:
+      next: nested
+  nested:
+    workflow: ./child-nested-inner.workflow.yaml
+    transitions:
+      completed: done
+  done:
+    prompt: "Mid done."
+    transitions: {}

@@ -1,0 +1,10 @@
+version: 1.2
+initial: outer
+states:
+  outer:
+    workflow: ./child-nested-middle.workflow.yaml
+    transitions:
+      completed: done
+  done:
+    prompt: "All done."
+    transitions: {}

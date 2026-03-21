@@ -1,0 +1,10 @@
+version: 1
+initial: inner-start
+states:
+  inner-start:
+    prompt: "Inner start."
+    transitions:
+      next: done
+  done:
+    prompt: "Inner done."
+    transitions: {}
