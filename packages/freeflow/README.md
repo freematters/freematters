@@ -50,8 +50,7 @@ FreeFlow is typically used through these skills:
 
 - `/fflow:create` — guided Q&A to create a workflow YAML
 - `/fflow:start <path>` — start a workflow run (also searches `./workflows/` by name)
-- `/fflow:current` — show current state
-- `/fflow:finish` — abort an active run
+- `/fflow:e2e-run` — run e2e agent tests
 
 Codex skill names use `$` instead of `/`.
 

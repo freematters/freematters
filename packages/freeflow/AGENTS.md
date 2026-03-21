@@ -49,8 +49,7 @@ Design principles:
 | `hooks/hooks.json` | Claude Code hook declarations |
 | `skills/create/SKILL.md` | /fflow:create — guided FSM YAML creation |
 | `skills/start/SKILL.md` | /fflow:start — initialize a workflow run |
-| `skills/current/SKILL.md` | /fflow:current — query current state |
-| `skills/finish/SKILL.md` | /fflow:finish — abort an active run |
+| `skills/e2e-run/SKILL.md` | /fflow:e2e-run — run e2e agent tests |
 | `src/e2e/multi-turn-session.ts` | V1 query() wrapper for multi-turn agent sessions |
 | `src/e2e/agent-session.ts` | High-level agent control with send/wait API |
 | `src/e2e/verifier-tools.ts` | MCP tools (run_agent, wait, send) for verifier agent |
@@ -127,5 +126,5 @@ Both `fflow run` and `fflow verify` print the Claude session ID to stderr on ses
 |-----------|--------|
 | M1-M6: Schema, storage, CLI, all commands | Done |
 | M7: PostToolUse reminder hook | Done |
-| M8: Skills (/fflow:create, /fflow:start, /fflow:current, /fflow:finish) | Done |
+| M8: Skills (/fflow:create, /fflow:start, /fflow:e2e-run) | Done |
 | M9: E2E testing framework (gen, verify, verifier.workflow.yaml) | Done |
