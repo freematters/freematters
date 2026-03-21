@@ -158,6 +158,57 @@ function resolveRefs(
     // Remove from field after merge
     state.from = undefined;
   }
+
+  // --- extends_guide handling ---
+  resolveExtendsGuide(doc, currentPath, visited);
+}
+
+/**
+ * Resolve `extends_guide` field: load base workflow's guide and merge with local guide.
+ * Mutates doc in place. Deletes `extends_guide` after processing.
+ */
+function resolveExtendsGuide(
+  doc: Record<string, unknown>,
+  currentPath: string,
+  visited: Set<string>,
+): void {
+  if (doc.extends_guide === undefined) return;
+
+  if (typeof doc.extends_guide !== "string" || doc.extends_guide.length === 0) {
+    fail(`"extends_guide" must be a non-empty string`);
+  }
+
+  const workflowRef = doc.extends_guide as string;
+  const currentDir = dirname(currentPath);
+
+  // Resolve the base workflow path
+  const resolvedRef = workflowRef.startsWith(".")
+    ? resolve(currentDir, workflowRef)
+    : workflowRef;
+  const basePath = resolveWorkflow(resolvedRef);
+
+  // Load base workflow (reuse visited set for cycle detection)
+  const baseFsm = loadFsmInternal(basePath, new Set([...visited]));
+
+  // Base must have a guide
+  if (!baseFsm.guide) {
+    fail(`extends_guide: workflow "${workflowRef}" has no guide`);
+  }
+
+  const baseGuide = baseFsm.guide;
+
+  // Merge guide
+  if (doc.guide === undefined) {
+    // No local guide → inherit base guide
+    doc.guide = baseGuide;
+  } else if (typeof doc.guide === "string" && doc.guide.includes("{{base}}")) {
+    // Local guide has {{base}} → insert base guide at placeholder
+    doc.guide = doc.guide.replace("{{base}}", baseGuide);
+  }
+  // else: local guide without {{base}} → fully replace (no action needed)
+
+  // Remove extends_guide field before validation
+  doc.extends_guide = undefined;
 }
 
 // --- Loader ---

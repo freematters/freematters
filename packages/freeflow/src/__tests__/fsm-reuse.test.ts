@@ -185,3 +185,66 @@ describe("loadFsm — from ref: backwards compatible", () => {
     expect(fsm.states.review.prompt).toBe("Base review prompt.");
   });
 });
+
+// --- extends_guide tests ---
+
+describe("loadFsm — extends_guide: guide with {{base}}", () => {
+  test("inserts base guide at {{base}} placeholder", () => {
+    const fsm = loadFsm(fixture("child-extends-guide-with-base.workflow.yaml"));
+    expect(fsm.guide).toContain("Base guide content.");
+    expect(fsm.guide).toContain("Extra child rules.");
+    // base guide should come before child content
+    // biome-ignore lint/style/noNonNullAssertion: guide is asserted non-null by prior toContain checks
+    const baseIdx = fsm.guide!.indexOf("Base guide content.");
+    // biome-ignore lint/style/noNonNullAssertion: guide is asserted non-null by prior toContain checks
+    const childIdx = fsm.guide!.indexOf("Extra child rules.");
+    expect(baseIdx).toBeLessThan(childIdx);
+  });
+});
+
+describe("loadFsm — extends_guide: no local guide", () => {
+  test("inherits base guide when local guide is not specified", () => {
+    const fsm = loadFsm(fixture("child-extends-guide-no-local.workflow.yaml"));
+    expect(fsm.guide).toBe("Base guide content.");
+  });
+});
+
+describe("loadFsm — extends_guide: guide without {{base}}", () => {
+  test("fully replaces base guide", () => {
+    const fsm = loadFsm(fixture("child-extends-guide-replace.workflow.yaml"));
+    expect(fsm.guide).toBe("Completely new guide.");
+    expect(fsm.guide).not.toContain("Base guide content.");
+  });
+});
+
+describe("loadFsm — extends_guide: missing workflow", () => {
+  test("throws WORKFLOW_NOT_FOUND for nonexistent base workflow", () => {
+    try {
+      loadFsm(fixture("child-extends-guide-missing-workflow.workflow.yaml"));
+      expect.fail("Expected error");
+    } catch (e) {
+      expect((e as CliError).code).toBe("WORKFLOW_NOT_FOUND");
+    }
+  });
+});
+
+describe("loadFsm — extends_guide: base has no guide", () => {
+  test("throws SCHEMA_INVALID when base workflow has no guide", () => {
+    try {
+      loadFsm(fixture("child-extends-guide-no-base-guide.workflow.yaml"));
+      expect.fail("Expected error");
+    } catch (e) {
+      expect(e).toBeInstanceOf(FsmError);
+      expect((e as FsmError).code).toBe("SCHEMA_INVALID");
+      expect((e as FsmError).message).toMatch(/has no guide/);
+    }
+  });
+});
+
+describe("loadFsm — extends_guide: not present", () => {
+  test("behavior unchanged when extends_guide is absent", () => {
+    const fsm = loadFsm(fixture("base-with-guide.workflow.yaml"));
+    expect(fsm.guide).toBe("Base guide content.");
+    expect(fsm.version).toBe(1);
+  });
+});
