@@ -22,7 +22,7 @@
 #                    done
 
 version: 1
-extends_guide: ./spec-gen.workflow.yaml
+extends_guide: ../spec-gen/workflow.yaml
 guide: |
   {{base}}
 

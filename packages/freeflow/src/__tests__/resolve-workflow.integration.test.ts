@@ -191,7 +191,7 @@ describe("validate all bundled workflows", () => {
       "spec-to-code",
       "pr-lifecycle",
       "code-review",
-      "issue-bot",
+      "github-spec-gen",
       "release",
       "gamemaker",
       "verifier",
