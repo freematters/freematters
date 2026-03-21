@@ -1,10 +1,10 @@
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import { SocketModeClient } from "@slack/socket-mode";
 import { WebClient } from "@slack/web-api";
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
-import * as os from "node:os";
+import { addPending, isAllowed, readAccess, writeAccess } from "../core/access.js";
 import { createChannelServer } from "../core/channel-server.js";
-import { isAllowed, readAccess, addPending, writeAccess } from "../core/access.js";
 import { registerReplyTool } from "../core/reply-tool.js";
 
 const CHANNEL_DIR = path.join(os.homedir(), ".claude", "channels", "slack");
@@ -30,7 +30,9 @@ export async function main(): Promise<void> {
   const appToken = env.SLACK_APP_TOKEN || process.env.SLACK_APP_TOKEN;
 
   if (!botToken || !appToken) {
-    console.error("Missing SLACK_BOT_TOKEN or SLACK_APP_TOKEN. Run /slack:configure to set up.");
+    console.error(
+      "Missing SLACK_BOT_TOKEN or SLACK_APP_TOKEN. Run /slack:configure to set up.",
+    );
     process.exit(1);
   }
 
@@ -74,10 +76,17 @@ export async function main(): Promise<void> {
       return;
     }
 
-    if (!isAllowed(access, senderId, {
-      groupId: event.channel_type === "group" || event.channel_type === "channel" ? chatId : undefined,
-      isMention: typeof event.text === "string" && access.mentionPatterns.some((p) => event.text.includes(p)),
-    })) {
+    if (
+      !isAllowed(access, senderId, {
+        groupId:
+          event.channel_type === "group" || event.channel_type === "channel"
+            ? chatId
+            : undefined,
+        isMention:
+          typeof event.text === "string" &&
+          access.mentionPatterns.some((p) => event.text.includes(p)),
+      })
+    ) {
       return;
     }
 
@@ -101,7 +110,10 @@ export async function main(): Promise<void> {
       const files = await fs.readdir(approvedDir);
       for (const senderId of files) {
         const chatId = await fs.readFile(path.join(approvedDir, senderId), "utf-8");
-        await web.chat.postMessage({ channel: chatId.trim(), text: "You're paired! Your messages will now reach Claude." });
+        await web.chat.postMessage({
+          channel: chatId.trim(),
+          text: "You're paired! Your messages will now reach Claude.",
+        });
         await fs.rm(path.join(approvedDir, senderId));
       }
     } catch {

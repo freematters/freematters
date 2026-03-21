@@ -1,11 +1,11 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { Client } from "@notionhq/client";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { Client } from "@notionhq/client";
 import { createChannelServer } from "../core/channel-server.js";
 
 const CHANNEL_DIR = path.join(os.homedir(), ".claude", "channels", "notion");

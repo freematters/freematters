@@ -1,7 +1,7 @@
-import { Octokit } from "@octokit/rest";
 import * as fs from "node:fs/promises";
-import * as path from "node:path";
 import * as os from "node:os";
+import * as path from "node:path";
+import { Octokit } from "@octokit/rest";
 import { createChannelServer } from "../core/channel-server.js";
 import { registerReplyTool } from "../core/reply-tool.js";
 
@@ -91,7 +91,8 @@ export async function main(): Promise<void> {
 
   await connect();
 
-  const pollInterval = Number.parseInt(process.env.POLL_INTERVAL_MS || "", 10) || 60_000;
+  const pollInterval =
+    Number.parseInt(process.env.POLL_INTERVAL_MS || "", 10) || 60_000;
   const state = await readState();
 
   const poll = async () => {
@@ -123,7 +124,10 @@ export async function main(): Promise<void> {
 
         const { data: issues, headers } = await octokit.issues.listForRepo(params);
 
-        const remaining = Number.parseInt(headers["x-ratelimit-remaining"] || "100", 10);
+        const remaining = Number.parseInt(
+          headers["x-ratelimit-remaining"] || "100",
+          10,
+        );
         if (remaining < 10) {
           console.error(`GitHub rate limit low: ${remaining} remaining. Backing off.`);
           return;

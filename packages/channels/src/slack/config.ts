@@ -3,8 +3,7 @@ import type { ChannelConfig } from "../core/types.js";
 export const slackConfig: ChannelConfig = {
   name: "slack",
   version: "0.0.1",
-  description:
-    "Slack channel for Claude Code — chat bridge with access control",
+  description: "Slack channel for Claude Code — chat bridge with access control",
   keywords: ["slack", "messaging"],
   twoWay: true,
   tokens: [

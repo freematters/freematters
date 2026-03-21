@@ -2,9 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { ChannelServer, ChannelServerConfig } from "./types.js";
 
-export function createChannelServer(
-  config: ChannelServerConfig,
-): ChannelServer {
+export function createChannelServer(config: ChannelServerConfig): ChannelServer {
   const capabilities: Record<string, unknown> = {
     experimental: { "claude/channel": {} },
   };

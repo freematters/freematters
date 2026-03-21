@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
 import * as fs from "node:fs/promises";
-import * as path from "node:path";
 import * as os from "node:os";
+import * as path from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
 import {
   addPending,
   defaultAccessConfig,
@@ -79,12 +79,12 @@ describe("isAllowed", () => {
         group1: { requireMention: true, allowFrom: ["user1"] },
       },
     };
-    expect(
-      isAllowed(config, "user1", { groupId: "group1", isMention: false }),
-    ).toBe(false);
-    expect(
-      isAllowed(config, "user1", { groupId: "group1", isMention: true }),
-    ).toBe(true);
+    expect(isAllowed(config, "user1", { groupId: "group1", isMention: false })).toBe(
+      false,
+    );
+    expect(isAllowed(config, "user1", { groupId: "group1", isMention: true })).toBe(
+      true,
+    );
   });
 });
 
@@ -143,10 +143,7 @@ describe("readAccess / writeAccess", () => {
     tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "access-test-"));
     const config = defaultAccessConfig();
     await writeAccess(tmpDir, config);
-    const raw = await fs.readFile(
-      path.join(tmpDir, "access.json"),
-      "utf-8",
-    );
+    const raw = await fs.readFile(path.join(tmpDir, "access.json"), "utf-8");
     expect(raw).toContain("\n");
     expect(raw).toContain("  ");
   });

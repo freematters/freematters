@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
-import * as esbuild from "esbuild";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import * as esbuild from "esbuild";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const DIST = path.join(ROOT, "dist");
@@ -22,8 +22,7 @@ const CHANNELS: ChannelDef[] = [
   {
     name: "slack",
     version: "0.0.1",
-    description:
-      "Slack channel for Claude Code — chat bridge with access control",
+    description: "Slack channel for Claude Code — chat bridge with access control",
     keywords: ["slack", "messaging"],
     twoWay: true,
     tokens: [
@@ -43,9 +42,7 @@ const CHANNELS: ChannelDef[] = [
       "Notion channel for Claude Code — page and database change notifications",
     keywords: ["notion", "documents"],
     twoWay: false,
-    tokens: [
-      { envVar: "NOTION_API_TOKEN", hint: "from notion.so/my-integrations" },
-    ],
+    tokens: [{ envVar: "NOTION_API_TOKEN", hint: "from notion.so/my-integrations" }],
     skills: { configure: "override", access: false },
     entryPoint: "src/notion/server.ts",
   },
@@ -89,9 +86,7 @@ async function buildChannel(channel: ChannelDef): Promise<void> {
   try {
     await fs.access(entryPath);
   } catch {
-    console.warn(
-      `  ⚠ Entry point ${channel.entryPoint} not found, skipping bundle`,
-    );
+    console.warn(`  ⚠ Entry point ${channel.entryPoint} not found, skipping bundle`);
     return;
   }
 
@@ -152,18 +147,10 @@ async function buildChannel(channel: ChannelDef): Promise<void> {
   await fs.mkdir(configureOutDir, { recursive: true });
 
   if (channel.skills.configure === "override") {
-    const overridePath = path.join(
-      SKILLS_DIR,
-      channel.name,
-      "configure.md",
-    );
+    const overridePath = path.join(SKILLS_DIR, channel.name, "configure.md");
     await fs.copyFile(overridePath, path.join(configureOutDir, "SKILL.md"));
   } else {
-    const templatePath = path.join(
-      SKILLS_DIR,
-      "_templates",
-      "configure.md",
-    );
+    const templatePath = path.join(SKILLS_DIR, "_templates", "configure.md");
     const rendered = await renderTemplate(templatePath, templateVars);
     await fs.writeFile(path.join(configureOutDir, "SKILL.md"), rendered);
   }
@@ -173,20 +160,12 @@ async function buildChannel(channel: ChannelDef): Promise<void> {
     const accessOutDir = path.join(outDir, "skills", "access");
     await fs.mkdir(accessOutDir, { recursive: true });
 
-    const overridePath = path.join(
-      SKILLS_DIR,
-      channel.name,
-      "access.md",
-    );
+    const overridePath = path.join(SKILLS_DIR, channel.name, "access.md");
     try {
       await fs.access(overridePath);
       await fs.copyFile(overridePath, path.join(accessOutDir, "SKILL.md"));
     } catch {
-      const templatePath = path.join(
-        SKILLS_DIR,
-        "_templates",
-        "access.md",
-      );
+      const templatePath = path.join(SKILLS_DIR, "_templates", "access.md");
       const rendered = await renderTemplate(templatePath, templateVars);
       await fs.writeFile(path.join(accessOutDir, "SKILL.md"), rendered);
     }
@@ -197,9 +176,7 @@ async function buildChannel(channel: ChannelDef): Promise<void> {
 
 async function main(): Promise<void> {
   const target = process.argv[2];
-  const toBuild = target
-    ? CHANNELS.filter((c) => c.name === target)
-    : CHANNELS;
+  const toBuild = target ? CHANNELS.filter((c) => c.name === target) : CHANNELS;
 
   if (target && toBuild.length === 0) {
     console.error(`Unknown channel: ${target}`);
