@@ -1,0 +1,12 @@
+version: 1
+guide: "Chain B"
+initial: start
+states:
+  start:
+    from: "./chain-c.workflow.yaml#start"
+    prompt: |
+      {{base}}
+      Chain B addition.
+  done:
+    prompt: "Done."
+    transitions: {}

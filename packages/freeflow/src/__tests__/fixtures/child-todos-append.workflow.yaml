@@ -1,0 +1,16 @@
+version: 1
+guide: "Child with appended todos"
+initial: start
+states:
+  start:
+    from: "./base.workflow.yaml#start"
+    todos:
+      - "Child todo 1"
+      - "Child todo 2"
+  review:
+    prompt: "Child review."
+    transitions:
+      approved: done
+  done:
+    prompt: "Done."
+    transitions: {}

@@ -1,0 +1,13 @@
+version: 1
+guide: "Chain C"
+initial: start
+states:
+  start:
+    prompt: "Chain C start prompt."
+    todos:
+      - "C todo"
+    transitions:
+      next: done
+  done:
+    prompt: "Done."
+    transitions: {}

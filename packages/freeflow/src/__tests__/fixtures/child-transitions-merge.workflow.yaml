@@ -1,0 +1,16 @@
+version: 1
+guide: "Child with merged transitions"
+initial: start
+states:
+  start:
+    from: "./base.workflow.yaml#start"
+    transitions:
+      next: done
+      extra: review
+  review:
+    prompt: "Child review."
+    transitions:
+      approved: done
+  done:
+    prompt: "Done."
+    transitions: {}

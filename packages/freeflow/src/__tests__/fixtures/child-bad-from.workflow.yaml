@@ -1,0 +1,10 @@
+version: 1
+guide: "Bad from format"
+initial: start
+states:
+  start:
+    from: "no-hash-separator"
+    prompt: "x"
+  done:
+    prompt: "Done."
+    transitions: {}

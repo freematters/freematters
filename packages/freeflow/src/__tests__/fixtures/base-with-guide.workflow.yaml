@@ -1,0 +1,11 @@
+version: 1
+guide: "Base guide content."
+initial: start
+states:
+  start:
+    prompt: "Start."
+    transitions:
+      next: done
+  done:
+    prompt: "Done."
+    transitions: {}

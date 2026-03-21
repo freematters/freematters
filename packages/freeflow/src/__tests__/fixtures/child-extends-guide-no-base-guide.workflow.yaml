@@ -1,0 +1,11 @@
+version: 1
+extends_guide: ./base-no-guide.workflow.yaml
+initial: start
+states:
+  start:
+    prompt: "Child start."
+    transitions:
+      next: done
+  done:
+    prompt: "Child done."
+    transitions: {}

@@ -1,0 +1,14 @@
+version: 1
+extends_guide: ./base-with-guide.workflow.yaml
+guide: |
+  {{base}}
+  Extra child rules.
+initial: start
+states:
+  start:
+    prompt: "Child start."
+    transitions:
+      next: done
+  done:
+    prompt: "Child done."
+    transitions: {}

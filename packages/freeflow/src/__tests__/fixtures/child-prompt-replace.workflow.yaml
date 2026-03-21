@@ -1,0 +1,14 @@
+version: 1
+guide: "Child with replaced prompt"
+initial: start
+states:
+  start:
+    from: "./base.workflow.yaml#start"
+    prompt: "Completely new prompt."
+  review:
+    prompt: "Child review."
+    transitions:
+      approved: done
+  done:
+    prompt: "Done."
+    transitions: {}
