@@ -5,7 +5,7 @@ incorporates it into the agent's responses, and completes the workflow.
 
 ## Background
 
-The `tests/qa.workflow.yaml` workflow is a simple Q&A workflow with 4 states:
+The `src/__tests__/fixtures/qa.workflow.yaml` workflow is a simple Q&A workflow with 4 states:
 - **ask-name**: The agent asks the user for their name via `request_input`
 - **ask-hobby**: The agent asks the user for their favorite hobby via `request_input`
 - **summarize**: The agent produces a summary mentioning the user's name and hobby
@@ -20,11 +20,11 @@ Key behavior to verify: the agent does NOT skip `request_input` calls or advance
 to the next state without receiving input.
 
 ## Setup
-- Workflow: tests/qa.workflow.yaml
-- Confirm the workflow file exists at `tests/qa.workflow.yaml` in the repo root
+- Workflow: src/__tests__/fixtures/qa.workflow.yaml
+- Confirm the workflow file exists at `src/__tests__/fixtures/qa.workflow.yaml` in the repo root
 
 ## Steps
-1. **Start embedded run**: Start the embedded fflow run with `/fflow:start tests/qa.workflow.yaml`
+1. **Start embedded run**: Start the embedded fflow run with `/fflow:start src/__tests__/fixtures/qa.workflow.yaml`
    - Expected: The embedded run starts successfully, returning a run_id and store_root
 
 2. **Wait for name prompt**: Wait for the embedded agent to request input

@@ -9,8 +9,8 @@ guide: |
   **Important — path resolution**: All file paths in this FSM (saves/, spec.md)
   are relative to the directory containing this FSM file. Before any file
   operation, resolve paths using the FSM file's location as the base directory.
-  For example, if this FSM is at `/repo/freefsm/games/abandoned-hospital/abandoned-hospital.fsm.yaml`,
-  then `saves/current.md` means `/repo/freefsm/games/abandoned-hospital/saves/current.md`.
+  For example, if this FSM is at `/repo/freeflow/examples/abandoned-hospital/abandoned-hospital.workflow.yaml`,
+  then `saves/current.md` means `/repo/freeflow/examples/abandoned-hospital/saves/current.md`.
 initial: check_save
 states:
   check_save:
