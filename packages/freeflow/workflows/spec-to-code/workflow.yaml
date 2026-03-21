@@ -10,6 +10,9 @@
 #                              |
 #                         re-run e2e
 #
+# Fast forward mode (chosen at setup):
+#   setup → implement → e2e-test → review → done  (skips checkpoint)
+#
 # Picks up where spec-gen left off — reads ./specs/<slug>/ artifacts and implements them.
 
 version: 1
@@ -38,7 +41,7 @@ states:
 
       Check if the argument matches `owner/repo#N` (regex: `[\w.-]+/[\w.-]+#\d+`).
       - If yes → **issue mode**. Remember `source_mode = "issue"`, parse `owner`, `repo`, `issue_number`.
-        Derive `slug` from the issue title (lowercase, strip `feat:`/`fix:` prefixes, replace non-alphanumeric with hyphens).
+        Derive a concise `slug` from the issue title — a short, meaningful identifier (lowercase letters, digits, and hyphens only).
       - If no → **local mode**. Remember `source_mode = "local"`. The argument is the spec directory path.
 
       ### 2. Load spec
@@ -92,9 +95,17 @@ states:
 
       Create a todo item for each uncompleted step (using the step title). Mark already-completed steps as done.
 
+      Ask the user how to proceed:
+      - **ready** — implement with review checkpoints and user approval
+      - **fast forward** — implement, review, and finalize without stopping for approval
+        (skips checkpoint state entirely)
+
+      Remember the user's choice — later states check for fast-forward mode.
+
       You MUST NOT begin any implementation work in this state.
     transitions:
       ready: implement
+      fast forward: implement
       spec missing: done
 
   implement:
@@ -287,8 +298,11 @@ states:
       > 2. I'll handle the rest manually — proceed
 
       Update `./specs/<slug>/progress.md` with review summary.
+
+      **Fast forward mode**: Skip presenting to user. Transition directly to done.
     transitions:
       user approves: checkpoint
+      fast forward: done
 
   checkpoint:
     prompt: |

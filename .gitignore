@@ -3,4 +3,5 @@ dist/
 *.tsbuildinfo
 .claude/worktrees/
 .fc-worktrees/
+.worktrees/
 docs/plans/
