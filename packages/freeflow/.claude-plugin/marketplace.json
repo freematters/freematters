@@ -7,7 +7,7 @@
     {
       "name": "freeflow",
       "description": "CLI-first workflow runtime for agent workflows",
-      "version": "0.1.0",
+      "version": "0.5.0",
       "source": "./"
     }
   ]
