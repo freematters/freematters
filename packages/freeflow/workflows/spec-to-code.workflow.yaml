@@ -1,94 +1,50 @@
 # Flow:
 #
-#   load-spec → implement ←--+
-#                   |         |
-#                commit + loop (next step)
-#                   |
-#                e2e-test (all steps complete)
-#                   |  (self-fix up to 5x on failure, then flag user)
-#            pass → review
-#                   |
-#            user approves → checkpoint → done
-#                   |              |
-#            user requests    re-run e2e / review
-#            fixes → fix-review → review (loop)
+#   setup → implement (parallel waves via worktrees)
+#               |
+#            e2e-test (all steps complete)
+#               |
+#         pass → review
+#               |
+#         user approves → checkpoint → done
+#               |              |
+#         user requests    re-run e2e / review
+#         fixes → fix-review → review (loop)
 #
 # Picks up where spec-gen left off — reads ./specs/<slug>/ artifacts and implements them.
 
 version: 1
 guide: |
-  Spec-to-Code workflow. Implements a spec (from a local directory or a GitHub issue)
-  into working, tested code through strict TDD practices.
+  Spec-to-Code. Implements a spec into working code, one plan.md step at a time.
 
-  Input (two modes):
-    - **Local mode**: A `./specs/<slug>/` directory containing at minimum design.md and plan.md
-    - **Issue mode**: A GitHub issue reference `owner/repo#N` (a spec-ready issue from issue-bot)
-      The load-spec state downloads artifact comments to `./specs/<slug>/` automatically.
+  Input: `./specs/<slug>/` directory (local) or `owner/repo#N` issue reference.
+  design.md is the source of truth. Each step → sub-agent → commit.
 
-  The argument determines the mode:
-    - If it matches `owner/repo#N` (e.g., `freematters/freematters#37`) → issue mode
-    - Otherwise → local mode (treated as a directory path)
+  Testing: integration-first (system boundaries, real dependencies). Unit tests only
+  for complex single-module logic. No mocking internal modules.
 
-  Rules that apply across ALL states:
+  Issue mode (`owner/repo#N`): prefix comments with `[from bot]`, push after each
+  commit, update issue checklist. Remember `owner`, `repo`, `issue_number`, `branch_name`.
 
-  - TDD discipline: Write tests BEFORE implementation. RED → GREEN → REFACTOR cycle.
-  - Contract-first testing: Before writing any test, define the input/output contract
-    (expected inputs, outputs, side effects, error conditions). Tests verify contracts,
-    not implementation details. Do NOT mock internal dependencies unless absolutely necessary
-    (e.g., external APIs, network calls). Prefer real dependencies for honest coverage.
-  - Test type priorities (highest ROI first):
-    1. **Integration tests** — test components working together with real dependencies.
-       AI excels at generating diverse scenario combinations; leverage this.
-    2. **Property-based tests** — define invariants (e.g., "output is always non-negative",
-       "round-trip encode/decode is identity") rather than enumerating cases.
-       Use the language's property testing library (Hypothesis for Python, fast-check for TS, etc.).
-    3. **Regression tests** — when fixing bugs, ALWAYS write a failing test that reproduces
-       the bug BEFORE writing the fix. Every regression test corresponds to a real bug.
-    4. **Unit tests** — use sparingly and only for pure functions with clear contracts.
-       Avoid tautological tests that just restate the implementation.
-  - One step at a time: Implement exactly one plan.md step per cycle.
-  - Spec is authoritative: design.md is the source of truth.
-  - Demoable after each step: Every completed step MUST leave the system working.
-  - YAGNI & KISS: Only what the spec requires, simplest solution that works.
-  - Commit atomically: Each completed step gets its own git commit.
-  - Sub-agents: Each step is dispatched to a sub-agent that implements AND validates.
-    On Claude, the sub agent is called with the Agent tool.
-    The main agent orchestrates — it selects tasks, reviews results, marks progress, and commits.
-  - Progress log: `./specs/<slug>/progress.md` is an append-only log of completed steps.
-    After each step is committed, append a summary. Sub-agents MUST read this file
-    for context on what has been built so far.
-
-  ### Issue Mode Rules (only when source is owner/repo#N)
-
-  When the workflow is started with an issue reference, these additional rules apply:
-
-  - All comments posted to the issue MUST be prefixed with `[from bot]`
-  - Push to remote after every commit so commit SHAs are visitable
-  - Update the issue body checklist after each step completion
-  - Remember these values across states:
-    - `owner` — repo owner
-    - `repo` — repo name
-    - `issue_number` — the issue number
-    - `branch_name` — the working branch (e.g., `issue-37-freefsm-run`)
-    - `source_mode` — "issue" (vs "local" for local mode)
-
-initial: load-spec
+initial: setup
 
 states:
-  load-spec:
+  setup:
     prompt: |
-      ## Load Specification
+      ## Setup
 
-      Detect input mode and load the spec.
+      Load the spec and prepare the feature branch.
 
-      ### Step 0: Detect mode
+      ### 1. Detect mode
 
       Check if the argument matches `owner/repo#N` (regex: `[\w.-]+/[\w.-]+#\d+`).
       - If yes → **issue mode**. Remember `source_mode = "issue"`, parse `owner`, `repo`, `issue_number`.
         Derive `slug` from the issue title (lowercase, strip `feat:`/`fix:` prefixes, replace non-alphanumeric with hyphens).
       - If no → **local mode**. Remember `source_mode = "local"`. The argument is the spec directory path.
 
-      ### Issue mode: download artifacts and prepare
+      ### 2. Load spec
+
+      **Issue mode**:
 
       1. Validate the issue exists and has the `spec-ready` label:
          ```bash
@@ -101,17 +57,27 @@ states:
          python3 freefsm/workflows/download_spec.py {owner} {repo} {issue_number} --slug {slug}
          ```
 
-      3. Prepare implementation (create branch, add `doing` label, post start comment):
+      3. Prepare implementation (add `doing` label, post start comment):
          ```bash
          python3 freefsm/workflows/prepare_implementation.py {owner} {repo} {issue_number} {slug}
          ```
-         Returns JSON with `branch_name`. Remember `branch_name` for later states.
 
-      ### Local mode: read from directory (unchanged)
+      **Local mode**: The argument is the spec directory path (e.g., `./specs/my-feature/`).
 
-      The argument is the spec directory path (e.g., `./specs/my-feature/`).
+      If `./specs/<slug>/plan.md` or `./specs/<slug>/design.md` does not exist, inform the user and suggest
+      running the spec-gen workflow first (`/freefsm:start spec-gen`) or the issue-bot workflow for issue-driven specs.
 
-      ### Common: parse and present
+      ### 3. Prepare feature branch
+
+      Check the current git state:
+      - If on main/master: create a feature branch (e.g., `feat/<slug>`) and switch to it.
+      - If on a feature branch with a clean working tree: proceed.
+      - If the working tree is dirty: STOP and ask the user how to handle it
+        (stash, commit, or discard).
+
+      Remember the feature branch name — all worktrees will branch from it.
+
+      ### 4. Present
 
       1. Read `./specs/<slug>/plan.md` — parse the checklist and identify all implementation steps
       2. Read `./specs/<slug>/design.md` — understand architecture, components, interfaces, and data models
@@ -121,95 +87,87 @@ states:
       - Project summary (one paragraph)
       - Number of implementation steps
       - Current progress (which steps are already checked off, if any)
-      - The first uncompleted step title
       - Source mode: local or issue (with issue URL if applicable)
-
-      If `./specs/<slug>/plan.md` or `./specs/<slug>/design.md` does not exist, inform the user and suggest
-      running the spec-gen workflow first (`/freefsm:start spec-gen`) or the issue-bot workflow for issue-driven specs.
+      - Feature branch name
 
       Create a todo item for each uncompleted step (using the step title). Mark already-completed steps as done.
 
       You MUST NOT begin any implementation work in this state.
     transitions:
-      spec loaded: implement
+      ready: implement
       spec missing: done
 
   implement:
     prompt: |
-      ## Implement, Validate & Commit Next Step
+      ## Implement Steps
 
-      ### 1. Select
+      The main agent orchestrates — it analyzes dependencies, spawns sub-agents,
+      and merges results. It does NOT write implementation code itself.
 
-      Read `./specs/<slug>/plan.md`, find the first unchecked step (`- [ ]`).
-      If all steps are checked, transition to e2e-test (or done if no e2e).
+      ### 1. Build dependency graph
 
-      Present to the user: step number, title, and objective.
+      Read `./specs/<slug>/plan.md` and collect all unchecked steps (`- [ ]`).
+      If all steps are checked, transition to `all steps complete`.
 
-      ### 2. Execute
+      Parse the **Depends on** field of each unchecked step to build a dependency graph.
+      Identify all steps whose dependencies are already satisfied (checked or "none") —
+      these are immediately ready to dispatch.
 
-      Dispatch a sub-agent to implement AND validate the **current step only**:
+      ### 2. Dispatch & schedule
 
-      > Implement Step N of ./specs/<slug>/plan.md using strict TDD (RED → GREEN → REFACTOR).
-      > Read ./specs/<slug>/design.md for component interfaces and data models.
-      > Read the last 300 lines of ./specs/<slug>/progress.md for context on recent steps (if it exists).
-      > Before coding, explore existing code for patterns, conventions, and style to follow.
-      >
-      > Create a todo list and work through it:
-      > 1. Define the contract: identify inputs, expected outputs, side effects, and error
-      >    conditions for the code you're about to write. This is what your tests will verify.
-      > 2. Write failing tests (RED) — follow these priorities:
-      >    - Prefer integration tests that exercise components together with real dependencies.
-      >    - For functions with invariants, write property-based tests (Hypothesis / fast-check / etc.).
-      >    - Only mock external boundaries (network, third-party APIs), never internal modules.
-      >    - Avoid tautological unit tests that just restate the implementation.
-      > 3. Write minimum implementation to pass (GREEN)
-      > 4. Refactor — clean up, run linter/formatter
-      > 5. Update ./specs/<slug>/progress.md — append a summary:
-      >    ## Step N: <title>
-      >    - **Files changed**: <list of key files added/modified>
-      >    - **What was built**: <1-2 sentence summary>
-      >    - **Tests**: <number of tests added, type breakdown (integration/property/unit), all passing/failing>
-      >    - **Notes**: <any gotchas, workarounds, or deviations from spec>
-      > 6. If the spec is ambiguous or has minor issues, use your best judgment to
-      >    work around them. Note any spec deviations in progress.md under **Notes**.
-      > 7. Report: tests passed/failed, lint issues, any spec deviations
-      >
-      > Do NOT modify plan.md — the orchestrator handles plan.md updates.
+      Run a scheduling loop:
 
-      The sub-agent reads the spec files itself — do NOT paste their content.
+      1. Dispatch all ready steps as sub-agents **in parallel**.
+         Each sub-agent runs in its own **git worktree** branched from the feature branch:
 
-      If sub-agents are not available in your runtime, do the work directly.
-      Do NOT skip sub-agent dispatch just because the task seems simple.
+         > You are implementing Step N of ./specs/<slug>/plan.md.
+         > Use strict TDD (RED → GREEN → REFACTOR).
+         > Read ./specs/<slug>/design.md for component interfaces and data models.
+         > Before coding, explore existing code for patterns, conventions, and style.
+         >
+         > 1. Define the contract: inputs, expected outputs, side effects, error conditions.
+         > 2. Write failing tests (RED):
+         >    - Default to integration tests across system boundaries with real dependencies.
+         >    - Only mock true external boundaries (network, third-party APIs).
+         >    - Unit tests only for complex single-module logic.
+         > 3. Write minimum implementation to pass (GREEN)
+         > 4. Refactor — clean up, run linter/formatter
+         > 5. Commit your work in the worktree: `feat(scope): step N - <step title>`
+         > 6. Report: tests passed/failed, lint issues, any spec deviations
+         >
+         > Do NOT modify plan.md or progress.md — the orchestrator handles those.
 
-      ### 3. Commit & Mark Complete
+      2. When any sub-agent completes, immediately:
+         - Merge its worktree branch into the feature branch.
+           Resolve conflicts if any — prefer the feature branch for plan.md/progress.md,
+           prefer the worktree branch for implementation files.
+         - Run the full test suite to verify the merge is clean.
+         - Update `./specs/<slug>/plan.md` — check off the step (`- [x] Step N`).
+         - Update `./specs/<slug>/progress.md` — append a summary:
+           ```
+           ## Step N: <title>
+           - **Files changed**: <list of key files added/modified>
+           - **What was built**: <1-2 sentence summary>
+           - **Tests**: <number of tests added, type breakdown, all passing/failing>
+           - **Notes**: <any gotchas, workarounds, or deviations from spec>
+           ```
+         - Commit the plan.md and progress.md updates.
+         - Check the dependency graph: if this completion unblocks new steps,
+           dispatch them immediately.
 
-      The sub-agent has already tested and validated. Proceed directly to commit.
-
-      1. Update `./specs/<slug>/plan.md` — change `- [ ] Step N` to `- [x] Step N`
-      2. Stage all relevant files (new and modified, including progress.md and plan.md)
-      3. Create a git commit: `feat(scope): step N - <step title>`
-
-      Present to the user:
-      - Commit message
-      - Progress: "Step N/M complete"
+      3. Repeat until all steps are complete or no more steps can be dispatched.
 
       #### Issue mode additional steps
 
-      If `source_mode == "issue"`, also:
+      If `source_mode == "issue"`, also after each step is merged:
 
-      4. Push to remote:
+      6. Push to remote:
          ```bash
          git push -u origin {branch_name}   # first push
          git push                            # subsequent pushes
          ```
-
-      5. Update the issue body checklist — re-read the issue body, change `- [ ] Step N`
-         to `- [x] Step N`, then update:
-         ```bash
-         gh issue edit {issue_number} --repo {owner}/{repo} --body "{updated_body}"
-         ```
-
-      6. Post a `[from bot]` progress comment on the issue:
+      7. Update the issue body checklist for each completed step.
+      8. Post a `[from bot]` progress comment per step:
          ```
          [from bot] Step N/M complete: <step title>
          - **Commit**: https://github.com/{owner}/{repo}/commit/{sha}
@@ -217,21 +175,17 @@ states:
          - **Tests**: <count> added, all passing
          ```
 
-      Then loop back to step 1 for the next unchecked step.
+      Then proceed to the next wave. Repeat until all steps are complete.
 
       ### Constraints
-      - You MUST NOT write implementation before tests exist
-      - You MUST define the input/output contract before writing tests
-      - When fixing a bug, you MUST write a failing regression test that reproduces
-        the bug BEFORE writing the fix
-      - You MUST reference design.md — do not invent interfaces
-      - Implement ONLY the current step — no future steps
-      - You MUST dispatch a sub-agent, even if the task seems simple.
-        The orchestrator's job is to manage workflow state, not to write code itself.
+      - The orchestrator MUST NOT write implementation code — only manage branches,
+        merge, and update plan.md/progress.md.
+      - Each sub-agent runs in its own worktree branched from the feature branch.
+      - You MUST NOT skip sub-agent dispatch, even for simple steps.
+      - Sub-agents MUST NOT modify plan.md or progress.md.
     transitions:
       more steps remain: implement
       all steps complete: e2e-test
-      max retries exceeded: done
 
   e2e-test:
     prompt: |
@@ -241,29 +195,19 @@ states:
 
       Read `./specs/<slug>/e2e.md`. If it does not exist, skip directly to review.
 
-      `e2e.md` is a verifier–executor test plan designed for `freefsm verify`.
-      The verifier agent reads the plan, launches an executor agent to operate the software,
-      and judges pass/fail by observing the executor's output in a shared sandbox.
-
       ### Run the test
 
-      ```bash
-      freefsm verify ./specs/<slug>/e2e.md --test-dir ./specs/<slug>/e2e-out
-      ```
-
-      This produces `./specs/<slug>/e2e-out/test-report.md` with per-step results.
+      Run `/e2e-run` with the test plan at `./specs/<slug>/e2e.md` and
+      `--test-dir ./specs/<slug>/e2e-out`.
 
       - **Pass** (exit code 0) → transition to review
-      - **Fail** (exit code 2, attempt < 5) → read the test report, diagnose the failure,
-        fix the code minimally, run the full test suite to check for regressions,
-        then re-run `freefsm verify`
-      - **Fail** (attempt >= 5) → flag to user, ask how to proceed
+      - **Fail** → run `/e2e-fix` to diagnose the failure from the
+        test-dir artifacts, fix the code, and re-run. Repeat until passing.
 
       Update `./specs/<slug>/progress.md` with E2E result, attempt count, and notes.
     transitions:
       e2e passed: review
       no e2e design: review
-      user says skip: review
 
   review:
     prompt: |
@@ -287,7 +231,7 @@ states:
       **Sub-agent A — Spec Compliance**
       > Read ./specs/<slug>/design.md and ./specs/<slug>/progress.md.
       > Check: Does the implementation match design.md? Any missing or extra functionality?
-      > Verify acceptance criteria are met. Flag any spec deviations.
+      > Flag any spec deviations.
 
       **Sub-agent B — Code Quality**
       > Review the diff for:

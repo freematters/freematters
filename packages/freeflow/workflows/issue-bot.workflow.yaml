@@ -14,9 +14,7 @@
 #                           |     \
 #                          plan    requirements (gaps)
 #                         /    \
-#               e2e-test-design  design (revision)
-#                  /      |       \
-#               done    skip→done  revision→e2e-test-design
+#               done  design (revision)
 
 version: 1
 guide: |
@@ -105,7 +103,6 @@ guide: |
   - [ ] research
   - [ ] design
   - [ ] plan
-  - [ ] e2e-test-design
   - [ ] spec-ready
 
   ### User-Driven Flow
@@ -174,7 +171,7 @@ states:
       - [ ] research
       - [ ] design
       - [ ] plan
-      - [ ] e2e-test-design
+
       - [ ] spec-ready
       ```
 
@@ -423,8 +420,11 @@ states:
          ## 1. Overview
          {one-paragraph summary of what we are building and why}
 
-         ## 2. Detailed Requirements
-         {consolidated and synthesized from requirements — not a copy, restructured into coherent categories}
+         ## 2. Goal & Constraints
+         {Goal: what the feature must achieve.
+         Constraints: technical limits, compatibility requirements, performance targets,
+         security boundaries, and codebase conventions the implementation must respect.
+         Derived from requirements and codebase exploration.}
 
          ## 3. Architecture Overview
          {high-level structure with a Mermaid diagram}
@@ -438,11 +438,15 @@ states:
          ## 6. Error Handling
          {failure modes, recovery strategies, and degradation behavior}
 
-         ## 7. Acceptance Criteria
-         {Given/When/Then format, specific enough for machine verification}
+         ## 7. Integration Testing
+         {integration tests covering system boundaries: cross-component interactions,
+         data flow across modules, external API contracts. Real dependencies, only mock
+         true external boundaries. Implemented during plan steps.}
 
-         ## 8. Testing Strategy
-         {what to test, how to test, and coverage expectations}
+         ## 8. E2E Testing
+         {key end-to-end scenarios, expected user-facing behaviors, and how to verify
+         the feature works as a whole — for human review; /e2e-gen converts this into
+         an executable test plan later}
 
          ## 9. Appendices
          {technology choices with rationale, research findings summary,
@@ -479,7 +483,7 @@ states:
 
       Constraints:
       - Include Mermaid diagrams for architecture and data flow.
-      - The design MUST consolidate all requirements from the Q&A into section 2.
+      - The design MUST derive Goal & Constraints from the Q&A and codebase exploration.
       - Include an appendix summarizing research findings, technology choices, and alternatives.
       - Iterate on feedback until the user explicitly approves.
 
@@ -501,12 +505,12 @@ states:
          gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate
          ```
       2. Produce an implementation plan following this structure:
-         - Each step builds on previous steps
-         - Each step results in working, demoable functionality
+         - Each step is a complete module or logical unit, not a thin slice.
+           Map steps to components, features, or layers from design.
+         - Include **Depends on** for each step — steps with no dependency on each
+           other can be executed in parallel by the spec-to-code workflow.
+         - Each step results in working functionality
          - Each step follows TDD practices (tests before implementation)
-         - No orphaned code — every step ends with integration
-         - Core end-to-end functionality MUST be available by step 2 or 3
-         - Steps MUST be small enough to complete in one focused session
       3. Post the plan as a `## plan.md` comment:
          ```bash
          gh issue comment {n} --repo {repo} --body "## plan.md
@@ -522,15 +526,13 @@ states:
 
          ## Step 1: {Title}
 
+         **Depends on**: {step numbers, or "none"}
+
          **Objective**: {what and why}
 
          **Test Requirements**: {tests to write BEFORE implementation}
 
          **Implementation Guidance**: {specific technical instructions, referencing design sections}
-
-         **Integration Notes**: {how this connects to previous steps}
-
-         **Demo**: {concrete verifiable demonstration}
 
          ---
 
@@ -554,7 +556,7 @@ states:
          ```
          Please review the implementation plan above. You can:
 
-         1. **Approve** — plan looks good, proceed to E2E test design
+         1. **Approve** — plan looks good, proceed
          2. **Request changes** — describe what needs to be modified
          3. **Design revision needed** — we need to go back and revise the design
 
@@ -569,102 +571,40 @@ states:
       - Also update the plan checklist in the issue body with the revised steps.
       - Ask for feedback again. Repeat until approved.
 
-      When the user approves, transition to `plan approved`.
+      ### Integration test step
+
+      The plan MUST include a step for implementing the integration tests defined in
+      design.md's Integration Testing section. This step exercises cross-component
+      boundaries with real dependencies and should come after core functionality is built.
+
+      ### E2E test plan (if not skipped in requirements)
+
+      After the plan is approved, check the requirements artifact for e2e testing decisions.
+      If the user chose to include e2e tests during requirements gathering:
+
+      1. Read the e2e-related Q&A from the requirements artifact — the user's answers about
+         key scenarios, verification approach, infrastructure needs, and expected behaviors.
+      2. Run `/e2e-gen`, passing the e2e Q&A from requirements along with context from
+         the design and plan artifacts. The skill handles the verifier–executor format,
+         parser rules, and best practices.
+      3. Post the generated test plan as a `## e2e.md` comment on the issue.
+      4. Track the comment's node_id in `artifact_comment_ids` under `e2e.md`.
+      5. Add a final step in the plan checklist: `- [ ] E2E: run fflow verify on e2e.md`
+         and update the issue body accordingly.
+
+      When the user approves (with or without e2e), transition to `plan approved`.
       If the user wants design revision, transition to `needs design revision`.
 
       Constraints:
+      - Each step should be a complete module or logical unit, not a thin slice.
       - Do NOT duplicate design details — reference design sections instead.
-      - Each step MUST result in working, demoable functionality.
+      - Each step MUST result in working functionality.
       - Include test requirements BEFORE implementation guidance (TDD).
-      - Include at least one step for integration testing and cleanup.
 
       You MUST NOT proceed until the user explicitly approves the plan via an issue comment.
     transitions:
-      plan approved: e2e-test-design
+      plan approved: done
       needs design revision: design
-
-  e2e-test-design:
-    prompt: |
-      ## E2E Test Design (Optional)
-
-      The implementation plan is complete. Ask the user whether they want E2E test design.
-
-      Post a comment on the issue:
-      ```bash
-      gh issue comment {n} --repo {repo} --body "The implementation plan is approved! 🎉
-
-      Would you like to add an E2E test design? This creates a detailed end-to-end test plan
-      that can be executed after implementation.
-
-      1. **Yes** — design E2E tests
-      2. **Skip** — proceed without E2E test design
-
-      Reply with your choice (1 or 2)."
-      ```
-
-      Poll for the user's reply using the ETag polling pattern from the guide.
-      Filter: only process comments from the issue creator.
-
-      If the user chooses to **skip** (2):
-      - Transition to `skip` immediately.
-
-      If the user chooses **yes** (1):
-      1. Read the design and plan artifacts from issue comments for context.
-      2. Produce an E2E test design and post it as a `## e2e.md` comment:
-         ```bash
-         gh issue comment {n} --repo {repo} --body "## e2e.md
-
-         ## 1. E2E Infrastructure
-
-         **Existing infra**: {what was found and how to integrate}
-         **Proposed setup**: {minimal E2E setup appropriate for the project type}
-
-         ## 2. E2E Test Scenario
-
-         {step-by-step actions with expected outputs}
-
-         ## 3. How to Run
-
-         {exact commands to execute the E2E tests}
-         {required environment setup — env vars, services, test data}
-
-         ## 4. Debugging Guide
-
-         {how to read test output and identify which action failed}
-         {how to run individual actions in isolation}
-         {how to inspect intermediate state during a failed run}"
-         ```
-      3. Track the comment's node_id in `artifact_comment_ids` under `e2e.md`.
-      4. Update the issue body status checklist: check off "e2e-test-design".
-         Re-read the current issue body, then:
-         ```bash
-         gh issue edit {n} --repo {repo} --body "{updated body with [x] e2e-test-design}"
-         ```
-      5. Post a follow-up comment asking for approval:
-         ```
-         Please review the E2E test design above. You can:
-
-         1. **Approve** — E2E test design looks good, finalize the spec
-         2. **Request changes** — describe what needs to be modified
-
-         Reply with your choice or feedback.
-         ```
-      6. Poll for the user's reply.
-
-      If the user requests changes:
-      - Minimize the old `## e2e.md` comment using the GraphQL minimize mutation from the guide.
-      - Post a new `## e2e.md` comment with the revisions applied.
-      - Update `artifact_comment_ids` with the new comment's node_id.
-      - Ask for feedback again. Repeat until approved.
-
-      When the user approves, transition to `e2e design approved`.
-      If the user wants more revisions, transition to `needs revision`.
-
-      You MUST NOT proceed until the user explicitly confirms via an issue comment.
-    transitions:
-      e2e design approved: done
-      skip: done
-      needs revision: e2e-test-design
 
   done:
     prompt: |
@@ -696,10 +636,8 @@ states:
          - [x] research
          - [x] design
          - [x] plan
-         - [x] e2e-test-design
          - [x] spec-ready
          ```
-         Note: if e2e-test-design was skipped, still check it off (it was addressed by choosing to skip).
 
       3. Compile a list of all artifact comments posted during the workflow. For each artifact,
          include its filename and a link to the comment (using the issue comment URL format:

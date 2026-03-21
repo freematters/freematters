@@ -11,7 +11,7 @@
 #       |
 #     done
 #
-#   Fast forward: requirements → design → plan → done (no intermediate approvals)
+#   Fast forward: requirements → design → plan → done (no intermediate approvals, skips e2e)
 
 version: 1
 guide: |
@@ -178,18 +178,26 @@ states:
 
       Required sections:
       1. **Overview** — one-paragraph summary of what we're building and why
-      2. **Detailed Requirements** — consolidated and synthesized from requirements.md
-         (not a copy — restructure into coherent categories)
+      2. **Goal & Constraints** — derived from requirements.md and codebase exploration.
+         Goal: what the feature must achieve. Constraints: technical limits, compatibility
+         requirements, performance targets, security boundaries, and codebase conventions
+         that the implementation must respect.
       3. **Architecture Overview** — high-level structure with a Mermaid diagram
       4. **Components & Interfaces** — each component's responsibility, API surface,
          and how components interact
       5. **Data Models** — key data structures, schemas, state, and their relationships
-      6. **Testing Strategy** — what to test, how to test, and coverage expectations
-      7. **Appendices** — technology choices with rationale, research findings summary,
+      6. **Integration Testing** — define integration tests that cover system boundaries:
+         cross-component interactions, data flow across modules, external API contracts.
+         Use real dependencies; only mock true external boundaries. These tests are
+         implemented during plan steps and run as part of the normal test suite.
+      7. **E2E Testing** — describe key end-to-end scenarios, expected user-facing behaviors,
+         and how to verify the feature works as a whole. This section is for human review;
+         `/e2e-gen` will later convert it into an executable test plan.
+      8. **Appendices** (optional) — technology choices with rationale, research findings summary,
          alternative approaches considered and why they were rejected
 
       Constraints:
-      - You MUST consolidate all requirements from requirements.md into section 2.
+      - You MUST derive Goal & Constraints from requirements.md and codebase exploration.
         The design document replaces requirements.md as the authoritative spec.
       - You MUST include Mermaid diagrams for architecture and data flow.
       - You MUST iterate on feedback until the user explicitly approves the complete design.
@@ -205,13 +213,12 @@ states:
       **Normal mode**: You MUST NOT proceed to planning until the user explicitly approves the design.
       If significant gaps are found, offer to return to requirements or research.
     todos:
-      - Write Overview and Detailed Requirements sections
+      - Write Overview and Goal & Constraints sections
       - Write Architecture Overview with Mermaid diagram
       - Write Components & Interfaces section
       - Write Data Models section
-      - Write Error Handling section
-      - Write Acceptance Criteria (Given/When/Then)
-      - Write Testing Strategy
+      - Write Integration Testing section
+      - Write E2E Testing section
       - Write Appendices (tech choices, research, alternatives)
       - Present to user and get explicit approval
     transitions:
@@ -224,9 +231,9 @@ states:
 
       Create `./specs/<slug>/plan.md` — a numbered, incremental implementation plan.
 
-      Guiding principle: Each step builds on previous steps, results in working demoable
-      functionality, and follows TDD practices. No orphaned code — every step ends with
-      integration. Core end-to-end functionality MUST be available as early as possible.
+      Guiding principle: Each step is a complete, self-contained module or logical unit —
+      not a thin slice of work. Steps should map to components, features, or layers from
+      design.md, not to individual files or functions.
 
       Required format:
       ```markdown
@@ -241,61 +248,58 @@ states:
 
       ## Step N: <Title>
 
+      **Depends on**: Step X, Step Y (or "none" if independent)
+
       **Objective**: What this step achieves and why it matters.
 
       **Implementation Guidance**: Specific technical instructions — what to create,
       modify, or wire up. Reference design.md sections where relevant.
 
       **Test Requirements**: What tests to write BEFORE implementation (TDD).
-      Include both unit and integration tests where applicable.
-
-      **Integration Notes**: How this connects to previous steps. What should still
-      work after this step. Any migration or compatibility concerns.
-
-      **Demo**: Concrete description of what to demonstrate when this step is complete.
-      Must be verifiable — not "it works" but "run X, observe Y".
+      Default to integration tests covering system boundaries; unit tests only
+      for complex single-module logic.
       ```
+
+      ### Integration test step
+
+      The plan MUST include a step for implementing the integration tests defined in
+      design.md's Integration Testing section. This step exercises cross-component
+      boundaries with real dependencies and should come after core functionality is built.
 
       ### E2E test plan (if not skipped in requirements)
 
       Check `./specs/<slug>/requirements.md` for e2e testing decisions. If the user chose
-      to include e2e tests, create `./specs/<slug>/e2e.md` — a test plan following the
-      verifier–executor model (see `freefsm/docs/e2e-testing-design.md`).
+      to include e2e tests during requirements gathering:
 
-      The test plan is a structured markdown file executed by `freefsm verify`. It describes:
-
-      1. **Background** — what the executor agent should do and what behavior to expect
-      2. **Setup** — the prompt to launch the executor (e.g., a command to start a server,
-         run a CLI tool, or interact with the built feature), plus any prerequisites
-         (files to create, build steps, env setup)
-      3. **Steps** — numbered interactions between verifier and executor:
-         each step describes what to send to the executor and what to expect back.
-         Steps describe agent interactions via `wait()` and `send()`, NOT raw CLI commands.
-      4. **Expected Outcomes** — high-level success criteria
-      5. **Timeout Strategy** — suggested wait timeouts per phase
-
-      Also add a final step in plan.md's checklist: `- [ ] E2E: run freefsm verify on e2e.md`
-      with a corresponding step section that references the e2e test plan.
+      1. Read the e2e-related Q&A from `requirements.md` — the user's answers about key
+         scenarios, verification approach, infrastructure needs, and expected behaviors.
+      2. Run `/e2e-gen`, passing the e2e Q&A from requirements along with context from
+         `design.md` and `plan.md`. The skill handles the verifier–executor format,
+         parser rules, and best practices.
+         Output should be written to `./specs/<slug>/e2e.md`.
+      3. Add a final step in plan.md's checklist: `- [ ] E2E: run fflow verify on e2e.md`
+         with a corresponding step section that references the e2e test plan.
 
       Constraints:
+      - Each step should be a complete module or logical unit, not a thin slice.
+        Map steps to components, features, or layers from design.md.
+      - Include **Depends on** for each step. Steps with no dependency on each other
+        can be executed in parallel by the spec-to-code workflow.
       - You MUST NOT duplicate design details — reference design.md sections instead.
-      - You MUST ensure each step results in working, demoable functionality.
-        No step should leave the system in a broken state.
+      - You MUST ensure each step results in working functionality.
       - You MUST include test requirements BEFORE implementation guidance (TDD).
-      - You MUST ensure core end-to-end flow is available by step 2 or 3 at latest.
-      - Steps MUST be small enough to complete in one focused session.
-      - You MUST include at least one step for integration testing and cleanup.
       - You MUST present the plan to the user and iterate on feedback until approved.
 
       **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT wait for user
-      approval. Complete the plan, then immediately transition to done.
+      approval. Complete the plan (skip e2e), then immediately transition to done.
 
       **Normal mode**: You MUST NOT proceed until the user explicitly approves the implementation plan.
     todos:
       - Draft implementation steps with TDD ordering
-      - Verify each step produces demoable functionality
+      - Verify each step produces working functionality
       - Ensure core E2E flow is available early
       - Verify no orphaned code between steps
+      - Generate e2e test plan via /e2e-gen (if not skipped)
       - Get user approval on the plan
     transitions:
       plan approved: done
