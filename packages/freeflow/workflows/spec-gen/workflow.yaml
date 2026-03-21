@@ -155,7 +155,7 @@ states:
 
       When research is sufficient, ask the user:
       - "Research sufficient" — review progress → checkpoint
-      - "New questions came up, let's clarify requirements" → requirements
+      - "Back to requirements" — clarify requirements → requirements
 
       You MUST NOT proceed until the user confirms research is sufficient.
     transitions:
