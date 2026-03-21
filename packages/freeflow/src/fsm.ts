@@ -242,8 +242,8 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
   resolveExtendsGuide(obj, absPath, visited);
 
   // Top-level required fields
-  if (obj.version !== 1) {
-    fail(`"version" must be 1, got ${JSON.stringify(obj.version)}`);
+  if (obj.version !== 1 && obj.version !== 1.1) {
+    fail(`"version" must be 1 or 1.1, got ${JSON.stringify(obj.version)}`);
   }
 
   if (
@@ -391,7 +391,7 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
   }
 
   const fsm: Fsm = {
-    version: 1,
+    version: obj.version as number,
     initial: obj.initial as string,
     states,
   };

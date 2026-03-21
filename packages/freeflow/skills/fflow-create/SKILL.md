@@ -131,7 +131,8 @@ The child can override any field alongside `from:`:
 
 - **prompt**: if child prompt contains `{{base}}`, it's replaced with the base prompt; otherwise the child prompt fully replaces it
 - **transitions**: child transitions are merged on top of base transitions (child wins on conflict)
-- **todos**: child todos are appended after base todos
+- **todos**: child todos fully replace base todos; omit to inherit base todos as-is
+- **append_todos**: appends items after inherited (or overridden) todos — use when you want to keep base todos and add more
 
 ### Guide reuse (`extends_guide:`)
 
@@ -156,7 +157,7 @@ child guide fully replaces it. Omitting the local `guide` field inherits the bas
 
 ## Internal Validation Checklist (do not expose unless asked)
 
-- `version: 1`
+- `version: 1` or `version: 1.1` (use 1.1 when using `append_todos`)
 - `guide` is present and contains cross-cutting rules
 - one valid `initial` state exists
 - terminal `done` state exists with `transitions: {}`

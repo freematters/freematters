@@ -23,7 +23,7 @@
 #
 #   Fast forward: requirements → design → plan → e2e-gen → done (no intermediate approvals)
 
-version: 1
+version: 1.1
 extends_guide: ../spec-gen/workflow.yaml
 guide: |
   {{base}}
