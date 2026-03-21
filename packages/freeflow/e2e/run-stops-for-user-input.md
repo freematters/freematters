@@ -24,7 +24,7 @@ to the next state without receiving input.
 - Confirm the workflow file exists at `src/__tests__/fixtures/qa.workflow.yaml` in the repo root
 
 ## Steps
-1. **Start embedded run**: Start the embedded fflow run with `/fflow:start src/__tests__/fixtures/qa.workflow.yaml`
+1. **Start embedded run**: Start the embedded fflow run with `/fflow src/__tests__/fixtures/qa.workflow.yaml`
    - Expected: The embedded run starts successfully, returning a run_id and store_root
 
 2. **Wait for name prompt**: Wait for the embedded agent to request input

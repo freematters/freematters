@@ -53,19 +53,19 @@ states:
 
       2. Download spec artifacts:
          ```bash
-         python3 freefsm/workflows/download_spec.py {owner} {repo} {issue_number} --slug {slug}
+         python3 $SCRIPT_DIR/download_spec.py {owner} {repo} {issue_number} --slug {slug}
          ```
 
       3. Prepare implementation (add `doing` label, post start comment):
          ```bash
-         python3 freefsm/workflows/prepare_implementation.py {owner} {repo} {issue_number} {slug}
+         python3 $SCRIPT_DIR/prepare_implementation.py {owner} {repo} {issue_number} {slug}
          ```
          Returns JSON with `branch_name`. Remember `branch_name` for later states.
 
       **Local mode**: The argument is the spec directory path (e.g., `./specs/my-feature/`).
 
       If `./specs/<slug>/plan.md` or `./specs/<slug>/design.md` does not exist, inform the user and suggest
-      running the spec-gen workflow first (`/freefsm:start spec-gen`) or the issue-bot workflow for issue-driven specs.
+      running the spec-gen workflow first (`/fflow spec-gen`) or the issue-bot workflow for issue-driven specs.
 
       ### 3. Prepare feature branch
 
@@ -326,7 +326,7 @@ states:
       Present the summary to the user.
 
       If the workflow was started because the spec was missing, remind the user to run
-      the spec-gen workflow (`/freefsm:start spec-gen`) first.
+      the spec-gen workflow (`/fflow spec-gen`) first.
 
       ### Issue mode additional steps
 

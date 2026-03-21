@@ -32,7 +32,7 @@ import {
 import { getSessionDir } from "../session-log.js";
 
 const CLI = resolve(__dirname, "../../dist/cli.js");
-const VERIFIER_FSM = resolve(__dirname, "../../workflows/verifier.workflow.yaml");
+const VERIFIER_FSM = resolve(__dirname, "../../workflows/verifier/workflow.yaml");
 
 let tmp: string;
 let fsmRoot: string;

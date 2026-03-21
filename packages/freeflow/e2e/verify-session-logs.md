@@ -5,7 +5,7 @@ Verifies that `fflow verify` symlinks both the verifier's and executor's Claude 
 ## Background
 
 When `fflow verify` runs, it:
-1. Launches a verifier agent (which starts a workflow run via `/fflow:start verifier.workflow.yaml`)
+1. Launches a verifier agent (which starts a workflow run via `/fflow verifier.workflow.yaml`)
 2. The verifier launches an executor agent via `run_agent()`
 3. After completion, both Claude session JSONL logs should be symlinked into the verifier's run directory:
    - `verifier-session.jsonl` — the verifier agent's own session log

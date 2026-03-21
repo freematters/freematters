@@ -126,7 +126,7 @@ states:
       ```
       Review the code changes in PR #{pr_number}.
 
-      Read your review instructions from: freefsm/workflows/code-review-agents/{agent}.md
+      Read your review instructions from: $SCRIPT_DIR/agents/{agent}.md
 
       Steps:
       1. Read `/tmp/pr_changed_files.txt` to get the changed files list

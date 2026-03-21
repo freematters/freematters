@@ -48,8 +48,8 @@ fflow install claude
 
 FreeFlow is typically used through these skills:
 
-- `/fflow:create` — guided Q&A to create a workflow YAML
-- `/fflow:start <path>` — start a workflow run (also searches `./workflows/` by name)
+- `/fflow-create` — guided Q&A to create a workflow YAML
+- `/fflow <path>` — start a workflow run (also searches `./workflows/` by name)
 - `/fflow:e2e-run` — run e2e agent tests
 
 Codex skill names use `$` instead of `/`.
@@ -63,7 +63,7 @@ Codex skill names use `$` instead of `/`.
 Start a bundled workflow by name:
 
 ```
-/fflow:start spec-gen
+/fflow spec-gen
 ```
 
 ## How It Works
@@ -155,7 +155,7 @@ states:
 
 ### Three mechanisms enforce the workflow
 
-1. **Skills invoke the CLI** — `/fflow:start` loads the YAML, validates the schema, and enters the initial state. The agent sees a state card with the current prompt and available transitions.
+1. **Skills invoke the CLI** — `/fflow` loads the YAML, validates the schema, and enters the initial state. The agent sees a state card with the current prompt and available transitions.
 2. **CLI enforces transitions** — `fflow goto fix --on "test written"` validates the transition against the YAML before committing. Illegal transitions are rejected.
 3. **Hooks inject reminders** — a PostToolUse hook runs `fflow current` every 5 tool calls, re-injecting the state card into the agent's context. This counteracts context drift in long conversations.
 

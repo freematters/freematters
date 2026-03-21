@@ -36,8 +36,8 @@ Code is deterministic but rigid, hard to extend, and bug-prone.
 |              Claude Code Plugin              |
 |                                              |
 |  skills/              hooks/                 |
-|  +-- create/          +-- hooks.json         |
-|  +-- start/                                  |
+|  +-- fflow-create/    +-- hooks.json         |
+|  +-- fflow/                                  |
 |  +-- current/          PostToolUse:           |
 |  +-- finish/            - every 5 tool calls |
 |                           inject state       |
@@ -67,7 +67,7 @@ Code is deterministic but rigid, hard to extend, and bug-prone.
 
 **Data flow:**
 
-1. `/fflow:start workflow.yaml` -> skill instructs agent to call `fflow start`
+1. `/fflow workflow.yaml` -> skill instructs agent to call `fflow start`
 2. `fflow start` -> writes start event, outputs guide + initial state card
 3. Agent works -> PostToolUse hook every 5 tool calls injects state reminder via `fflow current`
 4. Agent calls `fflow goto X --on "label"` -> CLI validates transition legality; if legal, writes event, outputs new state card
@@ -333,13 +333,13 @@ Transitions:
 
 ## Skills
 
-### `/fflow:create [PATH]`
+### `/fflow-create [PATH]`
 
 Interactively create an FSM workflow YAML through conversation. User describes workflows in natural language, agent generates schema-compliant YAML.
 
 Does not depend on `fflow` CLI. Pure conversation, agent writes YAML via Write tool.
 
-### `/fflow:start PATH`
+### `/fflow PATH`
 
 Start an FSM workflow run. Generates a descriptive slug as `run_id`, calls `fflow start`, and guides the agent into the state machine.
 
@@ -354,7 +354,7 @@ Abort the current FSM run. Calls `fflow finish` and displays the terminal summar
 ### Skills design decisions
 
 - **Hooks are always mounted, activated on demand** — hooks check for an active session/run and no-op if none exists. No dynamic install/uninstall.
-- **`/fflow:create` does not depend on CLI** — pure conversation to generate YAML
+- **`/fflow-create` does not depend on CLI** — pure conversation to generate YAML
 - **`goto` is not a skill** — transitions are driven by agent via CLI, not exposed as slash commands
 
 ## Plugin Structure
@@ -362,9 +362,9 @@ Abort the current FSM run. Calls `fflow finish` and displays the terminal summar
 ```
 ./
 ├── skills/
-│   ├── create/
+│   ├── fflow-create/
 │   │   └── SKILL.md
-│   ├── start/
+│   ├── fflow/
 │   │   └── SKILL.md
 │   ├── current/
 │   │   └── SKILL.md

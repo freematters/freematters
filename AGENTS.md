@@ -12,10 +12,10 @@ Monorepo for FreeFlow — agent-native developer tools.
 
 | Command | Expands to |
 |---------|------------|
-| `/spec-gen` | `/fflow:start spec-gen` |
-| `/spec-to-code` | `/fflow:start spec-to-code` |
-| `/pr` | `/fflow:start pr-lifecycle` |
-| `/release` | `/fflow:start release` |
+| `/spec-gen` | `/fflow spec-gen` |
+| `/spec-to-code` | `/fflow spec-to-code` |
+| `/pr` | `/fflow pr-lifecycle` |
+| `/release` | `/fflow release` |
 
 ## Build & Test
 

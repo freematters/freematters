@@ -8,7 +8,7 @@ import { DualStreamLogger } from "./dual-stream-logger.js";
 import { createVerifierMcpServer } from "./verifier-tools.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const VERIFIER_FSM = resolve(__dirname, "../../workflows/verifier.workflow.yaml");
+const VERIFIER_FSM = resolve(__dirname, "../../workflows/verifier/workflow.yaml");
 
 export interface VerifyCoreArgs {
   planPath: string;
@@ -25,7 +25,7 @@ export interface VerifyCoreResult {
 /**
  * Core verification: runs the verifier agent via Agent SDK.
  *
- * The verifier agent uses `/fflow:start verifier` to drive itself through
+ * The verifier agent uses `/fflow verifier` to drive itself through
  * the verifier.workflow.yaml workflow. It receives MCP tools for embedded agent
  * control (run_agent, wait, send).
  */
@@ -41,7 +41,7 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
 
   const runId = `verifier-${Date.now()}`;
   const prompt = [
-    `Run the e2e verifier workflow with: /fflow:start ${VERIFIER_FSM} --run-id ${runId}`,
+    `Run the e2e verifier workflow with: /fflow ${VERIFIER_FSM} --run-id ${runId}`,
     "",
     `Test plan file: ${resolve(planPath)}`,
     `Test output directory: ${resolve(testDir)}`,
