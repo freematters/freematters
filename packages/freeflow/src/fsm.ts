@@ -158,9 +158,6 @@ function resolveRefs(
     // Remove from field after merge
     state.from = undefined;
   }
-
-  // --- extends_guide handling ---
-  resolveExtendsGuide(doc, currentPath, visited);
 }
 
 /**
@@ -235,8 +232,9 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
 
   const obj = doc as Record<string, unknown>;
 
-  // Resolve from: refs before validation
+  // Resolve from: refs and extends_guide before validation
   resolveRefs(obj, absPath, visited);
+  resolveExtendsGuide(obj, absPath, visited);
 
   // Top-level required fields
   if (obj.version !== 1) {
