@@ -86,7 +86,7 @@ packages/channels/
 │       ├── skills/
 │       │   └── configure/
 │       │       └── SKILL.md
-│       └── server.js
+│       └── server.js              # two-way: includes comment tool
 └── marketplace.json            # references dist/ paths
 ```
 
@@ -94,22 +94,29 @@ packages/channels/
 
 ### channel-server.ts
 
-Factory function that creates a configured MCP `Server` instance:
+Factory function that creates a configured MCP `Server` and a `notify` helper:
 
 ```ts
+interface ChannelServer {
+  server: Server;
+  notify: (content: string, meta?: Record<string, string>) => Promise<void>;
+  connect: () => Promise<void>;  // wires StdioServerTransport
+}
+
 createChannelServer(config: {
   name: string;
   version: string;
   instructions: string;
   twoWay?: boolean;  // adds tools capability
-}): Server
+}): ChannelServer
 ```
 
-Returns a `Server` with:
-- `capabilities.experimental['claude/channel']` set
-- `capabilities.tools` set if `twoWay: true`
-- `instructions` injected into system prompt
-- Helper method: `notify(content: string, meta?: Record<string, string>)` wrapping `mcp.notification()`
+Returns a wrapper with:
+- `server` — MCP `Server` with `capabilities.experimental['claude/channel']` set, and `capabilities.tools` if `twoWay: true`
+- `notify()` — standalone helper wrapping `server.notification({ method: 'notifications/claude/channel', params: { content, meta } })`
+- `connect()` — creates `StdioServerTransport` and calls `server.connect()`
+
+`notify` is a standalone function (not a method on `Server`) since the SDK `Server` class should not be subclassed.
 
 ### access.ts
 
@@ -126,9 +133,14 @@ interface AccessConfig {
 
 readAccess(channelDir: string): Promise<AccessConfig>
 writeAccess(channelDir: string, config: AccessConfig): Promise<void>
-isAllowed(config: AccessConfig, senderId: string): boolean
+isAllowed(config: AccessConfig, senderId: string, context?: {
+  groupId?: string;
+  isMention?: boolean;
+}): boolean
 addPending(config: AccessConfig, senderId: string, chatId: string): string  // returns 6-char code
 ```
+
+`isAllowed` accepts optional `context` for group chat filtering — if `groupId` is set, checks group-level `allowFrom` and `requireMention`.
 
 ### reply-tool.ts
 
@@ -156,21 +168,25 @@ Each channel's `server.ts` is the entrypoint:
 - Uses Slack Socket Mode (WebSocket, no public URL needed)
 - Two-way: reply tool sends messages back to Slack
 - Full access skill with pairing flow
-- Token: `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN`
+- Tokens: `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN` (two tokens — configure skill is a full override, not template-based)
+- Graceful shutdown: close WebSocket on SIGTERM/SIGINT
 
 ### Notion
 
-- Polls Notion API for page/database changes
+- Polls Notion API for page/database changes (default interval: 30s, configurable via `POLL_INTERVAL_MS`)
 - One-way: notifies Claude of edits, new pages, comments
 - No access skill — authenticated via Notion integration token
 - Token: `NOTION_API_TOKEN`
+- State persistence: last-seen cursor stored in `~/.claude/channels/notion/state.json` to avoid re-emitting on restart
 
 ### GitHub Issues
 
-- Polls GitHub API for issue/comment activity (or uses webhook if user exposes a port)
-- Semi-two-way: can post comments via GitHub API
+- Polls GitHub API for issue/comment activity (default interval: 60s, configurable via `POLL_INTERVAL_MS`)
+- Two-way: `comment` tool posts comments via GitHub API (uses `registerReplyTool` with tool name `comment`)
 - No pairing — authenticated via GitHub token
 - Token: `GITHUB_TOKEN`
+- State persistence: last-seen event timestamp in `~/.claude/channels/github-issues/state.json`
+- Rate limiting: respect `X-RateLimit-Remaining` header, back off when low
 
 ## Skill Templates
 
@@ -178,14 +194,17 @@ Each channel's `server.ts` is the entrypoint:
 
 Placeholders:
 - `{{CHANNEL}}` — channel name (e.g., `slack`)
-- `{{TOKEN_VAR}}` — env var name (e.g., `SLACK_BOT_TOKEN`)
-- `{{TOKEN_HINT}}` — where to get the token (e.g., "from api.slack.com/apps → OAuth")
+- `{{TOKEN_VAR}}` — env var name (e.g., `NOTION_API_TOKEN`)
+- `{{TOKEN_HINT}}` — where to get the token (e.g., "from notion.so/my-integrations")
 - `{{CHANNEL_DIR}}` — `~/.claude/channels/{{CHANNEL}}`
 
 Follows the pattern from official plugins:
 - Frontmatter: `user-invocable: true`, `allowed-tools: [Read, Write, Bash(ls *), Bash(mkdir *)]`
 - Dispatch on `$ARGUMENTS`: no args → status, token → save, `clear` → remove
+- `chmod 600` on `.env` files (credentials)
 - Push toward lockdown (for chat channels with access skill)
+
+Channels needing multiple tokens (e.g., Slack with `SLACK_BOT_TOKEN` + `SLACK_APP_TOKEN`) use a full override in `skills/<name>/configure.md` instead of the template.
 
 ### access template (`skills/_templates/access.md`)
 
@@ -196,15 +215,46 @@ Only used by chat-bridge channels (Slack). Follows the official pattern:
 
 Channel-specific overrides in `skills/<name>/` take precedence over templates.
 
+## Channel Config Schema
+
+Each channel's `config.ts` exports a `ChannelConfig` used by the build script:
+
+```ts
+interface ChannelConfig {
+  name: string;                    // e.g., "slack"
+  version: string;                 // e.g., "0.0.1"
+  description: string;             // for plugin.json
+  keywords: string[];              // for plugin.json
+  twoWay: boolean;                 // whether to set tools capability
+  tokens: Array<{                  // supports multi-token channels
+    envVar: string;                // e.g., "SLACK_BOT_TOKEN"
+    hint: string;                  // e.g., "from api.slack.com/apps → OAuth"
+  }>;
+  skills: {
+    configure: 'template' | 'override';  // template = render from _templates, override = use skills/<name>/
+    access: boolean;                      // whether to include access skill
+  };
+  pollIntervalMs?: number;         // for polling channels (default env: POLL_INTERVAL_MS)
+}
+```
+
 ## Build System
 
 ### build-plugin.ts
 
 For each channel (or a specified one):
 
-1. **Bundle** — esbuild bundles `src/core/**` + `src/<name>/**` → `dist/<name>/server.js` (single file, no external deps except `@modelcontextprotocol/sdk`)
-2. **Skills** — render templates with channel config, copy to `dist/<name>/skills/`. Channel-specific overrides replace template output.
-3. **Plugin manifest** — generate `dist/<name>/.claude-plugin/plugin.json` from channel config
+1. **Bundle** — esbuild bundles `src/core/**` + `src/<name>/**` → `dist/<name>/server.js` as a single self-contained file. All dependencies including `@modelcontextprotocol/sdk` are bundled in (no external imports). The built plugin has zero runtime dependencies.
+2. **Skills** — render templates with channel config values, copy to `dist/<name>/skills/`. Channel-specific overrides in `skills/<name>/` replace template output.
+3. **Plugin manifest** — generate `dist/<name>/.claude-plugin/plugin.json`:
+   ```json
+   {
+     "name": "<name>",
+     "description": "<description from config>",
+     "version": "<version from config>",
+     "keywords": ["<keywords from config>", "channel", "mcp"]
+   }
+   ```
 4. **MCP config** — generate `dist/<name>/.mcp.json`:
    ```json
    {
@@ -222,10 +272,10 @@ For each channel (or a specified one):
 ```json
 {
   "scripts": {
-    "build": "tsx scripts/build-plugin.ts",
-    "build:slack": "tsx scripts/build-plugin.ts slack",
-    "build:notion": "tsx scripts/build-plugin.ts notion",
-    "build:github-issues": "tsx scripts/build-plugin.ts github-issues",
+    "build": "bun scripts/build-plugin.ts",
+    "build:slack": "bun scripts/build-plugin.ts slack",
+    "build:notion": "bun scripts/build-plugin.ts notion",
+    "build:github-issues": "bun scripts/build-plugin.ts github-issues",
     "test": "vitest run",
     "check": "biome check --write ."
   }
@@ -243,18 +293,55 @@ For each channel (or a specified one):
     "@biomejs/biome": "^1.9.0",
     "@types/node": "^22.0.0",
     "esbuild": "^0.27.3",
-    "tsx": "^4.21.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   }
 }
 ```
 
-Platform-specific SDKs (Slack, Notion, Octokit) added as dependencies per channel need.
+`@modelcontextprotocol/sdk` is a build-time dependency only — esbuild bundles it into `server.js`. The built plugin directories have no `node_modules`.
+
+Platform-specific SDKs (e.g., `@slack/socket-mode`, `@notionhq/client`, `@octokit/rest`) added as dependencies per channel need, also bundled at build time.
+
+### tsconfig.json
+
+Uses `noEmit: true` (typecheck only — esbuild handles bundling):
+
+```json
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "src"
+  },
+  "include": ["src"]
+}
+```
+
+### .gitignore
+
+```
+dist/
+node_modules/
+```
+
+## Root package.json Updates
+
+The monorepo root `package.json` scripts should be updated to include the channels package:
+
+```json
+{
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "check": "biome check --write --error-on-warnings ."
+  }
+}
+```
 
 ## Marketplace Distribution
 
-`marketplace.json` at package root:
+The `packages/channels/` directory doubles as the marketplace repo. `marketplace.json` at package root (checked in, references `dist/` paths which are build output):
 
 ```json
 {
@@ -291,7 +378,11 @@ claude --channels plugin:slack@freematters-channels
 - **Unit tests**: vitest, co-located `__tests__/` directories
 - **Core tests**: access logic, server factory, reply tool registration
 - **Channel tests**: mock platform APIs, verify correct notifications emitted and sender gating works
-- **Integration tests**: `--plugin-dir dist/<name>` with `--dangerously-load-development-channels`
+- **Integration tests**: manual, after build:
+  ```bash
+  claude --plugin-dir packages/channels/dist/slack \
+    --dangerously-load-development-channels plugin:slack
+  ```
 
 ## Adding a New Channel
 
