@@ -34,38 +34,6 @@ guide: |
     run containers, execute scripts, or begin any implementation work.
   - When proposing options to user, always provide a numbered list of options.
 
-  ### Requirements Q&A Cycle
-
-  When gathering requirements, follow this cycle for each question:
-  1. Formulate a question based on what's unclear, ambiguous, or underspecified
-  2. Record the question
-  3. Present it to the user and wait for their response
-  4. Record the user's answer
-  5. Proceed to the next question
-
-  Constraints:
-  - Ask ONE question at a time. Do NOT list multiple questions.
-  - Do NOT pre-populate or assume answers.
-  - Focus on: ambiguities, trade-offs, edge cases, non-functional constraints
-    (performance, security, compatibility), success criteria, and verification methods.
-  - Do NOT ask obvious questions — the initial description already conveys basic intent.
-  - When the user seems unsure, suggest concrete options rather than leaving it open-ended.
-
-  Troubleshooting:
-  - If requirements stall, suggest switching to a different aspect, provide example answers,
-    or pivot to research to unblock decisions.
-
-  ### Research Structure
-
-  Structure each research topic with:
-  - **Summary** — one-paragraph overview
-  - **Key Findings** — numbered list of important discoveries
-  - **Trade-offs** — pros/cons of different approaches
-  - **Recommendations** — what you suggest and why
-  - **References** — links, docs, or sources consulted
-
-  Include Mermaid diagrams when documenting architectures or data flows.
-
   ### Artifact Output
 
   All artifacts are written to `./specs/<slug>/`:
@@ -112,10 +80,27 @@ states:
       ## Requirements Clarification
 
       Guide the user through questions to refine the rough idea into concrete requirements.
-      Follow the Requirements Q&A Cycle from the guide.
+      Read rough-idea.md first to understand what's already been stated.
 
-      Record each Q&A by appending to requirements.md under a `### Q<index>: <question>` heading
-      (index starts from 1). Read rough-idea.md first to understand what's already been stated.
+      Follow this cycle for each question:
+      1. Formulate a question based on what's unclear, ambiguous, or underspecified
+      2. Record the question by appending to requirements.md under a `### Q<index>: <question>` heading
+         (index starts from 1)
+      3. Present it to the user and wait for their response
+      4. Record the user's answer
+      5. Proceed to the next question
+
+      Constraints:
+      - Ask ONE question at a time. Do NOT list multiple questions.
+      - Do NOT pre-populate or assume answers.
+      - Focus on: ambiguities, trade-offs, edge cases, non-functional constraints
+        (performance, security, compatibility), success criteria, and verification methods.
+      - Do NOT ask obvious questions — the initial description already conveys basic intent.
+      - When the user seems unsure, suggest concrete options rather than leaving it open-ended.
+
+      Troubleshooting:
+      - If requirements stall, suggest switching to a different aspect, provide example answers,
+        or pivot to research to unblock decisions.
 
       You MUST include questions about end-to-end testing as part of requirements.
       E2E test expectations are requirements, not an afterthought.
@@ -144,8 +129,14 @@ states:
 
       Process:
       1. Propose a research plan (2-4 topics) to the user. Incorporate their suggestions.
-      2. For each topic, investigate and write findings to a separate research artifact
-         following the Research Structure from the guide.
+      2. For each topic, investigate and write findings to a separate research artifact.
+         Structure each with:
+         - **Summary** — one-paragraph overview
+         - **Key Findings** — numbered list of important discoveries
+         - **Trade-offs** — pros/cons of different approaches
+         - **Recommendations** — what you suggest and why
+         - **References** — links, docs, or sources consulted
+         Include Mermaid diagrams when documenting architectures or data flows.
       3. Periodically check in with the user to share findings and confirm direction.
       4. Summarize key findings before transitioning.
 
