@@ -11,9 +11,6 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/freeflow
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,10 +19,10 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
           cache: 'npm'
       - run: npm install -g npm@11.11.1
-      - run: cd ../.. && npm ci
+      - run: npm ci
       - run: npm run build
       - run: npm test
-      - run: npm publish --access public --provenance
+      - run: npm publish -w packages/freeflow --access public --provenance
       - name: Create GitHub Release
         run: gh release create "${{ github.ref_name }}" --generate-notes
         env:
