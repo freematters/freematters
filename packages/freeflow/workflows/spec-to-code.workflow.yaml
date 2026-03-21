@@ -60,6 +60,7 @@ states:
          ```bash
          python3 freefsm/workflows/prepare_implementation.py {owner} {repo} {issue_number} {slug}
          ```
+         Returns JSON with `branch_name`. Remember `branch_name` for later states.
 
       **Local mode**: The argument is the spec directory path (e.g., `./specs/my-feature/`).
 
