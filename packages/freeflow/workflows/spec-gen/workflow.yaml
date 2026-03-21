@@ -17,9 +17,8 @@
 
 version: 1
 guide: |
-  Spec-Gen workflow. Generates a complete specification from a rough idea.
-  Produces a complete spec directory (./specs/<slug>/) through interactive requirements gathering,
-  research, design, and implementation planning. No code is written — output is pure documentation.
+  Spec-Gen — generates a complete specification from a rough idea through interactive
+  requirements gathering, research, design, and implementation planning.
 
   Rules that apply across ALL states:
 
@@ -27,8 +26,7 @@ guide: |
     At each transition point, present the options and wait for the user's choice.
   - Iterative: The user can move between requirements and research at any time.
     You MUST always offer this option at state transitions.
-  - Record as you go: Append questions, answers, and findings to project files in real time.
-    You MUST NOT batch-write content at the end of a phase.
+  - Record as you go: persist artifacts incrementally, not in batches.
   - Mermaid diagrams: Include diagrams for architectures, data flows, and component relationships
     in research and design documents.
   - Sources: Cite references and links in research documents when based on external materials.
@@ -36,14 +34,48 @@ guide: |
     run containers, execute scripts, or begin any implementation work.
   - When proposing options to user, always provide a numbered list of options.
 
-  Artifacts produced in ./specs/<slug>/:
-    - rough-idea.md         — original user input
-    - requirements.md       — Q&A record (appended in real-time)
-    - research/*.md         — per-topic research findings
-    - design.md             — architecture, components, data models, acceptance criteria
-    - plan.md               — numbered incremental implementation steps
-    - e2e.md                — verifier–executor test plan for freefsm verify
-    - summary.md            — artifact listing and next steps
+  ### Requirements Q&A Cycle
+
+  When gathering requirements, follow this cycle for each question:
+  1. Formulate a question based on what's unclear, ambiguous, or underspecified
+  2. Record the question
+  3. Present it to the user and wait for their response
+  4. Record the user's answer
+  5. Proceed to the next question
+
+  Constraints:
+  - Ask ONE question at a time. Do NOT list multiple questions.
+  - Do NOT pre-populate or assume answers.
+  - Focus on: ambiguities, trade-offs, edge cases, non-functional constraints
+    (performance, security, compatibility), success criteria, and verification methods.
+  - Do NOT ask obvious questions — the initial description already conveys basic intent.
+  - When the user seems unsure, suggest concrete options rather than leaving it open-ended.
+
+  Troubleshooting:
+  - If requirements stall, suggest switching to a different aspect, provide example answers,
+    or pivot to research to unblock decisions.
+
+  ### Research Structure
+
+  Structure each research topic with:
+  - **Summary** — one-paragraph overview
+  - **Key Findings** — numbered list of important discoveries
+  - **Trade-offs** — pros/cons of different approaches
+  - **Recommendations** — what you suggest and why
+  - **References** — links, docs, or sources consulted
+
+  Include Mermaid diagrams when documenting architectures or data flows.
+
+  ### Artifact Output
+
+  All artifacts are written to `./specs/<slug>/`:
+  - rough-idea.md         — original user input
+  - requirements.md       — Q&A record (appended in real-time)
+  - research/*.md         — per-topic research findings
+  - design.md             — architecture, components, data models, acceptance criteria
+  - plan.md               — numbered incremental implementation steps
+  - e2e.md                — verifier–executor test plan for freefsm verify
+  - summary.md            — artifact listing and next steps
 
 initial: create-structure
 
@@ -80,32 +112,17 @@ states:
       ## Requirements Clarification
 
       Guide the user through questions to refine the rough idea into concrete requirements.
+      Follow the Requirements Q&A Cycle from the guide.
 
-      You MUST follow this cycle for each question:
-      1. Formulate a question based on what's unclear, ambiguous, or underspecified
-      2. Append the question to `./specs/<slug>/requirements.md` under a `### Q<index>: <question>` heading, index is a number starting from 1.
-      3. Present the question to the user and wait for their complete response
-      4. Append the user's answer below the question in `./specs/<slug>/requirements.md`
-      5. Proceed to the next question
+      Record each Q&A by appending to requirements.md under a `### Q<index>: <question>` heading
+      (index starts from 1). Read rough-idea.md first to understand what's already been stated.
 
-      Constraints:
-      - You MUST ask ONE question at a time. You MUST NOT list multiple questions in a single message.
-      - You MUST NOT pre-populate or assume answers.
-      - You MUST focus on: ambiguities, trade-offs, edge cases, non-functional constraints
-        (performance, security, compatibility), success criteria, and verification methods.
-      - You MUST include questions about end-to-end testing as part of requirements.
-        E2E test expectations are requirements, not an afterthought.
-        Read `@packages/freeflow/docs/e2e-testing-design.md` for context on the verifier–executor
-        model, then based on gathered requirements, recommend e2e options: which user scenarios
-        to cover, what setup the executor needs, and whether e2e is worth it for this feature
-        (it's slow — two agent sessions per run). Record decisions in requirements.md.
-      - You MUST NOT ask obvious questions — the user's rough idea already conveys basic intent.
-        Read the rough-idea.md first to understand what's already been stated.
-      - When the user seems unsure, suggest concrete options rather than leaving it open-ended.
-
-      Troubleshooting:
-      - If requirements stall, suggest switching to a different aspect of the project,
-        provide example answers, or pivot to research to unblock decisions.
+      You MUST include questions about end-to-end testing as part of requirements.
+      E2E test expectations are requirements, not an afterthought.
+      Read `@packages/freeflow/docs/e2e-testing-design.md` for context on the verifier–executor
+      model, then based on gathered requirements, recommend e2e options: which user scenarios
+      to cover, what setup the executor needs, and whether e2e is worth it for this feature
+      (it's slow — two agent sessions per run). Record decisions in requirements.md.
 
       When you believe you have enough clarity on goals, constraints, and verification criteria,
       present a brief summary of what you've captured and ask the user:
@@ -127,19 +144,10 @@ states:
 
       Process:
       1. Propose a research plan (2-4 topics) to the user. Incorporate their suggestions.
-      2. For each topic, investigate and write findings to a separate file:
-         `./specs/<slug>/research/<topic-name>.md`
+      2. For each topic, investigate and write findings to a separate research artifact
+         following the Research Structure from the guide.
       3. Periodically check in with the user to share findings and confirm direction.
       4. Summarize key findings before transitioning.
-
-      You MUST structure each research file with:
-      - **Summary** — one-paragraph overview of the topic
-      - **Key Findings** — numbered list of important discoveries
-      - **Trade-offs** — pros/cons of different approaches
-      - **Recommendations** — what you suggest and why
-      - **References** — links, docs, or sources consulted
-
-      You MUST include Mermaid diagrams when documenting architectures or data flows.
 
       Optimization: If your runtime supports parallel agent dispatch, consider investigating
       multiple topics concurrently — one agent per topic, each writing to its own research file.
@@ -161,8 +169,8 @@ states:
     prompt: |
       ## Detailed Design
 
-      Create `./specs/<slug>/design.md` — a standalone, comprehensive design document.
-      "Standalone" means it MUST be fully understandable without reading any other file.
+      Produce a standalone, comprehensive design.md artifact.
+      "Standalone" means it MUST be fully understandable on its own without other artifacts.
 
       ### Step 1: Design approaches (normal mode only)
 
@@ -182,7 +190,7 @@ states:
 
       Required sections:
       1. **Overview** — one-paragraph summary of what we're building and why
-      2. **Goal & Constraints** — derived from requirements.md and codebase exploration.
+      2. **Goal & Constraints** — derived from requirements and codebase exploration.
          Goal: what the feature must achieve. Constraints: technical limits, compatibility
          requirements, performance targets, security boundaries, and codebase conventions
          that the implementation must respect.
@@ -190,21 +198,22 @@ states:
       4. **Components & Interfaces** — each component's responsibility, API surface,
          and how components interact
       5. **Data Models** — key data structures, schemas, state, and their relationships
-      6. **Integration Testing** — define integration tests that cover system boundaries:
+      6. **Error Handling** — failure modes, recovery strategies, and degradation behavior
+      7. **Integration Testing** — define integration tests that cover system boundaries:
          cross-component interactions, data flow across modules, external API contracts.
          Use real dependencies; only mock true external boundaries. Individual plan steps
          may implement some of these tests when their dependencies are available; the
          remaining tests are implemented in a dedicated integration test step after all
          steps are complete.
-      7. **E2E Testing** — describe key end-to-end scenarios, expected user-facing behaviors,
+      8. **E2E Testing** — describe key end-to-end scenarios, expected user-facing behaviors,
          and how to verify the feature works as a whole. This section is for human review;
          `/e2e-gen` will later convert it into an executable test plan.
-      8. **Appendices** (optional) — technology choices with rationale, research findings summary,
+      9. **Appendices** (optional) — technology choices with rationale, research findings summary,
          alternative approaches considered and why they were rejected
 
       Constraints:
-      - You MUST derive Goal & Constraints from requirements.md and codebase exploration.
-        The design document replaces requirements.md as the authoritative spec.
+      - You MUST derive Goal & Constraints from requirements and codebase exploration.
+        The design document replaces requirements as the authoritative spec.
       - You MUST include Mermaid diagrams for architecture and data flow.
       - You MUST iterate on feedback until the user explicitly approves the complete design.
 
@@ -223,6 +232,7 @@ states:
       - Write Architecture Overview with Mermaid diagram
       - Write Components & Interfaces section
       - Write Data Models section
+      - Write Error Handling section
       - Write Integration Testing section
       - Write E2E Testing section
       - Write Appendices (tech choices, research, alternatives)
@@ -235,7 +245,7 @@ states:
     prompt: |
       ## Implementation Plan
 
-      Create `./specs/<slug>/plan.md` — a numbered, incremental implementation plan.
+      Produce a plan.md artifact — a numbered, incremental implementation plan.
 
       Guiding principle: Each step is a complete, self-contained module or logical unit —
       not a thin slice of work. Steps should map to components, features, or layers from
@@ -316,11 +326,11 @@ states:
     prompt: |
       ## Generate E2E Test Plan
 
-      Check if `./specs/<slug>/design.md` has an E2E Testing section.
+      Check if design.md has an E2E Testing section.
 
       - If no → skip directly to done.
-      - If yes → run `/e2e-gen` to generate `./specs/<slug>/e2e.md` from design.md
-        and requirements.md. Then transition to done.
+      - If yes → run `/e2e-gen` to generate e2e.md from design and requirements
+        artifacts. Then transition to done.
     transitions:
       e2e plan generated: done
       no e2e in design: done
@@ -329,20 +339,11 @@ states:
     prompt: |
       ## Summary
 
-      Create `./specs/<slug>/summary.md` with:
+      Create a summary.md artifact with:
       1. **Project Overview** — one-paragraph description of what was planned
-      2. **Artifacts** — list of all files produced with paths and one-line descriptions
+      2. **Artifacts** — list of all artifacts produced with one-line descriptions
       3. **Key Decisions** — important decisions made during planning and their rationale
       4. **Next Steps** — concrete actions for implementation
 
       Present the summary to the user.
-
-      All spec-gen artifacts are in `./specs/<slug>/`:
-      - `rough-idea.md` — original input
-      - `requirements.md` — Q&A record
-      - `research/*.md` — research findings
-      - `design.md` — detailed design (authoritative spec)
-      - `plan.md` — implementation plan
-      - `e2e.md` — verifier–executor test plan (if design.md has E2E Testing section)
-      - `summary.md` — this summary
     transitions: {}
