@@ -117,6 +117,12 @@ Test plans are raw markdown read by the verifier agent.
 Output: `test-report.md` in `--test-dir`.
 Dogfood test plans live in `e2e/`.
 
+When generating e2e test plans for freeflow itself (via `/e2e-gen`), the Setup section
+MUST build from the current working tree (`npm run build` in `packages/freeflow/`) and
+use the local binary (`node packages/freeflow/dist/cli.js`) instead of the globally
+installed `fflow`. This ensures the executor tests the development version, not the
+released one — critical when running in worktrees or feature branches.
+
 Both `fflow run` and `fflow verify` print the Claude session ID to stderr on session start.
 `fflow run` symlinks the Claude session JSONL log (`session.jsonl`) into the run directory.
 `fflow verify` symlinks the verifier's (`verifier-session.jsonl`) and executor's (`executor-session.jsonl`) session logs into the run directory, along with a copy of the test plan.

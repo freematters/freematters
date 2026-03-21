@@ -9,9 +9,11 @@
 #       |
 #      plan ← → design (revision)
 #       |
+#     e2e-gen (if design.md has E2E Testing section)
+#       |
 #     done
 #
-#   Fast forward: requirements → design → plan → done (no intermediate approvals, skips e2e)
+#   Fast forward: requirements → design → plan → e2e-gen → done (no intermediate approvals)
 
 version: 1
 guide: |
@@ -40,7 +42,7 @@ guide: |
     - research/*.md         — per-topic research findings
     - design.md             — architecture, components, data models, acceptance criteria
     - plan.md               — numbered incremental implementation steps
-    - e2e.md                — verifier–executor test plan for freefsm verify (if not skipped)
+    - e2e.md                — verifier–executor test plan for freefsm verify
     - summary.md            — artifact listing and next steps
 
 initial: create-structure
@@ -91,10 +93,12 @@ states:
       - You MUST NOT pre-populate or assume answers.
       - You MUST focus on: ambiguities, trade-offs, edge cases, non-functional constraints
         (performance, security, compatibility), success criteria, and verification methods.
-      - You MUST include questions about end-to-end testing as part of requirements:
-        how will we verify this feature works end-to-end? What are the key user scenarios
-        to test? What infrastructure is needed (test fixtures, services, env setup)?
+      - You MUST include questions about end-to-end testing as part of requirements.
         E2E test expectations are requirements, not an afterthought.
+        Read `@packages/freeflow/docs/e2e-testing-design.md` for context on the verifier–executor
+        model, then based on gathered requirements, recommend e2e options: which user scenarios
+        to cover, what setup the executor needs, and whether e2e is worth it for this feature
+        (it's slow — two agent sessions per run). Record decisions in requirements.md.
       - You MUST NOT ask obvious questions — the user's rough idea already conveys basic intent.
         Read the rough-idea.md first to understand what's already been stated.
       - When the user seems unsure, suggest concrete options rather than leaving it open-ended.
@@ -106,7 +110,7 @@ states:
       When you believe you have enough clarity on goals, constraints, and verification criteria,
       present a brief summary of what you've captured and ask the user:
       - "Requirements complete, proceed to design" → design
-      - "Fast forward" — generate design, plan, and summary in one shot (skips e2e, no intermediate approvals) → design
+      - "Fast forward" — generate design, plan, and summary in one shot (no intermediate approvals) → design
       - "I need to research something first" → research
 
       You MUST NOT move on until the user explicitly confirms requirements are complete.
@@ -188,8 +192,10 @@ states:
       5. **Data Models** — key data structures, schemas, state, and their relationships
       6. **Integration Testing** — define integration tests that cover system boundaries:
          cross-component interactions, data flow across modules, external API contracts.
-         Use real dependencies; only mock true external boundaries. These tests are
-         implemented during plan steps and run as part of the normal test suite.
+         Use real dependencies; only mock true external boundaries. Individual plan steps
+         may implement some of these tests when their dependencies are available; the
+         remaining tests are implemented in a dedicated integration test step after all
+         steps are complete.
       7. **E2E Testing** — describe key end-to-end scenarios, expected user-facing behaviors,
          and how to verify the feature works as a whole. This section is for human review;
          `/e2e-gen` will later convert it into an executable test plan.
@@ -239,6 +245,15 @@ states:
       ```markdown
       # Implementation Plan: <Feature Name>
 
+      ## Dependency Graph
+
+      <!-- example: replace with actual steps and dependencies -->
+      ```mermaid
+      graph LR
+        S1[Step 1: title] --> S3[Step 3: title]
+        S2[Step 2: title] --> S3
+      ```
+
       ## Checklist
       - [ ] Step 1: <title>
       - [ ] Step 2: <title>
@@ -255,30 +270,23 @@ states:
       **Implementation Guidance**: Specific technical instructions — what to create,
       modify, or wire up. Reference design.md sections where relevant.
 
-      **Test Requirements**: What tests to write BEFORE implementation (TDD).
-      Default to integration tests covering system boundaries; unit tests only
-      for complex single-module logic.
+      **Test Requirements**: Assign specific test cases from design.md's
+      Integration Testing section that are relevant to this step (where
+      dependencies are available). Add unit tests for complex single-module
+      logic. Clearly list each test case so the implementing agent knows
+      exactly what to cover.
       ```
 
       ### Integration test step
 
-      The plan MUST include a step for implementing the integration tests defined in
-      design.md's Integration Testing section. This step exercises cross-component
-      boundaries with real dependencies and should come after core functionality is built.
+      If design.md has an Integration Testing section, the plan MUST include an
+      integration test step as the final step. Explicitly list which test cases
+      from design.md's Integration Testing section are NOT yet assigned to
+      earlier steps — these are the leftover tests whose dependencies were not
+      available until now. Do NOT re-test what individual steps already cover.
 
-      ### E2E test plan (if not skipped in requirements)
-
-      Check `./specs/<slug>/requirements.md` for e2e testing decisions. If the user chose
-      to include e2e tests during requirements gathering:
-
-      1. Read the e2e-related Q&A from `requirements.md` — the user's answers about key
-         scenarios, verification approach, infrastructure needs, and expected behaviors.
-      2. Run `/e2e-gen`, passing the e2e Q&A from requirements along with context from
-         `design.md` and `plan.md`. The skill handles the verifier–executor format,
-         parser rules, and best practices.
-         Output should be written to `./specs/<slug>/e2e.md`.
-      3. Add a final step in plan.md's checklist: `- [ ] E2E: run fflow verify on e2e.md`
-         with a corresponding step section that references the e2e test plan.
+      E2E testing is handled by the e2e-gen state after plan approval — do NOT add
+      an e2e step to plan.md.
 
       Constraints:
       - Each step should be a complete module or logical unit, not a thin slice.
@@ -291,19 +299,31 @@ states:
       - You MUST present the plan to the user and iterate on feedback until approved.
 
       **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT wait for user
-      approval. Complete the plan (skip e2e), then immediately transition to done.
+      approval. Complete the plan, then immediately transition to e2e-gen.
 
       **Normal mode**: You MUST NOT proceed until the user explicitly approves the implementation plan.
     todos:
       - Draft implementation steps with TDD ordering
       - Verify each step produces working functionality
-      - Ensure core E2E flow is available early
       - Verify no orphaned code between steps
-      - Generate e2e test plan via /e2e-gen (if not skipped)
+      - Add integration test as final step (no e2e step — handled by e2e-gen state)
       - Get user approval on the plan
     transitions:
-      plan approved: done
+      plan approved: e2e-gen
       needs design revision: design
+
+  e2e-gen:
+    prompt: |
+      ## Generate E2E Test Plan
+
+      Check if `./specs/<slug>/design.md` has an E2E Testing section.
+
+      - If no → skip directly to done.
+      - If yes → run `/e2e-gen` to generate `./specs/<slug>/e2e.md` from design.md
+        and requirements.md. Then transition to done.
+    transitions:
+      e2e plan generated: done
+      no e2e in design: done
 
   done:
     prompt: |
@@ -323,6 +343,6 @@ states:
       - `research/*.md` — research findings
       - `design.md` — detailed design (authoritative spec)
       - `plan.md` — implementation plan
-      - `e2e.md` — verifier–executor test plan (if not skipped)
+      - `e2e.md` — verifier–executor test plan (if design.md has E2E Testing section)
       - `summary.md` — this summary
     transitions: {}

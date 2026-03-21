@@ -126,10 +126,12 @@ states:
          > Before coding, explore existing code for patterns, conventions, and style.
          >
          > 1. Define the contract: inputs, expected outputs, side effects, error conditions.
-         > 2. Write failing tests (RED):
-         >    - Default to integration tests across system boundaries with real dependencies.
-         >    - Only mock true external boundaries (network, third-party APIs).
-         >    - Unit tests only for complex single-module logic.
+         > 2. Read this step's **Test Requirements** from plan.md — these are the
+         >    specific test cases assigned to this step. Write failing tests for them (RED).
+         >    You MAY add extra tests beyond the listed requirements if you discover
+         >    edge cases or complex logic that warrants coverage.
+         >    General rules: use real dependencies; only mock true external boundaries
+         >    (network, third-party APIs); unit tests for complex single-module logic.
          > 3. Write minimum implementation to pass (GREEN)
          > 4. Refactor — clean up, run linter/formatter
          > 5. Commit your work in the worktree: `feat(scope): step N - <step title>`
@@ -207,7 +209,7 @@ states:
       Update `./specs/<slug>/progress.md` with E2E result, attempt count, and notes.
     transitions:
       e2e passed: review
-      no e2e design: review
+      no e2e plan: review
 
   review:
     prompt: |
@@ -316,9 +318,10 @@ states:
       1. **Overview** — one paragraph describing what was built
       2. **Steps completed** — table of all steps with status and commit hash
       3. **Test summary** — total tests written, all passing, coverage notes
-      4. **Files created/modified** — list of key files with one-line descriptions
-      5. **How to run** — commands to run the project and tests
-      6. **Remaining work** — any manual testing, deployment, documentation, or known limitations
+      4. **E2E result** — pass/fail, attempt count, and notes (from progress.md; omit if no e2e)
+      5. **Files created/modified** — list of key files with one-line descriptions
+      6. **How to run** — commands to run the project and tests
+      7. **Remaining work** — any manual testing, deployment, documentation, or known limitations
 
       Present the summary to the user.
 
@@ -347,7 +350,14 @@ states:
          Ready for PR — run `/pr` to create a pull request.
          ```
 
-      3. Remove `doing` label and add `done` label to the issue:
+      3. Write `./specs/<slug>/source-issue` containing the issue reference
+         (e.g., `owner/repo#42`) so that pr-lifecycle can link the PR to the issue.
+
+      4. Update the issue body's Summary section (added by issue-bot) to reflect e2e results.
+         Re-read the current issue body, then update the `### E2E Testing` subsection with
+         the actual result (pass/fail, attempt count). If the section doesn't exist, add it.
+
+      5. Remove `doing` label and add `done` label to the issue:
          ```bash
          gh issue edit {issue_number} --repo {owner}/{repo} --remove-label doing
          gh label create done --repo {owner}/{repo} --description "Implementation complete" --color 0E8A16 2>/dev/null || true
