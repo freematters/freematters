@@ -19,6 +19,8 @@ guide: |
 
   - `--source-issue owner/repo#N` — optional. If provided, the PR description will
     include `Closes #N` to auto-link and close the source issue on merge.
+  - `--auto` — optional. If provided, pr-lifecycle runs in unattended mode without
+    prompting the user for decisions (auto-approve CI fixes, auto-rebase, etc.).
 
   ## Workflow directory
 
@@ -73,6 +75,8 @@ states:
           link the PR to the source issue.
         - Without `--source-issue`, skip issue linking (no regression from previous behavior).
         - Create via `gh pr create`
+
+      If `--auto` flag was set, proceed without user confirmation.
 
       Record the PR URL and number — subsequent states will need them.
     transitions:

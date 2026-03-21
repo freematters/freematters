@@ -59,6 +59,7 @@ Each finding should:
 If you're not sure something is a problem, say so: "This might be intentional, but..."
 Acknowledge trade-offs when they exist.
 
+<!-- NOTE: this section is duplicated across all 3 agent files — keep in sync -->
 ## Design compliance
 
 If `/tmp/freeflow-pr-{pr_number}-design.md` exists, also check:

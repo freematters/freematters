@@ -299,14 +299,16 @@ states:
       <!-- code-review -->
       # PR Code Review Summary
 
+      ## Spec Context
+
+      If a linked spec was found (i.e., `/tmp/freeflow-pr-{pr_number}-design.md` exists),
+      write: "Linked to issue #N — design-compliance checked."
+
+      If no linked spec was found, write: "No linked spec found — design-compliance checks skipped."
+
       ## Changes Overview
 
       [2-3 sentences describing the PR's purpose and contribution]
-
-      ## Spec Context
-
-      [If `/tmp/freeflow-pr-{pr_number}-design.md` was found: "Linked to issue #N — design-compliance checked."
-       If no linked issue or no spec found: "No linked spec found — design-compliance checks skipped."]
 
       ## Key Files
 

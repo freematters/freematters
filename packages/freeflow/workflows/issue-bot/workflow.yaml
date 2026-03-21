@@ -622,6 +622,8 @@ states:
     prompt: |
       ## Done — Finalize Spec Issue
 
+      Note: {repo} below refers to the fully-qualified owner/repo (e.g., freematters/freematters).
+
       Finalize the issue by adding the label, completing the status checklist, ensuring the
       plan checklist is correct, posting a summary, and offering to chain to spec-to-code.
 

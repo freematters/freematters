@@ -61,6 +61,7 @@ Each finding should:
 If you're not sure about the scale or frequency, say so: "If this runs on every request
 with a large dataset, consider..." — don't assume the worst case.
 
+<!-- NOTE: this section is duplicated across all 3 agent files — keep in sync -->
 ## Design compliance
 
 If `/tmp/freeflow-pr-{pr_number}-design.md` exists, also check:

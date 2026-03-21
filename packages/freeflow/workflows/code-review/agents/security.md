@@ -64,6 +64,7 @@ Each finding should:
 If the risk depends on deployment context you don't know, say so: "If this endpoint is
 publicly accessible, then..." — let the author decide.
 
+<!-- NOTE: this section is duplicated across all 3 agent files — keep in sync -->
 ## Design compliance
 
 If `/tmp/freeflow-pr-{pr_number}-design.md` exists, also check:
