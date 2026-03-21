@@ -17,3 +17,8 @@
 - **What was built**: Verified all 15 integration test scenarios from design.md §7 are present (19 tests total including extends_guide edge cases)
 - **Tests**: 19 reuse tests, 130 total, all passing
 - **Notes**: Steps 1 and 2 already implemented complete coverage; no additional tests needed
+
+## E2E Test
+- **Result**: PASS — 10/10 steps
+- **Attempts**: 1
+- **Notes**: Globally installed `fflow` doesn't have `from:` resolution yet (expected). Tests ran using worktree build. All features verified: prompt `{{base}}` insertion, transitions merge, todos append, extends_guide, full lifecycle.
