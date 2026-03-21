@@ -208,6 +208,9 @@ states:
 
       Read `./specs/<slug>/e2e.md`. If it does not exist, skip directly to review.
 
+      **IMPORTANT**: If `./specs/<slug>/e2e.md` exists, you MUST run the e2e test. Never skip it.
+      Only use the "no e2e plan" transition when e2e.md genuinely does not exist.
+
       ### Run the test
 
       Run `/e2e-run` with the test plan at `./specs/<slug>/e2e.md` and
@@ -218,6 +221,11 @@ states:
         test-dir artifacts, fix the code, and re-run. Repeat until passing.
 
       Update `./specs/<slug>/progress.md` with E2E result, attempt count, and notes.
+    todos:
+      - Check if ./specs/<slug>/e2e.md exists
+      - If e2e.md exists, run /e2e-run with the test plan (MUST NOT skip)
+      - If e2e fails, run /e2e-fix and re-run until passing
+      - Update progress.md with E2E result
     transitions:
       e2e passed: review
       no e2e plan: review
