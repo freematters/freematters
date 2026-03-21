@@ -2,7 +2,7 @@
 
 ## Checklist
 - [x] Step 1: 重组 workflow 目录结构、更新代码与文档
-- [ ] Step 2: Integration Test
+- [x] Step 2: Integration Test
 
 ---
 
