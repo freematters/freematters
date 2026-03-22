@@ -17,3 +17,9 @@
 - **What was built**: Routed subagent states to `formatSubagentDispatch` in start and goto commands. JSON output includes `subagent` field. `current` unchanged.
 - **Tests**: 6 tests added (start dispatch, goto dispatch, current normal, mixed workflow, JSON output), all passing
 - **Notes**: None
+
+## Step 4: Integration tests — cross-module verification
+- **Files changed**: `packages/freeflow/src/__tests__/subagent-integration.test.ts`, fixture YAML files
+- **What was built**: 3 integration tests: full JSON lifecycle, `from:` inheritance, `from:` override
+- **Tests**: 3 tests added, all passing (205 total)
+- **Notes**: Fixed JSON output to only include `subagent` field when `true` (omit for normal states)
