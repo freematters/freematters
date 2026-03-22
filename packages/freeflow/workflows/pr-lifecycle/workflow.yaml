@@ -55,6 +55,9 @@ states:
 
       Once authenticated:
       - Run lint/format checks (refer to project CLAUDE.md for check commands). Fix any failures first.
+      - **Exclude spec directory**: If a `./specs/<feature>/` directory exists for this feature,
+        ensure it is NOT included in the PR. Add it to `.gitignore` or `git reset HEAD specs/`
+        before committing. Spec artifacts are working documents and should not ship with the PR.
       - Commit all local changes.
       - Check if the current branch already has an open PR:
         `gh pr list --head <branch> --json number,url`
@@ -67,6 +70,23 @@ states:
           (e.g., `owner/repo#42`) and add `Closes #N` or `Resolves owner/repo#N` to the
           PR description to link the PR to the source issue.
         - Create via `gh pr create`
+
+      After the PR is created (or found), post a **PR comment** with:
+      1. **Implementation summary**: A concise overview of what was implemented and key design decisions.
+      2. **Integration test results**: Run integration tests (if any) and include the output.
+      3. **E2E test results**: If `e2e.md` exists in the spec directory (`./specs/<feature>/e2e.md`)
+         or in the project, run the e2e tests and include the output.
+      Format the comment as:
+      ```
+      ## Implementation Summary
+      <summary>
+
+      ## Integration Test Results
+      <test output or "N/A — no integration tests">
+
+      ## E2E Test Results
+      <test output or "N/A — no e2e tests">
+      ```
 
       Record the PR URL and number — subsequent states will need them.
     transitions:
