@@ -47,3 +47,15 @@
 - **What was built**: `fflow markdown convert <file> [-o <output>] [-j]` CLI command. Auto-detects direction by extension, loads with `loadFsm()`, serializes to opposite format.
 - **Tests**: 7 tests added, all passing (225 total)
 - **Notes**: Default output: same basename with swapped extension. `ARGS_INVALID` for unsupported extensions.
+
+## Code Review (Round 1)
+- **Verdict**: PASS after fixes
+- **Issues found**: 2 major, 4 medium, 4 minor
+- **Fixed**: All major + all medium (6 total)
+  - Added `# Workflow` h1 heading to serializer output
+  - Added guard for states without prompt (workflow delegation)
+  - Standardized on `js-yaml` (removed `yaml` package)
+  - Removed dead `append-todos` branch in tag handler
+  - Removed double `resolve()` in convert command
+  - Added `workflow.yml` probing in `probeDir()`
+- **Known limitations**: `from:`, `workflow:`, `extends_guide` directives are resolved by `loadFsm()` before serialization — round-trip doesn't preserve these directives (by design)
