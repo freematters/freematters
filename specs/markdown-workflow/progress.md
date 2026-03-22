@@ -29,3 +29,9 @@
 - **What was built**: Two agent skills — `/fflow markdown fix` (format spec + validation checklist + fix instructions) and `/fflow markdown convert` (CLI usage + verification steps + edge cases).
 - **Tests**: None (agent-driven skills)
 - **Notes**: Fix skill contains the canonical format spec for the agent to validate against.
+
+## Step 4: Loader Integration
+- **Files changed**: `src/fsm.ts` (modified), `src/__tests__/fsm.test.ts` (added tests), `src/__tests__/fixtures/` (3 new fixtures)
+- **What was built**: Wired `parseMarkdownWorkflow()` into `loadFsmInternal()` with extension-based format detection. Cross-format `from:` references work in both directions.
+- **Tests**: 4 tests added, all passing (209 total)
+- **Notes**: Created test fixtures for MD-only, MD→YAML refs, and YAML→MD refs.

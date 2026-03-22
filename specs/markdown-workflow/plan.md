@@ -19,7 +19,7 @@ graph LR
 - [x] Step 1: Markdown Parser
 - [x] Step 2: Markdown Serializer
 - [x] Step 3: YAML Serializer
-- [ ] Step 4: Loader Integration
+- [x] Step 4: Loader Integration
 - [ ] Step 5: Convert Command
 - [x] Step 6: Workflow Resolution
 - [x] Step 7: Skills (fix + convert)
