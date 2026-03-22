@@ -5,7 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { hookCommand } from "./commands/hook.js";
-import { installCommand } from "./commands/install.js";
+import { generateHooksCommand, installCommand } from "./commands/install.js";
 import { killCommand } from "./commands/kill.js";
 import { pollCommand } from "./commands/poll.js";
 import { serverCommand } from "./commands/server.js";
@@ -31,5 +31,6 @@ program.addCommand(stopCommand());
 program.addCommand(installCommand());
 program.addCommand(killCommand());
 program.addCommand(hookCommand(), { hidden: true });
+program.addCommand(generateHooksCommand(), { hidden: true });
 
 program.parse(process.argv);

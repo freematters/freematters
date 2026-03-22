@@ -8,7 +8,7 @@
   },
   "files": ["dist/", "skills/", "hooks/", ".claude-plugin/"],
   "scripts": {
-    "build": "tsc && npm --prefix frontend install && npm --prefix frontend run build",
+    "build": "tsc && node dist/cli.js _generate-hooks && npm --prefix frontend install && npm --prefix frontend run build",
     "prepublishOnly": "cd frontend && npm install && cd .. && npm run build",
     "postinstall": "codoc install claude 2>/dev/null || true",
     "test": "vitest run",

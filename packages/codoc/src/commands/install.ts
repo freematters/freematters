@@ -91,23 +91,28 @@ async function runInstall(platform: string): Promise<void> {
 
   const configPath = path.join(os.homedir(), ".codoc", "config.json");
   if (!fs.existsSync(configPath)) {
-    console.log("\nFirst-time setup: creating ~/.codoc/config.json\n");
-    const tunnelAnswer = await ask("Use Cloudflare Tunnel for remote access? (y/n): ");
-    const tunnel = tunnelAnswer.toLowerCase() === "y" ? "cloudflare" : null;
-    const portAnswer = await ask("HTTP port (default 3000): ");
-    const port = portAnswer ? Number.parseInt(portAnswer, 10) : 3000;
-    const nameAnswer = await ask("Default username (default browser_user): ");
-    const defaultName = nameAnswer || "browser_user";
+    if (!process.stdin.isTTY) {
+      console.log("No TTY detected, skipping interactive config setup.");
+      console.log("Create ~/.codoc/config.json manually before using codoc.");
+    } else {
+      console.log("\nFirst-time setup: creating ~/.codoc/config.json\n");
+      const tunnelAnswer = await ask("Use Cloudflare Tunnel for remote access? (y/n): ");
+      const tunnel = tunnelAnswer.toLowerCase() === "y" ? "cloudflare" : null;
+      const portAnswer = await ask("HTTP port (default 3000): ");
+      const port = portAnswer ? Number.parseInt(portAnswer, 10) : 3000;
+      const nameAnswer = await ask("Default username (default browser_user): ");
+      const defaultName = nameAnswer || "browser_user";
 
-    const configDir = path.dirname(configPath);
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
+      const configDir = path.dirname(configPath);
+      if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir, { recursive: true });
+      }
+      const config = { tunnel, port: Number.isNaN(port) ? 3000 : port, defaultName };
+      fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
+      console.log(`Config written to ${configPath}`);
+      console.log(JSON.stringify(config, null, 2));
+      console.log("");
     }
-    const config = { tunnel, port: Number.isNaN(port) ? 3000 : port, defaultName };
-    fs.writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`);
-    console.log(`Config written to ${configPath}`);
-    console.log(JSON.stringify(config, null, 2));
-    console.log("");
   }
 
   console.log(`Registering codoc plugin from ${packageRoot}...`);
@@ -138,6 +143,21 @@ async function runInstall(platform: string): Promise<void> {
   }
 
   console.log("Plugin registration complete.");
+}
+
+export function generateHooksCommand(): Command {
+  const cmd = new Command("_generate-hooks");
+  cmd
+    .description("Generate hooks.json with absolute paths (non-interactive)")
+    .action(() => {
+      const packageRoot = getPackageRoot();
+      const cliPath = path.join(packageRoot, "dist", "cli.js");
+      const hooksJsonPath = path.join(packageRoot, "hooks", "hooks.json");
+      const hooksJson = generateHooksJson(cliPath);
+      fs.writeFileSync(hooksJsonPath, `${JSON.stringify(hooksJson, null, 2)}\n`);
+      console.log(`hooks.json written to ${hooksJsonPath}`);
+    });
+  return cmd;
 }
 
 export function installCommand(): Command {
