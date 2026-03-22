@@ -16,7 +16,7 @@ graph LR
 
 - [x] Step 1: Define Message Types and Protocols
 - [x] Step 2: Extend Store with Gateway Fields
-- [ ] Step 3: Implement Gateway Server
+- [x] Step 3: Implement Gateway Server
 - [ ] Step 4: Implement Agent Daemon
 - [ ] Step 5: Extend CLI with --gateway Support
 - [ ] Step 6: Integration Tests

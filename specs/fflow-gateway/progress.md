@@ -11,3 +11,9 @@
 - **What was built**: Added GatewayInfo interface, extended RunMeta with optional gateway_id/client_id/daemon_id fields, added updateGatewayInfo() method
 - **Tests**: 6 tests added (create with/without gateway fields, partial fields, update/overwrite), all passing
 - **Notes**: None — no spec deviations
+
+## Step 3: Implement Gateway Server
+- **Files changed**: `packages/freeflow/src/gateway/server.ts` (created), `packages/freeflow/src/gateway/router.ts` (created), `packages/freeflow/src/gateway/client-handler.ts` (created), `packages/freeflow/src/gateway/daemon-handler.ts` (created), `packages/freeflow/src/gateway/__tests__/server.test.ts` (created)
+- **What was built**: Full Gateway server with REST API (health, CRUD runs), WebSocket handlers for clients and daemons, Router for message routing and daemon capacity tracking, API key auth middleware
+- **Tests**: 25 tests added (auth validation, REST endpoints, router logic, gateway-daemon integration), all passing
+- **Notes**: Required installing `ws` and `@types/ws` packages
