@@ -14,8 +14,8 @@ graph LR
 ## Checklist
 - [x] Step 1: Extend data models and store (Snapshot.visited_states, RunMeta.lite)
 - [x] Step 2: Add formatLiteCard and simplify formatReminder
-- [ ] Step 3: Lite-aware goto command
-- [ ] Step 4: start --lite flag and CLI parsing
+- [x] Step 3: Lite-aware goto command
+- [x] Step 4: start --lite flag and CLI parsing
 - [ ] Step 5: Integration tests
 
 ---
