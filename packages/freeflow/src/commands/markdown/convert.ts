@@ -15,7 +15,12 @@ export interface ConvertArgs {
 type Direction = "yaml-to-md" | "md-to-yaml";
 
 function detectDirection(filePath: string): Direction {
-  if (filePath.endsWith(".workflow.yaml") || filePath.endsWith(".workflow.yml")) {
+  if (
+    filePath.endsWith(".workflow.yaml") ||
+    filePath.endsWith(".workflow.yml") ||
+    filePath.endsWith(".yaml") ||
+    filePath.endsWith(".yml")
+  ) {
     return "yaml-to-md";
   }
   if (filePath.endsWith(".workflow.md")) {
@@ -23,7 +28,7 @@ function detectDirection(filePath: string): Direction {
   }
   throw new CliError(
     "ARGS_INVALID",
-    `unsupported file extension: expected .workflow.yaml or .workflow.md, got "${basename(filePath)}"`,
+    `unsupported file extension: expected .yaml, .yml, or .workflow.md, got "${basename(filePath)}"`,
   );
 }
 
@@ -31,7 +36,7 @@ function defaultOutputPath(filePath: string, direction: Direction): string {
   const dir = dirname(filePath);
   const base = basename(filePath);
   if (direction === "yaml-to-md") {
-    const stem = base.replace(/\.workflow\.ya?ml$/, "");
+    const stem = base.replace(/\.(workflow\.)?ya?ml$/, "");
     return join(dir, `${stem}.workflow.md`);
   }
   const stem = base.replace(/\.workflow\.md$/, "");
@@ -45,8 +50,12 @@ export function convert(args: ConvertArgs): void {
 
   let serialized: string;
   if (direction === "yaml-to-md") {
-    // Derive title from filename: "my-workflow.workflow.yaml" → "My Workflow"
-    const stem = basename(absPath).replace(/\.workflow\.ya?ml$/, "");
+    // Derive title from filename or parent dir name
+    let stem = basename(absPath).replace(/\.(workflow\.)?ya?ml$/, "");
+    // If stem is "workflow" (bare workflow.yaml), use parent directory name
+    if (stem === "workflow") {
+      stem = basename(dirname(absPath));
+    }
     const title = stem
       .split(/[-_]/)
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
