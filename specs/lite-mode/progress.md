@@ -23,3 +23,9 @@
 - **What was built**: Added `--lite` flag to `fflow start`. Persists `lite: true` in metadata and seeds `visited_states` with initial state in snapshot.
 - **Tests**: 4 new unit tests, all passing
 - **Notes**: Store changes duplicated in worktree, resolved during merge
+
+## Step 5: Integration tests
+- **Files changed**: `packages/freeflow/src/__tests__/lite-integration.test.ts`
+- **What was built**: 4 integration tests: visited states tracking, full lite round-trip, non-lite round-trip, hook reminder simplification
+- **Tests**: 4 new integration tests, all 188 tests passing
+- **Notes**: None

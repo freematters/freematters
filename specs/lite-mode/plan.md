@@ -16,7 +16,7 @@ graph LR
 - [x] Step 2: Add formatLiteCard and simplify formatReminder
 - [x] Step 3: Lite-aware goto command
 - [x] Step 4: start --lite flag and CLI parsing
-- [ ] Step 5: Integration tests
+- [x] Step 5: Integration tests
 
 ---
 
