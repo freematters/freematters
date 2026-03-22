@@ -12,7 +12,7 @@ graph LR
 ## Checklist
 - [x] Step 1: Schema — add `subagent` flag to FsmState
 - [x] Step 2: Output — add `formatSubagentDispatch` function
-- [ ] Step 3: Commands — route to dispatch format in start/goto
+- [x] Step 3: Commands — route to dispatch format in start/goto
 - [ ] Step 4: Integration tests — cross-module verification
 
 ---
