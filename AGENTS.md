@@ -27,6 +27,10 @@ npm test              # test all packages
 npm run check         # biome lint/format
 ```
 
+## Development
+
+- Always use the local build (`node packages/freeflow/dist/cli.js`) instead of the globally installed `fflow` when developing. The global binary points to the main repo and may not reflect worktree changes. Run `npm run build` in `packages/freeflow/` first.
+
 ## Conventions
 
 - Each package is self-contained under `packages/` with its own build, test, and lint setup
