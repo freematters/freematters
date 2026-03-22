@@ -88,7 +88,7 @@ describe("issue-to-pr workflow — path reachability", () => {
     fsm = loadFsm(WORKFLOW);
 
     // start → spec/create-issue
-    let state = walkPath(fsm, "start", ["new idea"]);
+    let state = walkPath(fsm, "start", ["proceed"]);
     expect(state).toBe("spec/create-issue");
 
     // Walk through spec-gen to spec/done
@@ -127,7 +127,7 @@ describe("issue-to-pr workflow — path reachability", () => {
     fsm = loadFsm(WORKFLOW);
 
     // start → spec/create-issue
-    let state = walkPath(fsm, "start", ["existing issue"]);
+    let state = walkPath(fsm, "start", ["proceed"]);
     expect(state).toBe("spec/create-issue");
 
     // Walk through spec-gen to spec/done

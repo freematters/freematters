@@ -97,7 +97,7 @@ states:
          ```
       4. Extract and remember: `repo` = `{owner}/{repo}`, `issue_number`, `issue_creator` = `.creator`.
       5. Derive `slug` from the issue title (lowercase, hyphens, no special chars).
-      6. Transition to `existing issue`.
+      6. Transition to `proceed`.
 
       ### New Idea
 
@@ -105,10 +105,9 @@ states:
 
       1. Extract the repo name from the user's prompt.
       2. Remember `repo`.
-      3. Transition to `new idea` — the spec sub-workflow will create the issue.
+      3. Transition to `proceed` — the spec sub-workflow will create the issue.
     transitions:
-      new idea: spec
-      existing issue: spec
+      proceed: spec
 
   spec:
     workflow: ../github-spec-gen/workflow.yaml
