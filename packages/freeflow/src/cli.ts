@@ -69,6 +69,7 @@ program
   .description("initialize a new run from a workflow YAML")
   .argument("<fsm_path>", "path to workflow YAML file")
   .option("--run-id <id>", "run identifier (auto-generated if omitted)")
+  .option("--lite", "enable lite mode (abbreviated output on re-visited states)")
   .action((_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     start({
@@ -76,6 +77,7 @@ program
       runId: opts.runId as string | undefined,
       root: resolveRoot(root),
       json: json ?? false,
+      lite: (opts.lite as boolean) ?? false,
     });
   });
 
