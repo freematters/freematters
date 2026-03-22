@@ -35,3 +35,9 @@
 - **What was built**: Wired `parseMarkdownWorkflow()` into `loadFsmInternal()` with extension-based format detection. Cross-format `from:` references work in both directions.
 - **Tests**: 4 tests added, all passing (209 total)
 - **Notes**: Created test fixtures for MD-only, MD→YAML refs, and YAML→MD refs.
+
+## Step 8: Integration Tests
+- **Files changed**: `src/__tests__/markdown-roundtrip.test.ts` (new)
+- **What was built**: 9 round-trip integration tests: YAML→MD→YAML (3), MD→YAML→MD (2), cross-format `from:` refs (2), complex workflow round-trips (2).
+- **Tests**: 9 tests added, all passing (218 total)
+- **Notes**: Uses `normalizeWhitespace()` for semantic comparison. State-level guide excluded from YAML→MD→YAML comparison (by design, it merges into Instructions).
