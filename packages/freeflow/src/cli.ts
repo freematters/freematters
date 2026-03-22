@@ -8,14 +8,12 @@ const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
 import { Command } from "commander";
 import { current } from "./commands/current.js";
-import { verify } from "./commands/e2e/verify.js";
 import { finish } from "./commands/finish.js";
 import { goto } from "./commands/goto.js";
 import { history } from "./commands/history.js";
 import { install } from "./commands/install.js";
 import { list } from "./commands/list.js";
 import { convert } from "./commands/markdown/convert.js";
-import { run as runCmd } from "./commands/run.js";
 import { start } from "./commands/start.js";
 import { validate } from "./commands/validate.js";
 import { main as postToolUseMain } from "./hooks/post-tool-use.js";
@@ -93,6 +91,7 @@ program
   .option("--stay", "stay and accept user input after workflow completes")
   .action(async (_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
+    const { run: runCmd } = await import("./commands/run.js");
     await runCmd({
       fsmPath: resolveWorkflowOrExit(_fsmPath, json ?? false),
       runId: opts.runId as string | undefined,
@@ -211,6 +210,7 @@ program
   .option("--verbose", "show tool calls in output")
   .action(async (planPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
+    const { verify } = await import("./commands/e2e/verify.js");
     await verify({
       planPath: resolve(planPath),
       testDir: resolve(opts.testDir as string),
