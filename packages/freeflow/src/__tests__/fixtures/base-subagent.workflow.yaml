@@ -1,0 +1,11 @@
+version: 1
+initial: start
+states:
+  start:
+    prompt: "Base start with subagent."
+    subagent: true
+    transitions:
+      next: done
+  done:
+    prompt: "Base done."
+    transitions: {}

@@ -1,0 +1,11 @@
+version: 1
+initial: start
+states:
+  start:
+    from: "./base-subagent.workflow.yaml#start"
+    subagent: false
+    transitions:
+      next: done
+  done:
+    prompt: "Child done."
+    transitions: {}

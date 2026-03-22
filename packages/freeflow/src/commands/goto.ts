@@ -139,6 +139,9 @@ ${labels}`,
       if (result.isDone) {
         data.completion_reason = "done_auto";
       }
+      if (card.subagent) {
+        data.subagent = true;
+      }
       printJson(jsonSuccess("Transition complete", data));
     } else if (card.subagent) {
       const cardOutput = formatSubagentDispatch(card, args.runId);
