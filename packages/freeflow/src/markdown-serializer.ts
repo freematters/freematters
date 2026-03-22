@@ -2,11 +2,16 @@ import { dump } from "js-yaml";
 import type { Fsm } from "./fsm.js";
 import { fsmToMermaid } from "./output.js";
 
+export interface SerializeMarkdownOptions {
+  /** Title for the h1 heading. Defaults to "Workflow". */
+  title?: string;
+}
+
 /**
  * Serialize an Fsm object into markdown workflow format.
  * Generates frontmatter, state machine mermaid diagram, and state sections.
  */
-export function serializeMarkdown(fsm: Fsm): string {
+export function serializeMarkdown(fsm: Fsm, opts?: SerializeMarkdownOptions): string {
   const lines: string[] = [];
 
   // 1. YAML frontmatter
@@ -23,7 +28,7 @@ export function serializeMarkdown(fsm: Fsm): string {
   lines.push("");
 
   // 2. Title
-  lines.push("# Workflow");
+  lines.push(`# ${opts?.title ?? "Workflow"}`);
   lines.push("");
 
   // 3. State Machine mermaid diagram

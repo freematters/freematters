@@ -43,8 +43,18 @@ export function convert(args: ConvertArgs): void {
   const direction = detectDirection(absPath);
   const fsm = loadFsm(absPath);
 
-  const serialized =
-    direction === "yaml-to-md" ? serializeMarkdown(fsm) : serializeYaml(fsm);
+  let serialized: string;
+  if (direction === "yaml-to-md") {
+    // Derive title from filename: "my-workflow.workflow.yaml" → "My Workflow"
+    const stem = basename(absPath).replace(/\.workflow\.ya?ml$/, "");
+    const title = stem
+      .split(/[-_]/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+    serialized = serializeMarkdown(fsm, { title: `${title} Workflow` });
+  } else {
+    serialized = serializeYaml(fsm);
+  }
 
   const outPath = args.output
     ? resolve(args.output)

@@ -84,6 +84,77 @@ function inlineToText(node: any): string {
     .join("");
 }
 
+// --- HTML node joining ---
+
+const APPEND_TODOS_OPEN_RE = /^<freeflow\s+append-todos\s*>/i;
+
+/**
+ * Join fragmented `<freeflow append-todos>...</freeflow>` html nodes.
+ * remark may split the block into separate html nodes when blank lines
+ * separate the opening tag, content, and closing tag. This function
+ * detects an open `<freeflow append-todos>` node and accumulates
+ * subsequent html nodes until `</freeflow>` is found, then emits
+ * the joined content as a single html node.
+ */
+function joinConsecutiveHtmlNodes(nodes: RootContent[]): RootContent[] {
+  const result: RootContent[] = [];
+  let collecting = false;
+  let htmlBuf: string[] = [];
+  let bufStart: RootContent | null = null;
+
+  for (const node of nodes) {
+    if (collecting) {
+      if (node.type === "html") {
+        htmlBuf.push((node as { value: string }).value);
+        if ((node as { value: string }).value.trim() === "</freeflow>") {
+          // Emit joined node
+          result.push({
+            ...bufStart,
+            type: "html",
+            value: htmlBuf.join("\n"),
+          } as RootContent);
+          collecting = false;
+          htmlBuf = [];
+          bufStart = null;
+        }
+      } else {
+        // Non-html node while collecting — flush as-is (malformed tag)
+        for (const line of htmlBuf) {
+          result.push({ ...bufStart, type: "html", value: line } as RootContent);
+        }
+        collecting = false;
+        htmlBuf = [];
+        bufStart = null;
+        result.push(node);
+      }
+      continue;
+    }
+
+    if (
+      node.type === "html" &&
+      APPEND_TODOS_OPEN_RE.test((node as { value: string }).value.trim()) &&
+      !(node as { value: string }).value.includes("</freeflow>")
+    ) {
+      // Start collecting: open tag without matching close
+      collecting = true;
+      bufStart = node;
+      htmlBuf = [(node as { value: string }).value];
+      continue;
+    }
+
+    result.push(node);
+  }
+
+  // Flush any remaining collected nodes (unclosed tag)
+  if (collecting) {
+    for (const line of htmlBuf) {
+      result.push({ ...bufStart, type: "html", value: line } as RootContent);
+    }
+  }
+
+  return result;
+}
+
 // --- Freeflow tag parsing ---
 
 const FREEFLOW_SELF_CLOSING_RE = /^<freeflow\s+(from|workflow)="([^"]+)"\s*\/?>$/;
@@ -186,6 +257,24 @@ function parseAppendTodosContent(raw: string): string[] {
 // --- Main parser ---
 
 /**
+ * Extract the h1 title from a markdown workflow string.
+ * Returns the text of the first h1 heading, or undefined if none.
+ */
+export function extractMarkdownTitle(content: string): string | undefined {
+  const tree = unified()
+    .use(remarkParse)
+    .use(remarkFrontmatter, ["yaml"])
+    .parse(content);
+
+  for (const node of tree.children) {
+    if (node.type === "heading" && node.depth === 1) {
+      return inlineToText(node);
+    }
+  }
+  return undefined;
+}
+
+/**
  * Parse a markdown workflow string into a raw document object.
  * The returned object has the same shape as yamlLoad() output,
  * ready for resolveWorkflowStates/resolveRefs/validation.
@@ -242,7 +331,9 @@ export function parseMarkdownWorkflow(content: string): Record<string, unknown> 
     const state: Record<string, unknown> = {};
 
     // Look for freeflow tags and subsections within the state
-    const stateNodes = section.nodes;
+    // Pre-join consecutive html nodes so that <freeflow append-todos> blocks
+    // split across multiple nodes (due to blank lines) are reassembled.
+    const stateNodes = joinConsecutiveHtmlNodes(section.nodes);
 
     // Extract freeflow tags first
     const filteredNodes: RootContent[] = [];
@@ -262,7 +353,7 @@ export function parseMarkdownWorkflow(content: string): Record<string, unknown> 
           continue;
         }
 
-        // Check for append-todos block (entire block as single HTML node)
+        // Check for append-todos block (entire block or joined fragments)
         const appendMatch = val.match(
           /^<freeflow\s+append-todos\s*>([\s\S]*?)<\/freeflow>$/,
         );
@@ -271,6 +362,7 @@ export function parseMarkdownWorkflow(content: string): Record<string, unknown> 
           continue;
         }
 
+        // Skip stray closing tags (shouldn't happen after joining, but defensive)
         if (val === "</freeflow>") {
           continue;
         }
