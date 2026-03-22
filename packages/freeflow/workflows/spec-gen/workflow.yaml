@@ -276,6 +276,12 @@ states:
 
       **Objective**: What this step achieves and why it matters.
 
+      **Related Files**: List the specific codebase files (existing or to-be-created)
+      that this step will read, modify, or create. Include files that provide
+      essential context (e.g., types, interfaces, configs) the implementing agent
+      needs. This allows spec-to-code to skip broad codebase exploration and jump
+      straight into implementation.
+
       **Implementation Guidance**: Specific technical instructions — what to create,
       modify, or wire up. Reference design.md sections where relevant.
 
