@@ -9,18 +9,14 @@
 #   create-issue
 #       |           \
 #   requirements ← → research
-#       |               |
-#       +-------+-------+
-#               |
-#          checkpoint
-#         /    |     \
-#   requirements  research  design
-#                           |     \
-#                          plan    requirements (gaps)
-#                         /    \
-#                   e2e-gen  design (revision)
-#                      |
-#                    done
+#       |
+#     design ← → requirements (gaps)
+#       |
+#      plan ← → design (revision)
+#       |
+#     e2e-gen
+#       |
+#     done
 #
 #   Fast forward: requirements → design → plan → e2e-gen → done (no intermediate approvals)
 
@@ -208,14 +204,11 @@ states:
       1. Post the structured requirements as a `## requirements.md` artifact comment.
       2. Update the issue body status checklist: check off "gathering requirements".
       3. Post transition options as an issue comment:
-         - "Requirements complete" (checkpoint)
-         - "Fast forward" (skip to design)
+         - "Revise requirements"
          - "Research first"
+         - "Proceed to design"
+         - "Fast forward" (skip to design, no intermediate approvals)
       4. Poll for the user's choice via comment reply.
-    transitions:
-      requirements complete: checkpoint
-      fast forward: design
-      need research: research
 
   research:
     from: "../spec-gen/workflow.yaml#research"
@@ -231,32 +224,9 @@ states:
       After completing research:
       1. Update the issue body status checklist: check off "research".
       2. Post transition options as an issue comment:
-         - "Research sufficient" (checkpoint)
          - "Back to requirements"
+         - "Proceed to design"
       3. Poll for the user's choice via comment reply.
-    transitions:
-      research sufficient: checkpoint
-      back to requirements: requirements
-
-  checkpoint:
-    from: "../spec-gen/workflow.yaml#checkpoint"
-    prompt: |
-      {{base}}
-
-      ### GitHub Adaptation
-
-      All artifact review happens via issue comments — do NOT read local files.
-      Fetch all comments on the issue to find artifacts:
-      ```bash
-      gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate
-      ```
-
-      Identify artifact comments (those starting with `## requirements.md`, `## research/...`, etc.).
-      Post the summary as an issue comment.
-    transitions:
-      proceed to design: design
-      back to requirements: requirements
-      more research: research
 
   design:
     from: "../spec-gen/workflow.yaml#design"
