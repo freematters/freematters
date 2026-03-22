@@ -1,4 +1,4 @@
 {
-  "references": [{ "path": "packages/freeflow" }],
+  "references": [{ "path": "packages/freeflow" }, { "path": "packages/codoc" }],
   "files": []
 }

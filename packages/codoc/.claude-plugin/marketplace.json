@@ -1,0 +1,12 @@
+{
+  "name": "codoc-local",
+  "owner": {
+    "name": "freematters"
+  },
+  "plugins": [
+    {
+      "name": "codoc",
+      "source": "./"
+    }
+  ]
+}

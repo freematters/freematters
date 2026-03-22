@@ -1,0 +1,6 @@
+node_modules/
+dist/
+hooks/hooks.json
+.claude/
+.playwright/
+test-results/

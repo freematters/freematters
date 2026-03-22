@@ -1,0 +1,8 @@
+{
+  "name": "codoc",
+  "version": "0.1.0",
+  "description": "Real-time collaborative markdown editing between AI agents and humans",
+  "author": {
+    "name": "freematters"
+  }
+}

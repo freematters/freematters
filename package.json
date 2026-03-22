@@ -4,11 +4,11 @@
   "type": "module",
   "workspaces": ["packages/*"],
   "scripts": {
-    "build": "npm run build -w packages/freeflow",
-    "test": "npm run test -w packages/freeflow",
+    "build": "npm run build -w packages/freeflow && npm run build -w packages/codoc",
+    "test": "npm run test -w packages/freeflow && npm run test -w packages/codoc",
     "test:integration": "npm run test:integration -w packages/freeflow",
     "test:claude": "npm run test:claude -w packages/freeflow",
-    "check": "biome check --write --error-on-warnings .",
+    "check": "biome check --write --error-on-warnings . && npm run check -w packages/codoc",
     "clean": "npm run clean --workspaces --if-present"
   },
   "devDependencies": {

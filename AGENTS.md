@@ -1,12 +1,13 @@
-# FreeFlow
+# FreeMatters
 
-Monorepo for FreeFlow — agent-native developer tools.
+Monorepo for FreeMatters — agent-native developer tools.
 
 ## Packages
 
 | Package | Description |
 |---------|-------------|
 | [freeflow](packages/freeflow/) | CLI-first workflow runtime for agent workflows |
+| [codoc](packages/codoc/) | Real-time collaborative markdown editing between AI agents and humans |
 
 ## Local Commands
 

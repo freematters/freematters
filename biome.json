@@ -21,6 +21,6 @@
     }
   },
   "files": {
-    "ignore": ["dist/", "node_modules/", ".fc/", ".fc-worktrees/"]
+    "ignore": ["dist/", "node_modules/", ".fc/", ".fc-worktrees/", "packages/codoc/"]
   }
 }
