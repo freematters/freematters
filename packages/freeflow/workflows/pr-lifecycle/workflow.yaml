@@ -151,6 +151,16 @@ states:
     prompt: |
       Rebase onto the latest target branch.
 
+      ## Pre-check: verify PR is still open
+
+      The target branch may have been updated because THIS PR was just merged.
+      Before rebasing, wait 2 seconds and then check if the PR was already merged:
+      ```bash
+      sleep 2
+      gh pr view <pr_number> --json state --jq '.state'
+      ```
+      If the state is `MERGED` or `CLOSED`, skip the rebase and transition to `PR merged`.
+
       ## Steps
 
       1. Fetch the latest target branch:
@@ -166,11 +176,13 @@ states:
       4. Run lint/format/unit tests locally to confirm the rebase doesn't break anything
          (refer to project CLAUDE.md for check commands).
     todos:
+      - Check if PR was merged before rebasing
       - Fetch latest target branch
       - Rebase and resolve any conflicts
       - Run lint/format/unit tests to verify
     transitions:
       rebased: push
+      PR merged: done
 
   address:
     prompt: |
