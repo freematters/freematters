@@ -89,14 +89,10 @@ export function formatSubagentDispatch(
     lines.push("");
   }
 
-  lines.push(
-    `You are in **${card.state}** state. This state uses subagent execution.`,
-  );
+  lines.push(`You are in **${card.state}** state. This state uses subagent execution.`);
   lines.push("");
   lines.push("Spawn a subagent with the following instructions:");
-  lines.push(
-    `1. Run \`fflow current --run-id ${runId}\` to get your instructions`,
-  );
+  lines.push(`1. Run \`fflow current --run-id ${runId}\` to get your instructions`);
   lines.push("2. Execute the instructions fully");
   lines.push("3. When done, report back using this exact format:");
   lines.push("");
