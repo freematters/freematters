@@ -17,3 +17,9 @@
 - **What was built**: Full Gateway server with REST API (health, CRUD runs), WebSocket handlers for clients and daemons, Router for message routing and daemon capacity tracking, API key auth middleware
 - **Tests**: 25 tests added (auth validation, REST endpoints, router logic, gateway-daemon integration), all passing
 - **Notes**: Required installing `ws` and `@types/ws` packages
+
+## Step 4: Implement Agent Daemon
+- **Files changed**: `packages/freeflow/src/daemon/index.ts` (created), `packages/freeflow/src/daemon/agent-pool.ts` (created), `packages/freeflow/src/daemon/gateway-client.ts` (created), `packages/freeflow/src/daemon/__tests__/daemon.test.ts` (created)
+- **What was built**: Daemon process with GatewayClient (WebSocket connection, registration, message passing), AgentPool (lifecycle management, capacity enforcement, input queuing), and createDaemon factory
+- **Tests**: 14 tests added (gateway client, agent pool, daemon factory, integration), all passing
+- **Notes**: None — no spec deviations
