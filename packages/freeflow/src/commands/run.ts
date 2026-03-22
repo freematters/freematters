@@ -260,7 +260,8 @@ function fsmGotoHandler(
         let text =
           lite && alreadyVisited
             ? formatLiteCard(card, {
-                currentHint: "Call the `fsm_current` tool to review full instructions.",
+                currentHint:
+                  "Run `fflow current` or call `fsm_current` to review full instructions.",
               })
             : formatStateCard(card);
         if (isTerminal) {
