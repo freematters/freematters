@@ -1,8 +1,8 @@
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { CliError } from "../../errors.js";
 import { loadFsm } from "../../fsm.js";
-import { serializeMarkdown } from "../../markdown-serializer.js";
+import { serializeRawYamlToMarkdown } from "../../markdown-serializer.js";
 import { jsonSuccess, printJson } from "../../output.js";
 import { serializeYaml } from "../../yaml-serializer.js";
 
@@ -43,25 +43,31 @@ function defaultOutputPath(filePath: string, direction: Direction): string {
   return join(dir, `${stem}.workflow.yaml`);
 }
 
+function deriveTitle(absPath: string): string {
+  let stem = basename(absPath).replace(/\.(workflow\.)?ya?ml$/, "");
+  if (stem === "workflow") {
+    stem = basename(dirname(absPath));
+  }
+  return `${stem
+    .split(/[-_]/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ")} Workflow`;
+}
+
 export function convert(args: ConvertArgs): void {
   const absPath = args.filePath;
   const direction = detectDirection(absPath);
-  const fsm = loadFsm(absPath);
 
   let serialized: string;
   if (direction === "yaml-to-md") {
-    // Derive title from filename or parent dir name
-    let stem = basename(absPath).replace(/\.(workflow\.)?ya?ml$/, "");
-    // If stem is "workflow" (bare workflow.yaml), use parent directory name
-    if (stem === "workflow") {
-      stem = basename(dirname(absPath));
-    }
-    const title = stem
-      .split(/[-_]/)
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-    serialized = serializeMarkdown(fsm, { title: `${title} Workflow` });
+    // Read raw YAML and convert directly — preserves from:, workflow:, extends_guide
+    const yamlContent = readFileSync(absPath, "utf-8");
+    serialized = serializeRawYamlToMarkdown(yamlContent, {
+      title: deriveTitle(absPath),
+    });
   } else {
+    // MD→YAML: load resolved Fsm and serialize
+    const fsm = loadFsm(absPath);
     serialized = serializeYaml(fsm);
   }
 
