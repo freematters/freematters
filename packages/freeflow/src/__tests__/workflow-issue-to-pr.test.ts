@@ -2,9 +2,8 @@ import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 import { type Fsm, loadFsm } from "../fsm.js";
 
-// biome-ignore lint/style/noNonNullAssertion: dirname is always defined for file modules
 const WORKFLOW = resolve(
-  import.meta.dirname!,
+  import.meta.dirname ?? __dirname,
   "../../workflows/issue-to-pr/workflow.yaml",
 );
 
