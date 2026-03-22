@@ -121,12 +121,11 @@ export function serializeRawYamlToMarkdown(
 
   const lines: string[] = [];
 
-  // 1. Frontmatter
+  // 1. Frontmatter (extends_guide goes in body, not frontmatter)
   const frontmatter: Record<string, unknown> = {};
   if (doc.version !== undefined) frontmatter.version = doc.version;
   if (doc.initial !== undefined) frontmatter.initial = doc.initial;
   if (doc.allowed_tools !== undefined) frontmatter.allowed_tools = doc.allowed_tools;
-  if (doc.extends_guide !== undefined) frontmatter.extends_guide = doc.extends_guide;
   lines.push("---");
   lines.push(dump(frontmatter, { lineWidth: -1 }).trimEnd());
   lines.push("---");
@@ -154,7 +153,20 @@ export function serializeRawYamlToMarkdown(
   if (typeof doc.guide === "string" && doc.guide.length > 0) {
     lines.push("## Guide");
     lines.push("");
+    if (doc.extends_guide) {
+      lines.push(
+        `<freeflow extends-guide="${doc.extends_guide}">*Extends guide from: ${doc.extends_guide}*</freeflow>`,
+      );
+      lines.push("");
+    }
     lines.push(doc.guide.trimEnd());
+    lines.push("");
+  } else if (doc.extends_guide) {
+    lines.push("## Guide");
+    lines.push("");
+    lines.push(
+      `<freeflow extends-guide="${doc.extends_guide}">*Extends guide from: ${doc.extends_guide}*</freeflow>`,
+    );
     lines.push("");
   }
 
@@ -164,15 +176,19 @@ export function serializeRawYamlToMarkdown(
     lines.push(`## State: ${name}`);
     lines.push("");
 
-    // from: directive → <freeflow from="...">
+    // from: directive → <freeflow from="...">readable text</freeflow>
     if (state.from) {
-      lines.push(`<freeflow from="${state.from}">`);
+      lines.push(
+        `<freeflow from="${state.from}">*Inherits from: ${state.from}*</freeflow>`,
+      );
       lines.push("");
     }
 
-    // workflow: directive → <freeflow workflow="...">
+    // workflow: directive → <freeflow workflow="...">readable text</freeflow>
     if (state.workflow) {
-      lines.push(`<freeflow workflow="${state.workflow}">`);
+      lines.push(
+        `<freeflow workflow="${state.workflow}">*Run workflow: ${state.workflow}*</freeflow>`,
+      );
       lines.push("");
     }
 

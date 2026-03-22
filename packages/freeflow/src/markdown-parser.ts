@@ -157,10 +157,15 @@ function joinConsecutiveHtmlNodes(nodes: RootContent[]): RootContent[] {
 
 // --- Freeflow tag parsing ---
 
-const FREEFLOW_SELF_CLOSING_RE = /^<freeflow\s+(from|workflow)="([^"]+)"\s*\/?>$/;
+// Matches both self-closing and content-bearing freeflow tags:
+//   <freeflow from="x">          (self-closing without /)
+//   <freeflow from="x"/>         (self-closing with /)
+//   <freeflow from="x">...</freeflow>  (with content — content is ignored)
+const FREEFLOW_ATTR_RE =
+  /^<freeflow\s+(from|workflow|extends-guide)="([^"]+)"[^>]*>(?:[\s\S]*<\/freeflow>)?$/;
 
-function isFreeflowOpenTag(text: string): { attr: string; value: string } | null {
-  const m = text.trim().match(FREEFLOW_SELF_CLOSING_RE);
+function isFreeflowAttrTag(text: string): { attr: string; value: string } | null {
+  const m = text.trim().match(FREEFLOW_ATTR_RE);
   if (m) return { attr: m[1], value: m[2] };
   return null;
 }
@@ -317,9 +322,23 @@ export function parseMarkdownWorkflow(content: string): Record<string, unknown> 
       continue;
     }
 
-    // Guide section
+    // Guide section — extract extends-guide tags, then capture remaining as guide text
     if (section.heading === "Guide" && section.depth === 2) {
-      doc.guide = nodesToMarkdown(section.nodes);
+      const guideNodes: RootContent[] = [];
+      for (const node of section.nodes) {
+        if (node.type === "html") {
+          const tagInfo = isFreeflowAttrTag(node.value.trim());
+          if (tagInfo && tagInfo.attr === "extends-guide") {
+            doc.extends_guide = tagInfo.value;
+            continue;
+          }
+        }
+        guideNodes.push(node);
+      }
+      const guideText = nodesToMarkdown(guideNodes);
+      if (guideText.length > 0) {
+        doc.guide = guideText;
+      }
       continue;
     }
 
@@ -343,7 +362,7 @@ export function parseMarkdownWorkflow(content: string): Record<string, unknown> 
         const val = node.value.trim();
 
         // Check for self-closing freeflow tags (single-line)
-        const tagInfo = isFreeflowOpenTag(val);
+        const tagInfo = isFreeflowAttrTag(val);
         if (tagInfo) {
           if (tagInfo.attr === "from") {
             state.from = tagInfo.value;
