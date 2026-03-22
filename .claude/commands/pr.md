@@ -18,10 +18,14 @@ If `CURRENT_BRANCH == DEFAULT_BRANCH`:
    ```
 3. Proceed with the workflow from the worktree directory.
 
-After the PR is merged (workflow reaches `done` state):
-1. Return to the original repo root.
-2. Remove the worktree: `git worktree remove .claude/worktrees/<branch_name>`
-3. Check out the default branch: `git checkout $DEFAULT_BRANCH && git pull`
+After the PR is merged (workflow reaches `done` state), print cleanup instructions for the user:
+```
+To clean up the worktree, run:
+  cd <original_repo_root>
+  git worktree remove .claude/worktrees/<branch_name>
+  git checkout <DEFAULT_BRANCH> && git pull
+```
+Do NOT execute the cleanup yourself — removing the worktree from within it breaks the session.
 
 Then proceed with the workflow:
 
