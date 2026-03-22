@@ -10,7 +10,12 @@ import { agentLog, colors as c, logSdkMessage } from "../agent-log.js";
 import { MultiTurnSession } from "../e2e/multi-turn-session.js";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
-import { formatStateCard, handleError, stateCardFromFsm } from "../output.js";
+import {
+  formatLiteCard,
+  formatStateCard,
+  handleError,
+  stateCardFromFsm,
+} from "../output.js";
 import { symlinkSessionLog } from "../session-log.js";
 import { type RunStatus, Store } from "../store.js";
 
@@ -29,6 +34,7 @@ export interface RunArgs {
   model?: string;
   verbose?: boolean;
   stay?: boolean;
+  lite?: boolean;
 }
 
 export interface RunCoreOptions {
@@ -39,6 +45,7 @@ export interface RunCoreOptions {
   model?: string;
   verbose?: boolean;
   stay?: boolean;
+  lite?: boolean;
   logFn?: (msg: string, color?: string) => void;
 }
 
@@ -93,13 +100,14 @@ export function createFsmTools(
   store: Store,
   runId: string,
   logFn: (msg: string, color?: string) => void = () => {},
+  lite?: boolean,
 ): {
   fsm_goto: FsmToolHandler;
   fsm_current: FsmToolHandler;
   request_input: FsmToolHandler;
 } {
   return {
-    fsm_goto: fsmGotoHandler(fsm, store, runId, logFn),
+    fsm_goto: fsmGotoHandler(fsm, store, runId, logFn, lite),
     fsm_current: fsmCurrentHandler(fsm, store, runId),
     request_input: requestInputHandler(fsm, store, runId),
   };
@@ -110,8 +118,9 @@ export function createFsmMcpServer(
   store: Store,
   runId: string,
   logFn: (msg: string, color?: string) => void = () => {},
+  lite?: boolean,
 ) {
-  const tools = createFsmTools(fsm, store, runId, logFn);
+  const tools = createFsmTools(fsm, store, runId, logFn, lite);
   const fsmGoto = tool(
     "fsm_goto",
     "Transition FSM to a new state",
@@ -150,6 +159,7 @@ function fsmGotoHandler(
   store: Store,
   runId: string,
   logFn: (msg: string, color?: string) => void = () => {},
+  lite?: boolean,
 ): FsmToolHandler {
   return async (rawArgs) => {
     const args = rawArgs as { target: string; on: string };
@@ -213,6 +223,16 @@ function fsmGotoHandler(
         const isTerminal = Object.keys(targetState.transitions).length === 0;
         const newStatus: RunStatus = isTerminal ? "completed" : "active";
 
+        // Track visited states in lite mode
+        let alreadyVisited = false;
+        let visitedStates: string[] | undefined;
+        if (lite) {
+          const visitedSet = new Set(snapshot.visited_states ?? []);
+          alreadyVisited = visitedSet.has(args.target);
+          visitedSet.add(args.target);
+          visitedStates = [...visitedSet];
+        }
+
         logFn(
           `fsm_goto: ${snapshot.state} —[${args.on}]→ ${args.target}${isTerminal ? " (terminal)" : ""}`,
           c.green,
@@ -228,12 +248,17 @@ function fsmGotoHandler(
             actor: "agent",
             reason: isTerminal ? "done_auto" : null,
           },
-          { run_status: newStatus, state: args.target },
+          {
+            run_status: newStatus,
+            state: args.target,
+            ...(visitedStates !== undefined && { visited_states: visitedStates }),
+          },
           { lockHeld: true },
         );
 
         const card = stateCardFromFsm(args.target, targetState);
-        let text = formatStateCard(card);
+        let text =
+          lite && alreadyVisited ? formatLiteCard(card) : formatStateCard(card);
         if (isTerminal) {
           text += "\n\nThis is a terminal state. The workflow is complete.";
         }
@@ -363,7 +388,7 @@ export async function runCore(
 
   const store = new Store(opts.root);
   try {
-    store.initRun(runId, opts.fsmPath);
+    store.initRun(runId, opts.fsmPath, opts.lite);
   } catch (err: unknown) {
     if (err instanceof Error && err.message.includes("already exists")) {
       throw new CliError("RUN_EXISTS", "run already exists, use a different --run-id", {
@@ -383,12 +408,16 @@ export async function runCore(
       actor: "system",
       reason: null,
     },
-    { run_status: "active", state: fsm.initial },
+    {
+      run_status: "active",
+      state: fsm.initial,
+      ...(opts.lite ? { visited_states: [fsm.initial] } : {}),
+    },
   );
 
   logFn(`state=${fsm.initial} (initial)`, c.green);
 
-  const fsmServer = createFsmMcpServer(fsm, store, runId, logFn);
+  const fsmServer = createFsmMcpServer(fsm, store, runId, logFn, opts.lite);
 
   const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
   const stateCard = formatStateCard(card);
@@ -533,6 +562,7 @@ export async function run(args: RunArgs): Promise<void> {
       model: args.model,
       verbose: args.verbose,
       stay: args.stay,
+      lite: args.lite,
     });
   } catch (err: unknown) {
     handleError(err, args.json);
