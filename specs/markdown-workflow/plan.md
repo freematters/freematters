@@ -21,7 +21,7 @@ graph LR
 - [x] Step 3: YAML Serializer
 - [ ] Step 4: Loader Integration
 - [ ] Step 5: Convert Command
-- [ ] Step 6: Workflow Resolution
+- [x] Step 6: Workflow Resolution
 - [ ] Step 7: Skills (fix + convert)
 - [ ] Step 8: Integration Tests
 

@@ -11,3 +11,9 @@
 - **What was built**: `serializeYaml(fsm)` function that converts an `Fsm` object to YAML format using `js-yaml` dump with block scalar style for multi-line content.
 - **Tests**: 9 tests added, all passing
 - **Notes**: Optional fields (guide, allowed_tools, todos, per-state guide) omitted when absent. Round-trip verified.
+
+## Step 6: Workflow Resolution
+- **Files changed**: `src/resolve-workflow.ts` (modified), `src/__tests__/resolve-workflow.test.ts` (new)
+- **What was built**: Updated `probeDir()` to discover `.workflow.md` files and throw `WORKFLOW_AMBIGUOUS` when both formats exist. Added `.workflow.md` to `hasWorkflowExtension()`.
+- **Tests**: 5 tests added, all passing (+ 8 existing pass)
+- **Notes**: YAML checked first, then MD. Flat filename regex updated for `.workflow.md`.
