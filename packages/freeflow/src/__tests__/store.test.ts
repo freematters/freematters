@@ -235,6 +235,71 @@ describe("Store — session management", () => {
   });
 });
 
+describe("Store — lite mode data models", () => {
+  test("backwards-compatible snapshot parsing: missing visited_states returns undefined", () => {
+    const s = freshStore();
+    s.initRun("compat", "/fake.yaml");
+    // Commit without visited_states (old-style snapshot)
+    s.commit("compat", startEvent("plan"), startSnapshot("plan"));
+
+    const snap = s.readSnapshot("compat");
+    expect(snap).not.toBeNull();
+    expect(snap?.visited_states).toBeUndefined();
+  });
+
+  test("commit() with visited_states in snapshot input persists the array", () => {
+    const s = freshStore();
+    s.initRun("visited", "/fake.yaml");
+    s.commit("visited", startEvent("plan"), {
+      run_status: "active",
+      state: "plan",
+      visited_states: ["plan"],
+    });
+
+    const snap = s.readSnapshot("visited");
+    expect(snap).not.toBeNull();
+    expect(snap?.visited_states).toEqual(["plan"]);
+
+    // Second commit adds another state
+    s.commit("visited", gotoEvent("plan", "coding", "approved"), {
+      run_status: "active",
+      state: "coding",
+      visited_states: ["plan", "coding"],
+    });
+
+    const snap2 = s.readSnapshot("visited");
+    expect(snap2?.visited_states).toEqual(["plan", "coding"]);
+  });
+
+  test("commit() without visited_states carries forward from current snapshot", () => {
+    const s = freshStore();
+    s.initRun("carry", "/fake.yaml");
+    // First commit with visited_states
+    s.commit("carry", startEvent("plan"), {
+      run_status: "active",
+      state: "plan",
+      visited_states: ["plan"],
+    });
+
+    // Second commit without visited_states — should carry forward
+    s.commit("carry", gotoEvent("plan", "coding", "approved"), {
+      run_status: "active",
+      state: "coding",
+    });
+
+    const snap = s.readSnapshot("carry");
+    expect(snap?.visited_states).toEqual(["plan"]);
+  });
+
+  test("readMeta() on a meta file without lite returns undefined for that field", () => {
+    const s = freshStore();
+    s.initRun("no-lite", "/fake.yaml");
+
+    const meta = s.readMeta("no-lite");
+    expect(meta.lite).toBeUndefined();
+  });
+});
+
 describe("Store — concurrent writes", () => {
   test("parallel commits produce monotonic seq with no corruption", async () => {
     const root = join(tmp, "concurrent-root");

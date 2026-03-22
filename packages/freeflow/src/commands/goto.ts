@@ -1,6 +1,8 @@
 import { CliError } from "../errors.js";
 import { loadFsm } from "../fsm.js";
 import {
+  formatDuration,
+  formatLiteCard,
   formatStateCard,
   handleError,
   jsonSuccess,
@@ -29,6 +31,7 @@ export function goto(args: GotoArgs): void {
 
     const meta = store.readMeta(args.runId);
     const fsm = loadFsm(meta.fsm_path);
+    const isLite = meta.lite === true;
 
     const result = store.withLock(args.runId, () => {
       const snapshot = store.readSnapshot(args.runId);
@@ -73,6 +76,16 @@ ${labels}`,
         );
       }
 
+      // Track visited states only in lite mode
+      let alreadyVisited = false;
+      let visitedStates: string[] | undefined;
+      if (isLite) {
+        const visitedSet = new Set(snapshot.visited_states ?? []);
+        alreadyVisited = visitedSet.has(args.target);
+        visitedSet.add(args.target);
+        visitedStates = [...visitedSet];
+      }
+
       const isDone = args.target === "done";
       const newStatus: RunStatus = isDone ? "completed" : "active";
 
@@ -86,11 +99,15 @@ ${labels}`,
           actor: "agent",
           reason: isDone ? "done_auto" : null,
         },
-        { run_status: newStatus, state: args.target },
+        {
+          run_status: newStatus,
+          state: args.target,
+          ...(visitedStates !== undefined && { visited_states: visitedStates }),
+        },
         { lockHeld: true },
       );
 
-      return { isDone, newStatus, fromState: snapshot.state };
+      return { isDone, newStatus, fromState: snapshot.state, alreadyVisited };
     });
 
     const card = stateCardFromFsm(args.target, fsm.states[args.target]);
@@ -103,11 +120,7 @@ ${labels}`,
       const curEvent = events[events.length - 1];
       const elapsed =
         new Date(curEvent.ts).getTime() - new Date(prevEvent.ts).getTime();
-      if (elapsed < 1000) timeInPrevState = `${elapsed}ms`;
-      else if (elapsed < 60_000) timeInPrevState = `${(elapsed / 1000).toFixed(1)}s`;
-      else if (elapsed < 3_600_000)
-        timeInPrevState = `${(elapsed / 60_000).toFixed(1)}m`;
-      else timeInPrevState = `${(elapsed / 3_600_000).toFixed(1)}h`;
+      timeInPrevState = formatDuration(elapsed);
     }
 
     if (args.json) {
@@ -125,6 +138,8 @@ ${labels}`,
         data.completion_reason = "done_auto";
       }
       printJson(jsonSuccess("Transition complete", data));
+    } else if (isLite && result.alreadyVisited) {
+      process.stdout.write(`${formatLiteCard(card)}\n`);
     } else {
       process.stdout.write(`${formatStateCard(card)}\n`);
     }

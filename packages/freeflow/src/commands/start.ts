@@ -20,6 +20,7 @@ export interface StartArgs {
   runId?: string;
   root: string;
   json: boolean;
+  lite?: boolean;
 }
 
 export function start(args: StartArgs): void {
@@ -29,7 +30,7 @@ export function start(args: StartArgs): void {
 
     const store = new Store(args.root);
     try {
-      store.initRun(runId, args.fsmPath);
+      store.initRun(runId, args.fsmPath, args.lite);
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("already exists")) {
         throw new CliError(
@@ -51,7 +52,11 @@ export function start(args: StartArgs): void {
         actor: "system",
         reason: null,
       },
-      { run_status: "active", state: fsm.initial },
+      {
+        run_status: "active",
+        state: fsm.initial,
+        ...(args.lite ? { visited_states: [fsm.initial] } : {}),
+      },
     );
 
     const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);

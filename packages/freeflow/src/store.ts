@@ -22,6 +22,7 @@ export interface RunMeta {
   created_at: string;
   version: number;
   session_id?: string;
+  lite?: boolean;
 }
 
 export interface StoreEvent {
@@ -43,6 +44,7 @@ export interface Snapshot {
   state: string;
   last_seq: number;
   updated_at: string;
+  visited_states?: string[];
 }
 
 export interface EventInput {
@@ -58,6 +60,7 @@ export interface EventInput {
 export interface SnapshotInput {
   run_status: RunStatus;
   state: string;
+  visited_states?: string[];
 }
 
 // --- Helpers ---
@@ -146,7 +149,7 @@ export class Store {
 
   // --- Public API ---
 
-  initRun(runId: string, fsmPath: string): RunMeta {
+  initRun(runId: string, fsmPath: string, lite?: boolean): RunMeta {
     const dir = this.runDir(runId);
     if (existsSync(dir)) {
       throw new Error(`Run "${runId}" already exists`);
@@ -158,6 +161,7 @@ export class Store {
       fsm_path: fsmPath,
       created_at: nowISO(),
       version: 1,
+      ...(lite && { lite: true }),
     };
     writeFileSync(this.metaPath(runId), JSON.stringify(meta, null, 2), "utf-8");
     return meta;
@@ -240,6 +244,9 @@ export class Store {
       // Append event
       appendFileSync(this.eventsPath(runId), `${JSON.stringify(event)}\n`, "utf-8");
 
+      // Resolve visited_states: use input if provided, else carry forward from current snapshot
+      const visitedStates = snapshotInput.visited_states ?? currentSnap?.visited_states;
+
       // Write snapshot
       const snapshot: Snapshot = {
         run_id: runId,
@@ -247,6 +254,7 @@ export class Store {
         state: snapshotInput.state,
         last_seq: event.seq,
         updated_at: now,
+        ...(visitedStates !== undefined && { visited_states: visitedStates }),
       };
       writeFileSync(
         this.snapshotPath(runId),
