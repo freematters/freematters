@@ -23,8 +23,8 @@ export function stateCardFromFsm(stateName: string, fsmState: FsmState): StateCa
   if (fsmState.guide) {
     card.guide = fsmState.guide;
   }
-  if (fsmState.subagent) {
-    card.subagent = true;
+  if (fsmState.subagent !== undefined) {
+    card.subagent = fsmState.subagent;
   }
   return card;
 }

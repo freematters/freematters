@@ -65,4 +65,15 @@ describe("stateCardFromFsm subagent flag", () => {
 
     expect(card.subagent).toBeUndefined();
   });
+
+  test("Test 7c: preserves explicit subagent: false", () => {
+    const fsmState: FsmState = {
+      prompt: "Do the work.",
+      transitions: { done: "done" },
+      subagent: false,
+    };
+    const card = stateCardFromFsm("execute", fsmState);
+
+    expect(card.subagent).toBe(false);
+  });
 });
