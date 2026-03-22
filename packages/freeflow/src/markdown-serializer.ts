@@ -22,7 +22,11 @@ export function serializeMarkdown(fsm: Fsm): string {
   lines.push("---");
   lines.push("");
 
-  // 2. State Machine mermaid diagram
+  // 2. Title
+  lines.push("# Workflow");
+  lines.push("");
+
+  // 3. State Machine mermaid diagram
   lines.push("## State Machine");
   lines.push("");
   lines.push("```mermaid");
@@ -30,7 +34,7 @@ export function serializeMarkdown(fsm: Fsm): string {
   lines.push("```");
   lines.push("");
 
-  // 3. Guide (if present)
+  // 4. Guide (if present)
   if (fsm.guide) {
     lines.push("## Guide");
     lines.push("");
@@ -38,22 +42,24 @@ export function serializeMarkdown(fsm: Fsm): string {
     lines.push("");
   }
 
-  // 4. State sections
+  // 5. State sections
   for (const [name, state] of Object.entries(fsm.states)) {
     lines.push(`## State: ${name}`);
     lines.push("");
 
-    // Instructions
-    lines.push("### Instructions");
-    lines.push("");
-    if (state.guide) {
-      lines.push(state.guide);
+    // Instructions (skip for delegation states with no prompt)
+    if (state.prompt) {
+      lines.push("### Instructions");
       lines.push("");
-      lines.push("---");
+      if (state.guide) {
+        lines.push(state.guide);
+        lines.push("");
+        lines.push("---");
+        lines.push("");
+      }
+      lines.push(state.prompt);
       lines.push("");
     }
-    lines.push(state.prompt);
-    lines.push("");
 
     // Todos (only if present)
     if (state.todos && state.todos.length > 0) {

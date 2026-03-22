@@ -39,7 +39,7 @@ function defaultOutputPath(filePath: string, direction: Direction): string {
 }
 
 export function convert(args: ConvertArgs): void {
-  const absPath = resolve(args.filePath);
+  const absPath = args.filePath;
   const direction = detectDirection(absPath);
   const fsm = loadFsm(absPath);
 

@@ -1,8 +1,8 @@
+import { load as yamlLoad } from "js-yaml";
 import type { Root, RootContent } from "mdast";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkParse from "remark-parse";
 import { unified } from "unified";
-import { parse as yamlParse } from "yaml";
 import { FsmError } from "./fsm.js";
 
 // --- Helpers ---
@@ -91,10 +91,6 @@ const FREEFLOW_SELF_CLOSING_RE = /^<freeflow\s+(from|workflow)="([^"]+)"\s*\/?>$
 function isFreeflowOpenTag(text: string): { attr: string; value: string } | null {
   const m = text.trim().match(FREEFLOW_SELF_CLOSING_RE);
   if (m) return { attr: m[1], value: m[2] };
-  // Check for append-todos open tag
-  if (/^<freeflow\s+append-todos\s*>$/i.test(text.trim())) {
-    return { attr: "append-todos", value: "" };
-  }
   return null;
 }
 
@@ -206,7 +202,7 @@ export function parseMarkdownWorkflow(content: string): Record<string, unknown> 
     fail("missing frontmatter (YAML front matter block is required)");
   }
 
-  const frontmatter = yamlParse(yamlNode.value) as Record<string, unknown>;
+  const frontmatter = yamlLoad(yamlNode.value) as Record<string, unknown>;
   if (!frontmatter || typeof frontmatter !== "object") {
     fail("frontmatter must be a YAML mapping");
   }
@@ -262,8 +258,6 @@ export function parseMarkdownWorkflow(content: string): Record<string, unknown> 
             state.from = tagInfo.value;
           } else if (tagInfo.attr === "workflow") {
             state.workflow = tagInfo.value;
-          } else if (tagInfo.attr === "append-todos") {
-            // Should not happen as block form is parsed as single HTML node
           }
           continue;
         }

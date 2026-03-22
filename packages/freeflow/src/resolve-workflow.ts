@@ -78,26 +78,34 @@ export function resolveWorkflow(input: string): string {
 }
 
 /**
- * Probe a directory for a workflow file at `<baseName>/workflow.yaml` or
- * `<baseName>/workflow.md`. If both exist, throw WORKFLOW_AMBIGUOUS.
+ * Probe a directory for a workflow file at `<baseName>/workflow.yaml`,
+ * `<baseName>/workflow.yml`, or `<baseName>/workflow.md`.
+ * If two or more exist, throw WORKFLOW_AMBIGUOUS.
  * Returns absolute path if found, undefined otherwise.
  */
 function probeDir(dir: string, baseName: string): string | undefined {
   const yamlCandidate = join(dir, baseName, "workflow.yaml");
+  const ymlCandidate = join(dir, baseName, "workflow.yml");
   const mdCandidate = join(dir, baseName, "workflow.md");
   const hasYaml = existsSync(yamlCandidate);
+  const hasYml = existsSync(ymlCandidate);
   const hasMd = existsSync(mdCandidate);
 
-  if (hasYaml && hasMd) {
+  const foundFiles: string[] = [];
+  if (hasYaml) foundFiles.push("workflow.yaml");
+  if (hasYml) foundFiles.push("workflow.yml");
+  if (hasMd) foundFiles.push("workflow.md");
+  if (foundFiles.length >= 2) {
     const wfDir = join(dir, baseName);
     throw new CliError(
       "WORKFLOW_AMBIGUOUS",
-      `Ambiguous workflow "${baseName}": found both workflow.yaml and workflow.md in ${wfDir}. Remove one.`,
+      `Ambiguous workflow "${baseName}": found both ${foundFiles.join(" and ")} in ${wfDir}. Remove one.`,
       { context: { fsmPath: baseName } },
     );
   }
 
   if (hasYaml) return yamlCandidate;
+  if (hasYml) return ymlCandidate;
   if (hasMd) return mdCandidate;
   return undefined;
 }
