@@ -143,7 +143,8 @@ describe("handlePostToolUse — counter and reminder", () => {
     expect(result).not.toBeNull();
     expect(result).toContain("[FSM Reminder]");
     expect(result).toContain("State: plan");
-    expect(result).toContain("Plan the work.");
+    // formatReminder no longer includes prompt text (lite-mode simplification)
+    expect(result).not.toContain("Plan the work.");
     expect(result).toContain("approved → execute");
   });
 
