@@ -112,15 +112,17 @@ states:
 
       When you believe you have enough clarity on goals, constraints, and verification criteria,
       present a brief summary of what you've captured and ask the user:
-      - "Requirements complete, proceed to design" → design
-      - "Fast forward" — generate design, plan, and summary in one shot (no intermediate approvals) → design
+      - "Revise requirements" — revisit and refine what we have → requirements
       - "I need to research something first" → research
+      - "Proceed to design" → design
+      - "Fast forward" — generate design, plan, and summary in one shot (no intermediate approvals) → design
 
-      You MUST NOT move on until the user explicitly confirms requirements are complete.
+      You MUST NOT move on until the user explicitly confirms.
     transitions:
+      revise requirements: requirements
+      need research: research
       proceed to design: design
       fast forward: design
-      need research: research
 
   research:
     prompt: |
@@ -150,12 +152,13 @@ states:
         available information, and ask the user for additional context. Do not block progress.
 
       When research is sufficient, ask the user:
-      - "Research sufficient, back to requirements" → requirements
-      - "New questions came up, let's clarify requirements" → requirements
+      - "Back to requirements" — clarify requirements → requirements
+      - "Proceed to design" → design
 
       You MUST NOT proceed until the user confirms research is sufficient.
     transitions:
       back to requirements: requirements
+      proceed to design: design
 
   design:
     prompt: |

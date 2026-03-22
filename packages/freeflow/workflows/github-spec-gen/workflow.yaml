@@ -1,25 +1,22 @@
 # GitHub Spec-Gen — GitHub Issue-driven spec-gen workflow
 #
 # Reuses spec-gen's guide (process rules, Q&A cycle, research structure) and
-# state definitions (design, plan, e2e-gen) via extends_guide + from:.
+# state definitions (requirements, research, design, plan, e2e-gen) via
+# extends_guide + from:.
 #
 # Flow:
 #
 #   create-issue
 #       |           \
 #   requirements ← → research
-#       |               |
-#       +-------+-------+
-#               |
-#          checkpoint
-#         /    |     \
-#   requirements  research  design
-#                           |     \
-#                          plan    requirements (gaps)
-#                         /    \
-#                   e2e-gen  design (revision)
-#                      |
-#                    done
+#       |
+#     design ← → requirements (gaps)
+#       |
+#      plan ← → design (revision)
+#       |
+#     e2e-gen
+#       |
+#     done
 #
 #   Fast forward: requirements → design → plan → e2e-gen → done (no intermediate approvals)
 
@@ -192,87 +189,44 @@ states:
       start with research: research
 
   requirements:
+    from: "../spec-gen/workflow.yaml#requirements"
     prompt: |
-      ## Requirements Clarification
+      {{base}}
 
-      Guide the user through questions to refine the rough idea into concrete requirements.
-      Follow the Requirements Q&A Cycle from the guide. All interaction happens via issue comments.
+      ### GitHub Adaptation
 
-      Read the issue body first to understand the rough idea.
-      Post each question as an issue comment. Poll for replies. Track Q&A pairs in memory.
+      All interaction happens via issue comments — do NOT use local files.
+      Read the issue body first to understand the rough idea (instead of rough-idea.md).
+      Post each question as an issue comment. Poll for replies using the polling pattern.
+      Track Q&A pairs in memory (do not append to a local requirements.md).
 
-      When you believe you have enough clarity:
-      1. Compile all Q&A pairs into a structured `## requirements.md` artifact comment.
+      When compiling requirements:
+      1. Post the structured requirements as a `## requirements.md` artifact comment.
       2. Update the issue body status checklist: check off "gathering requirements".
-      3. Post transition options:
-         - Review progress (checkpoint) → `requirements complete`
-         - Fast forward — generate design, plan, and e2e in one shot (no intermediate approvals) → `fast forward`
-         - Research first → `need research`
-      4. Poll for the user's choice.
-    transitions:
-      requirements complete: checkpoint
-      fast forward: design
-      need research: research
+      3. Post transition options as an issue comment:
+         - "Revise requirements"
+         - "Research first"
+         - "Proceed to design"
+         - "Fast forward" (skip to design, no intermediate approvals)
+      4. Poll for the user's choice via comment reply.
 
   research:
+    from: "../spec-gen/workflow.yaml#research"
     prompt: |
-      ## Research
+      {{base}}
 
-      Investigate specific technical topics relevant to the project.
-      All interaction and output happens via issue comments.
+      ### GitHub Adaptation
 
-      Process:
-      1. Propose a research plan (2–4 topics) as an issue comment. Poll for feedback.
-      2. For each topic, investigate and post findings as a separate
-         `## research/<topic-name>.md` artifact comment, following the Research Structure
-         from the guide.
+      All interaction and output happens via issue comments — do NOT write local files.
+      Post research findings as `## research/<topic-name>.md` artifact comments,
+      following the Research Structure from the guide.
 
       After completing research:
       1. Update the issue body status checklist: check off "research".
-      2. Post transition options:
-         - Review progress (checkpoint) → `research sufficient`
-         - Clarify requirements → `new questions arose`
-      3. Poll for the user's choice.
-
-      Troubleshooting:
-      - If research hits dead ends, document what is missing, suggest alternatives, and
-        ask the user for additional context. Do not block progress.
-    transitions:
-      research sufficient: checkpoint
-      new questions arose: requirements
-
-  checkpoint:
-    prompt: |
-      ## Iteration Checkpoint
-
-      Read all artifact comments on the issue to build a comprehensive summary of progress so far.
-
-      Process:
-      1. Fetch all comments on the issue:
-         ```bash
-         gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate
-         ```
-      2. Identify artifact comments (those starting with `## requirements.md`, `## research/...`, etc.).
-      3. Read through all artifacts and produce a structured summary covering:
-         - **Requirements**: Key decisions made and any open questions remaining
-         - **Research Findings**: Summary of each research topic investigated
-         - **Gaps & Contradictions**: Areas where requirements and research do not align, or
-           where more information is needed
-         - **Readiness Assessment**: Your assessment of whether there is enough information
-           to proceed to design
-
-      4. Post the summary as an issue comment with transition options:
-         - Proceed to design → `proceed to design`
-         - Back to requirements → `back to requirements`
-         - More research → `more research`
-
-      5. Poll for the user's choice.
-
-      You MUST support iterating between requirements and research as many times as needed.
-    transitions:
-      proceed to design: design
-      back to requirements: requirements
-      more research: research
+      2. Post transition options as an issue comment:
+         - "Back to requirements"
+         - "Proceed to design"
+      3. Poll for the user's choice via comment reply.
 
   design:
     from: "../spec-gen/workflow.yaml#design"
