@@ -1,6 +1,7 @@
 import { homedir } from "node:os";
 import { loadFsm } from "../fsm.js";
 import { formatReminder, stateCardFromFsm } from "../output.js";
+import { isHookEnabled } from "../settings.js";
 import { Store } from "../store.js";
 
 export interface HookInput {
@@ -20,6 +21,8 @@ const RUN_ID_FLAG_RE = /--run-id\s+(\S+)/;
  * Pure function (no stdin/stdout) for testability.
  */
 export function handlePostToolUse(input: HookInput, root: string): string | null {
+  if (!isHookEnabled(root, "postToolUse")) return null;
+
   const store = new Store(root);
   const sessionId = input.session_id;
 
