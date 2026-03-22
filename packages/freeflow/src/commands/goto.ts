@@ -32,8 +32,6 @@ export function goto(args: GotoArgs): void {
     const fsm = loadFsm(meta.fsm_path);
     const isLite = meta.lite === true;
 
-    let alreadyVisited = false;
-
     const result = store.withLock(args.runId, () => {
       const snapshot = store.readSnapshot(args.runId);
       if (!snapshot) {
@@ -79,7 +77,7 @@ ${labels}`,
 
       // Track visited states for lite mode
       const visitedSet = new Set(snapshot.visited_states ?? []);
-      alreadyVisited = visitedSet.has(args.target);
+      const alreadyVisited = visitedSet.has(args.target);
       visitedSet.add(args.target);
 
       const isDone = args.target === "done";
@@ -103,7 +101,7 @@ ${labels}`,
         { lockHeld: true },
       );
 
-      return { isDone, newStatus, fromState: snapshot.state };
+      return { isDone, newStatus, fromState: snapshot.state, alreadyVisited };
     });
 
     const card = stateCardFromFsm(args.target, fsm.states[args.target]);
@@ -138,7 +136,7 @@ ${labels}`,
         data.completion_reason = "done_auto";
       }
       printJson(jsonSuccess("Transition complete", data));
-    } else if (isLite && alreadyVisited) {
+    } else if (isLite && result.alreadyVisited) {
       process.stdout.write(`${formatLiteCard(card)}\n`);
     } else {
       process.stdout.write(`${formatStateCard(card)}\n`);

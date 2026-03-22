@@ -149,7 +149,11 @@ export class Store {
 
   // --- Public API ---
 
-  initRun(runId: string, fsmPath: string): RunMeta {
+  initRun(
+    runId: string,
+    fsmPath: string,
+    overrides?: Partial<Pick<RunMeta, "lite">>,
+  ): RunMeta {
     const dir = this.runDir(runId);
     if (existsSync(dir)) {
       throw new Error(`Run "${runId}" already exists`);
@@ -161,6 +165,7 @@ export class Store {
       fsm_path: fsmPath,
       created_at: nowISO(),
       version: 1,
+      ...overrides,
     };
     writeFileSync(this.metaPath(runId), JSON.stringify(meta, null, 2), "utf-8");
     return meta;

@@ -30,7 +30,7 @@ export function start(args: StartArgs): void {
 
     const store = new Store(args.root);
     try {
-      store.initRun(runId, args.fsmPath);
+      store.initRun(runId, args.fsmPath, args.lite ? { lite: true } : undefined);
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("already exists")) {
         throw new CliError(
@@ -40,10 +40,6 @@ export function start(args: StartArgs): void {
         );
       }
       throw err;
-    }
-
-    if (args.lite) {
-      store.updateMeta(runId, { lite: true });
     }
 
     store.commit(
