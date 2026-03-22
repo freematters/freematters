@@ -114,12 +114,15 @@ describe("verifier wait tool streaming", () => {
     await server.tools.runAgent.handler({ prompt: "test", model: undefined }, {});
     const result = await server.tools.wait.handler({ timeout: 5000 }, {});
 
-    // Timeout should be logged
-    expect(logger.logEmbedded).toHaveBeenCalledWith("[timeout]");
+    // Timeout should be logged with partial output info
+    expect(logger.logEmbedded).toHaveBeenCalledWith(
+      "[timeout with partial output, 1 text block(s)]",
+    );
 
-    // Result should indicate timeout
+    // Result should indicate timeout with accumulated partial output
     const content = JSON.parse((result.content as Array<{ text: string }>)[0].text);
     expect(content.type).toBe("timeout");
+    expect(content.output).toBe("partial output");
   });
 
   test("logs error events from stream", async () => {

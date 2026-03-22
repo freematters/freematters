@@ -10,6 +10,12 @@ The github-spec-gen workflow drives a spec-generation process entirely through G
 issue comments. It creates an issue on a target repo, asks requirements questions via
 comments, and posts spec artifacts (requirements.md, design.md, plan.md) as issue comments.
 
+Artifacts are cached locally at `$HOME/.freeflow/runs/{run_id}/artifacts/` and their
+GitHub comment IDs are tracked in `$HOME/.freeflow/runs/{run_id}/artifact_comment_ids.json`.
+When creating artifacts, the executor writes a local file first, then posts it to GitHub
+via `gh api -F body=@file`. When updating, it edits the local file and patches the
+existing comment in-place (no minimize-and-repost).
+
 In fast-forward mode, after requirements are gathered, the workflow skips the checkpoint
 and proceeds directly through design → plan → e2e-gen → done without polling for user
 approval at each step.
@@ -48,7 +54,7 @@ on the GitHub issue (not via `send()`) since the executor reads from GitHub, not
     Follow the workflow states. When you reach a state that requires polling for user
     comments, use the poll_issue.py script as described in the workflow guide.
 
-    IMPORTANT: You are running from the repo root at /home/ubuntu/Code/freematters/.claude/worktrees/pr-62-review
+    IMPORTANT: You are running from the repo root at /home/ubuntu/Code/freematters/.claude/worktrees/optimize-github-spec-gen
 
 ## Steps
 
@@ -73,12 +79,17 @@ on the GitHub issue (not via `send()`) since the executor reads from GitHub, not
 7. **Verify completion**: Wait for the executor to reach the done state and finalize the issue.
    - Expected: Executor adds the `spec-ready` label, checks off status items, and posts a summary comment. The workflow completes.
 
+8. **Verify local artifact cache**: After the workflow completes, find the run ID from the executor output and verify local artifact files exist. Run `ls $HOME/.freeflow/runs/*/artifacts/` to find artifact files, and `cat $HOME/.freeflow/runs/*/artifact_comment_ids.json` to check the comment ID tracking file.
+   - Expected: Local artifact files exist for at least requirements.md, design.md, and plan.md. The artifact_comment_ids.json file contains numeric comment IDs for each artifact. The GitHub comments referenced by those IDs exist and match the local file content.
+
 ## Expected Outcomes
 
 - A GitHub issue is created on freematters/testbed with proper structure (title, status checklist)
 - Requirements Q&A happens through issue comments with `[bot reply]` prefix
 - Fast-forward mode skips checkpoint and intermediate approvals
 - All spec artifacts (requirements.md, design.md, plan.md) are posted as issue comments
+- Local artifact cache files exist at `$HOME/.freeflow/runs/{run_id}/artifacts/`
+- `artifact_comment_ids.json` maps artifact filenames to valid GitHub comment IDs
 - The issue receives the `spec-ready` label upon completion
 - Status checklist items are checked off in the issue body
 
@@ -101,4 +112,4 @@ substantial content creation.
 
 - Close the test issue on freematters/testbed: `gh issue close <number> --repo freematters/testbed --comment "[test cleanup] Closing test issue"`
 - Remove the `spec-ready` label if it was created: this is fine to leave as it may be reused
-- The freeflow run storage is automatically cleaned up
+- Clean up the freeflow run directory including artifact cache: `rm -rf $HOME/.freeflow/runs/<run_id>`

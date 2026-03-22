@@ -27,28 +27,77 @@ guide: |
 
   ### Artifact Output — GitHub Issue Override
 
-  IMPORTANT: This overrides the "Artifact Output" section above. Do NOT write local files.
-  All artifacts are posted as GitHub issue comments with the title `## <filename>`:
-  - `## requirements.md`
-  - `## research/<topic-name>.md`
-  - `## design.md`
-  - `## plan.md`
-  - `## e2e.md`
+  IMPORTANT: This overrides the "Artifact Output" section above.
+  All artifacts are posted as GitHub issue comments AND cached locally as files.
 
-  The comment body is the full markdown content preceded by the `## <filename>` title.
-  Track each artifact comment's node_id in `artifact_comment_ids` for future updates.
+  **Local artifact cache** (source of truth for content):
+  ```
+  $HOME/.freeflow/runs/{run_id}/artifacts/
+    requirements.md
+    research/<topic-name>.md
+    design.md
+    plan.md
+    e2e.md
+  ```
 
-  ### Minimize-and-Repost for Artifact Updates
+  **Comment ID tracking**:
+  ```
+  $HOME/.freeflow/runs/{run_id}/artifact_comment_ids.json
+  ```
+  Maps artifact filenames to their GitHub REST API numeric comment IDs.
 
-  When an artifact comment needs updating (e.g., design revision), you MUST:
-  1. Minimize the old comment using the GitHub GraphQL API with classifier OUTDATED:
+  Set these variables at the start of each state:
+  ```bash
+  ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
+  IDS_FILE="$HOME/.freeflow/runs/{run_id}/artifact_comment_ids.json"
+  mkdir -p "$ARTIFACTS"
+  [ -f "$IDS_FILE" ] || echo '{}' > "$IDS_FILE"
+  ```
+
+  #### Creating an Artifact
+
+  1. Write the full artifact content to a local cache file using the Write tool.
+     The file content MUST start with `## <filename>` as the first line, followed by
+     the markdown content. Example for `design.md`:
      ```
-     gh api graphql -f query='mutation { minimizeComment(input: {subjectId: "{node_id}", classifier: OUTDATED}) { minimizedComment { isMinimized } } }'
-     ```
-  2. Post a new comment with the updated content.
-  3. Track the new comment's node_id for future updates.
+     ## design.md
 
-  If minimizing fails, log a warning and continue — it is non-critical.
+     <design content here>
+     ```
+
+  2. Post the local file as an issue comment and capture the comment ID:
+     ```bash
+     COMMENT_ID=$(gh api "repos/{owner}/{repo}/issues/{n}/comments" \
+       -F body=@"$ARTIFACTS/<filename>" --jq '.id')
+     ```
+
+  3. Save the comment ID to the tracking file:
+     ```bash
+     jq --arg k "<filename>" --argjson v "$COMMENT_ID" '. + {($k): $v}' \
+       "$IDS_FILE" > "$IDS_FILE.tmp" && mv "$IDS_FILE.tmp" "$IDS_FILE"
+     ```
+
+  #### Updating an Artifact (In-Place Edit)
+
+  When an artifact needs revision (e.g., design changes after feedback):
+
+  1. Edit the local cache file using the **Edit tool**. This sends only the diff
+     through the LLM session, avoiding full content round-trips.
+
+  2. Push the updated file to GitHub by patching the existing comment in-place:
+     ```bash
+     COMMENT_ID=$(jq -r '.["<filename>"]' "$IDS_FILE")
+     gh api "repos/{owner}/{repo}/issues/comments/$COMMENT_ID" \
+       -X PATCH -F body=@"$ARTIFACTS/<filename>"
+     ```
+
+  Do NOT minimize old comments or create new ones — always edit in place.
+
+  #### Reading Artifacts
+
+  Read artifacts from the local cache files instead of fetching all issue comments.
+  Use the Read tool on `$ARTIFACTS/<filename>`. This avoids pulling the entire
+  comment history through the LLM context.
 
   ### Comment Polling
 
@@ -107,7 +156,8 @@ guide: |
   - `repo` — the owner/repo string (e.g., `freematters/testbed`)
   - `issue_number` — the issue number returned by `gh issue create`
   - `issue_creator` — the username of the person who created the issue
-  - `artifact_comment_ids` — a map of artifact filename to comment node_id
+
+  Artifact comment IDs are persisted in `$IDS_FILE` — do NOT track them in conversation memory.
 
   ### Error Handling
 
@@ -195,10 +245,13 @@ states:
 
       ### GitHub Adaptation
 
-      All interaction happens via issue comments — do NOT use local files.
+      All interaction happens via issue comments.
       Read the issue body first to understand the rough idea (instead of rough-idea.md).
       Post each question as an issue comment. Poll for replies using the polling pattern.
-      Track Q&A pairs in memory (do not append to a local requirements.md).
+
+      You MUST ask ONE question at a time. Post a single question as an issue comment,
+      poll for the reply, record the Q&A pair, then ask the next question.
+      Do NOT batch multiple questions into one comment.
 
       When compiling requirements:
       1. Post the structured requirements as a `## requirements.md` artifact comment.
@@ -241,14 +294,15 @@ states:
       for approval. Complete the design, post it as an artifact comment, update the status
       checklist, and immediately transition to plan.
 
-      Before writing, fetch all issue comments to read requirements and research artifacts:
+      Before writing, read requirements and research from the local artifact cache:
       ```bash
-      gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate
+      ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
       ```
+      Use the Read tool on `$ARTIFACTS/requirements.md` and any files in `$ARTIFACTS/research/`.
 
-      Post the design as a `## design.md` artifact comment.
+      Write the design to the local cache and post it per the artifact creation guide.
       Ask for feedback via comment (approve / request changes / requirements gaps). Poll for reply.
-      Use minimize-and-repost for revisions per the guide.
+      Use in-place edit for revisions per the guide.
 
       On approval, update the issue body status checklist: check off "design".
     todos:
@@ -266,17 +320,18 @@ states:
       for approval. Complete the plan, post it as an artifact comment, update the status
       checklist and plan task list in the issue body, and immediately transition to e2e-gen.
 
-      Fetch all comments to read the latest `## design.md` artifact:
+      Read the design from the local artifact cache:
       ```bash
-      gh api 'repos/{owner}/{repo}/issues/{n}/comments' --paginate
+      ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
       ```
+      Use the Read tool on `$ARTIFACTS/design.md`.
 
-      Post the plan as a `## plan.md` artifact comment.
+      Write the plan to the local cache and post it per the artifact creation guide.
       Also update the issue body to add the plan steps as a `## Plan` task checklist.
       Update the issue body status checklist: check off "plan".
 
       Ask for feedback via comment (approve / request changes / design revision). Poll for reply.
-      Use minimize-and-repost for revisions per the guide. Also update the issue body plan
+      Use in-place edit for revisions per the guide. Also update the issue body plan
       checklist when revising.
     todos:
       - Post plan as issue comment with plan checklist in issue body
@@ -289,8 +344,8 @@ states:
 
       ### GitHub Adaptation
 
-      Check the latest `## design.md` artifact comment (not a local file).
-      If generating e2e.md, post it as a `## e2e.md` artifact comment.
+      Read `$HOME/.freeflow/runs/{run_id}/artifacts/design.md` for the design artifact.
+      If generating e2e.md, write it to the local cache and post per the artifact creation guide.
       Update the issue body: append an `### E2E Testing` section and add `- [ ] e2e`
       to the Status checklist.
 
@@ -313,9 +368,13 @@ states:
 
       2. Update the issue body status checklist: check off ALL remaining items including "spec-ready".
 
-      3. Compile a list of all artifact comments posted during the workflow. For each artifact,
-         include its filename and a link to the comment (using the issue comment URL format:
-         `https://github.com/{owner}/{repo}/issues/{n}#issuecomment-{comment_id}`).
+      3. Compile a list of all artifact comments from the ID tracking file:
+         ```bash
+         IDS_FILE="$HOME/.freeflow/runs/{run_id}/artifact_comment_ids.json"
+         cat "$IDS_FILE"
+         ```
+         For each artifact, include its filename and a link to the comment (using the issue
+         comment URL format: `https://github.com/{owner}/{repo}/issues/{n}#issuecomment-{comment_id}`).
 
       4. Update the issue body to append a summary section after the Status section:
          ```markdown
