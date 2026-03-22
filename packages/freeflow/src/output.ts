@@ -24,7 +24,7 @@ export function stateCardFromFsm(stateName: string, fsmState: FsmState): StateCa
     card.guide = fsmState.guide;
   }
   if (fsmState.subagent) {
-    card.subagent = fsmState.subagent;
+    card.subagent = true;
   }
   return card;
 }
@@ -74,7 +74,7 @@ export function formatStateCard(card: StateCard, fsmGuide?: string): string {
   return lines.join("\n");
 }
 
-// --- Subagent Dispatch ---
+// --- Subagent Dispatch Card ---
 
 export function formatSubagentDispatch(
   card: StateCard,
@@ -89,34 +89,27 @@ export function formatSubagentDispatch(
     lines.push("");
   }
 
-  lines.push(`You are in **${card.state}** state. This state uses subagent execution.`);
+  lines.push(`State **${card.state}** is marked for subagent execution.`);
   lines.push("");
-  lines.push("Spawn a subagent with the following instructions:");
-  lines.push(`1. Run \`fflow current --run-id ${runId}\` to get your instructions`);
-  lines.push("2. Execute the instructions fully");
-  lines.push("3. When done, report back using this exact format:");
+  lines.push(
+    "Launch a subagent (via the Agent tool) with the prompt below. " +
+      "The subagent will receive full state instructions via `fflow current`.",
+  );
   lines.push("");
-  lines.push("## Execution Summary");
-  lines.push("<describe what was accomplished>");
-  lines.push("");
-  lines.push("## Proposed Transition");
-  lines.push('label: "<transition label>"');
-  lines.push("reason: <why this transition>");
-  lines.push("");
+  lines.push("```");
+  lines.push(
+    `Run \`fflow current --run-id ${runId}\` to get your instructions, then execute them.`,
+  );
+  lines.push("```");
 
   const entries = Object.entries(card.transitions);
   if (entries.length > 0) {
-    lines.push("Valid transitions from this state:");
+    lines.push("");
+    lines.push("After the subagent finishes, transition using:");
     for (const [label, target] of entries) {
       lines.push(`  ${label} → ${target}`);
     }
-    lines.push("");
   }
-
-  lines.push(
-    "After the subagent reports back, validate the proposed transition label against the valid transitions above, then run:",
-  );
-  lines.push(`  fflow goto <target> --run-id ${runId} --on "<label>"`);
 
   return lines.join("\n");
 }
