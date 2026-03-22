@@ -50,9 +50,9 @@ npm run test -w packages/freeflow
 ### codoc
 
 ```bash
-cd packages/codoc/frontend && npm install && cd ..
-npm run build -w packages/codoc    # tsc backend + vite frontend
-npm run test -w packages/codoc     # 202 unit/integration tests
+npm --prefix packages/codoc/frontend install   # install frontend deps
+npm run build -w packages/codoc                # tsc backend + vite frontend
+npm run test -w packages/codoc                 # 202 unit/integration tests
 ```
 
 ## License

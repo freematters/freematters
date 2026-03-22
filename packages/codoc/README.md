@@ -34,7 +34,7 @@ Set `tunnel` to `"cloudflare"` (expose via Cloudflare Tunnel, auto-downloads `cl
 
 ```bash
 git clone https://github.com/freematters/freematters.git && cd freematters
-npm install && cd packages/codoc/frontend && npm install && cd ../../..
+npm install && npm --prefix packages/codoc/frontend install
 npm run build -w packages/codoc
 npm link -w packages/codoc
 codoc install claude
