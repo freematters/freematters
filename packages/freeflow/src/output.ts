@@ -123,16 +123,13 @@ export function formatSubagentDispatch(
 
 // --- Lite Card (re-entered state) ---
 
-export function formatLiteCard(
-  card: StateCard,
-  opts?: { currentHint?: string },
-): string {
+export function formatLiteCard(card: StateCard): string {
   const lines: string[] = [];
 
   lines.push(
     `Re-entering **${card.state}** state. Instructions unchanged from previous visit.`,
   );
-  lines.push(opts?.currentHint ?? "Run `fflow current` to review full instructions.");
+  lines.push("Run `fflow current` or call `fsm_current` to review full instructions.");
 
   if (card.todos && card.todos.length > 0) {
     lines.push("");
