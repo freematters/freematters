@@ -70,9 +70,44 @@ export function formatStateCard(card: StateCard, fsmGuide?: string): string {
   return lines.join("\n");
 }
 
-// --- Reminder (PostToolUse hook) ---
+// --- Lite Card (re-entered state) ---
 
-const REMINDER_PROMPT_MAX = 200;
+export function formatLiteCard(card: StateCard): string {
+  const lines: string[] = [];
+
+  lines.push(
+    `Re-entering **${card.state}** state. Instructions unchanged from previous visit.`,
+  );
+  lines.push("Run `fflow current` to review full instructions.");
+
+  if (card.todos && card.todos.length > 0) {
+    lines.push("");
+    lines.push(TODO_HEADER);
+    for (const t of card.todos) {
+      lines.push(`  - ${t}`);
+    }
+  }
+
+  const entries = Object.entries(card.transitions);
+  if (entries.length === 0) {
+    lines.push("");
+    lines.push("This is a terminal state. The workflow is complete.");
+  } else {
+    lines.push("");
+    lines.push("Transitions:");
+    for (const [label, target] of entries) {
+      lines.push(`  ${label} → ${target}`);
+    }
+    lines.push("");
+    lines.push(
+      "Keep driving the workflow — do NOT stop until you reach a terminal state.",
+    );
+  }
+
+  return lines.join("\n");
+}
+
+// --- Reminder (PostToolUse hook) ---
 
 export function formatReminder(card: StateCard, fsmGuide?: string): string {
   const lines: string[] = [];
@@ -86,14 +121,7 @@ export function formatReminder(card: StateCard, fsmGuide?: string): string {
     lines.push("");
   }
 
-  let prompt = card.prompt.trim();
-  if (prompt.length > REMINDER_PROMPT_MAX) {
-    prompt = `${prompt.slice(0, REMINDER_PROMPT_MAX)}...`;
-  }
-  lines.push(prompt);
-
   if (card.todos && card.todos.length > 0) {
-    lines.push("");
     lines.push(TODO_HEADER);
     for (const t of card.todos) {
       lines.push(`  - ${t}`);
