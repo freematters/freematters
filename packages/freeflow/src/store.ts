@@ -16,6 +16,12 @@ export type RunStatus = "active" | "completed" | "aborted";
 export type EventType = "start" | "goto" | "finish";
 export type Actor = "agent" | "human" | "system";
 
+export interface GatewayInfo {
+  gateway_id?: string;
+  client_id?: string;
+  daemon_id?: string;
+}
+
 export interface RunMeta {
   run_id: string;
   fsm_path: string;
@@ -23,6 +29,9 @@ export interface RunMeta {
   version: number;
   session_id?: string;
   lite?: boolean;
+  gateway_id?: string;
+  client_id?: string;
+  daemon_id?: string;
 }
 
 export interface StoreEvent {
@@ -149,7 +158,12 @@ export class Store {
 
   // --- Public API ---
 
-  initRun(runId: string, fsmPath: string, lite?: boolean): RunMeta {
+  initRun(
+    runId: string,
+    fsmPath: string,
+    lite?: boolean,
+    gatewayInfo?: GatewayInfo,
+  ): RunMeta {
     const dir = this.runDir(runId);
     if (existsSync(dir)) {
       throw new Error(`Run "${runId}" already exists`);
@@ -162,6 +176,9 @@ export class Store {
       created_at: nowISO(),
       version: 1,
       ...(lite && { lite: true }),
+      ...(gatewayInfo?.gateway_id && { gateway_id: gatewayInfo.gateway_id }),
+      ...(gatewayInfo?.client_id && { client_id: gatewayInfo.client_id }),
+      ...(gatewayInfo?.daemon_id && { daemon_id: gatewayInfo.daemon_id }),
     };
     writeFileSync(this.metaPath(runId), JSON.stringify(meta, null, 2), "utf-8");
     return meta;
@@ -266,6 +283,12 @@ export class Store {
     } finally {
       if (!skipLock) this.releaseLock(runId);
     }
+  }
+
+  // --- Gateway Info ---
+
+  updateGatewayInfo(runId: string, info: GatewayInfo): void {
+    this.updateMeta(runId, info);
   }
 
   // --- Session Management ---
