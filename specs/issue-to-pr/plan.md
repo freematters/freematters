@@ -9,7 +9,7 @@ graph LR
 
 ## Checklist
 - [x] Step 1: Create the issue-to-pr workflow YAML
-- [ ] Step 2: Validate schema loads and expands correctly
+- [x] Step 2: Validate schema loads and expands correctly
 
 ---
 
