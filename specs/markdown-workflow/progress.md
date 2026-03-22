@@ -23,3 +23,9 @@
 - **What was built**: `parseMarkdownWorkflow(content)` that produces the same raw doc shape as `yamlLoad()`. Parses frontmatter, guide, states (instructions/todos/transitions), `<freeflow>` tags.
 - **Tests**: 14 tests added (11 valid cases, 3 error cases), all passing
 - **Notes**: Added `unified`, `remark-parse`, `remark-frontmatter`, `yaml`, `@types/mdast` deps. Supports both `→` and `->` separators.
+
+## Step 7: Skills (fix + convert)
+- **Files changed**: `skills/markdown-fix/SKILL.md` (new), `skills/markdown-convert/SKILL.md` (new)
+- **What was built**: Two agent skills — `/fflow markdown fix` (format spec + validation checklist + fix instructions) and `/fflow markdown convert` (CLI usage + verification steps + edge cases).
+- **Tests**: None (agent-driven skills)
+- **Notes**: Fix skill contains the canonical format spec for the agent to validate against.

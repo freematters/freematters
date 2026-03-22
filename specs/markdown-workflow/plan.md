@@ -22,7 +22,7 @@ graph LR
 - [ ] Step 4: Loader Integration
 - [ ] Step 5: Convert Command
 - [x] Step 6: Workflow Resolution
-- [ ] Step 7: Skills (fix + convert)
+- [x] Step 7: Skills (fix + convert)
 - [ ] Step 8: Integration Tests
 
 ---
