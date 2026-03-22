@@ -113,12 +113,13 @@ Default to agent-agnostic workflows:
 
 ### Heading levels in prompts
 
-State prompts are rendered under `## State: xxx` in the markdown workflow format.
-To avoid heading conflicts, use these levels inside prompts:
+State prompts are rendered under `### Instructions:` in the markdown workflow format,
+which is itself under `## State: xxx`. To avoid heading conflicts, use these levels
+inside prompts:
 
-- `###` for top-level sections within a state prompt
-- `####` for sub-sections
-- `**bold text**` for inline emphasis instead of deeper headings
+- `####` for top-level sections within a state prompt
+- `**bold text**` for sub-sections and emphasis
+- Never use `##` or `###` inside prompts — those levels are reserved for the markdown format structure
 
 This ensures the markdown renders correctly when the workflow is converted to `.workflow.md`.
 

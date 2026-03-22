@@ -395,7 +395,7 @@ export function parseMarkdownWorkflow(content: string): Record<string, unknown> 
       // Parse sub-sections for transitions only
       const subSections = splitBySubSections(filteredNodes);
       for (const sub of subSections) {
-        if (sub.heading === "Transitions") {
+        if (sub.heading === "Transitions" || sub.heading === "Transitions:") {
           state.transitions = parseTransitions(stateName, sub.nodes);
         }
       }
@@ -408,12 +408,12 @@ export function parseMarkdownWorkflow(content: string): Record<string, unknown> 
 
     let hasInstructions = false;
     for (const sub of subSections) {
-      if (sub.heading === "Instructions") {
+      if (sub.heading === "Instructions" || sub.heading === "Instructions:") {
         hasInstructions = true;
         state.prompt = nodesToMarkdown(sub.nodes);
-      } else if (sub.heading === "Todos") {
+      } else if (sub.heading === "Todos" || sub.heading === "Todos:") {
         state.todos = extractTodoItems(sub.nodes);
-      } else if (sub.heading === "Transitions") {
+      } else if (sub.heading === "Transitions" || sub.heading === "Transitions:") {
         state.transitions = parseTransitions(stateName, sub.nodes);
       }
     }

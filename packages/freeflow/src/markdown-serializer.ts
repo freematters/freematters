@@ -53,7 +53,7 @@ export function serializeMarkdown(fsm: Fsm, opts?: SerializeMarkdownOptions): st
     lines.push("");
 
     // Transitions (first — gives quick overview of state's exits)
-    lines.push("### Transitions");
+    lines.push("### Transitions:");
     lines.push("");
     const entries = Object.entries(state.transitions);
     if (entries.length === 0) {
@@ -67,7 +67,7 @@ export function serializeMarkdown(fsm: Fsm, opts?: SerializeMarkdownOptions): st
 
     // Instructions (skip for delegation states with no prompt)
     if (state.prompt) {
-      lines.push("### Instructions");
+      lines.push("### Instructions:");
       lines.push("");
       if (state.guide) {
         lines.push(state.guide);
@@ -81,7 +81,7 @@ export function serializeMarkdown(fsm: Fsm, opts?: SerializeMarkdownOptions): st
 
     // Todos (last)
     if (state.todos && state.todos.length > 0) {
-      lines.push("### Todos");
+      lines.push("### Todos:");
       lines.push("");
       for (const todo of state.todos) {
         lines.push(`- ${todo}`);
@@ -193,7 +193,7 @@ export function serializeRawYamlToMarkdown(
     }
 
     // Transitions (first)
-    lines.push("### Transitions");
+    lines.push("### Transitions:");
     lines.push("");
     const transitions = state.transitions ?? {};
     const entries = Object.entries(transitions);
@@ -208,7 +208,7 @@ export function serializeRawYamlToMarkdown(
 
     // Instructions (prompt)
     if (state.prompt) {
-      lines.push("### Instructions");
+      lines.push("### Instructions:");
       lines.push("");
       if (state.guide) {
         lines.push(state.guide.trimEnd());
@@ -222,7 +222,7 @@ export function serializeRawYamlToMarkdown(
 
     // Todos
     if (state.todos && state.todos.length > 0) {
-      lines.push("### Todos");
+      lines.push("### Todos:");
       lines.push("");
       for (const todo of state.todos) {
         lines.push(`- ${todo}`);
