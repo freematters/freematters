@@ -206,20 +206,40 @@ export function formatDuration(ms: number): string {
 
 // --- Graph Visualization (Mermaid) ---
 
+/**
+ * Sanitize a state name for mermaid stateDiagram-v2.
+ * Mermaid doesn't allow hyphens or slashes in bare state IDs.
+ * Replace them with underscores.
+ */
+function mermaidId(name: string): string {
+  return name.replace(/[-/]/g, "_");
+}
+
 export function fsmToMermaid(
   states: Record<string, { transitions: Record<string, string> }>,
   initial: string,
 ): string {
   const lines: string[] = [];
   lines.push("stateDiagram-v2");
-  lines.push(`  [*] --> ${initial}`);
+
+  // Declare state aliases for names that need sanitizing
+  const declared = new Set<string>();
+  for (const name of [...Object.keys(states), initial]) {
+    const id = mermaidId(name);
+    if (id !== name && !declared.has(id)) {
+      lines.push(`  ${id}: ${name}`);
+      declared.add(id);
+    }
+  }
+
+  lines.push(`  [*] --> ${mermaidId(initial)}`);
 
   for (const [name, state] of Object.entries(states)) {
     for (const [label, target] of Object.entries(state.transitions)) {
-      lines.push(`  ${name} --> ${target}: ${label}`);
+      lines.push(`  ${mermaidId(name)} --> ${mermaidId(target)}: ${label}`);
     }
     if (Object.keys(state.transitions).length === 0) {
-      lines.push(`  ${name} --> [*]`);
+      lines.push(`  ${mermaidId(name)} --> [*]`);
     }
   }
 
