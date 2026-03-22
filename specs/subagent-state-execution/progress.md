@@ -23,3 +23,8 @@
 - **What was built**: 3 integration tests: full JSON lifecycle, `from:` inheritance, `from:` override
 - **Tests**: 3 tests added, all passing (205 total)
 - **Notes**: Fixed JSON output to only include `subagent` field when `true` (omit for normal states)
+
+## E2E Test
+- **Result**: PASS — 4/4 steps passed
+- **Attempts**: 1
+- **Notes**: Subagent proactively called `fflow goto` instead of just proposing the transition, but the end result was correct. All expected outcomes verified: greeting.txt, work.txt, workflow completion, dispatch vs normal rendering.
