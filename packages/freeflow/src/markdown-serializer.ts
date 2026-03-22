@@ -47,9 +47,22 @@ export function serializeMarkdown(fsm: Fsm, opts?: SerializeMarkdownOptions): st
     lines.push("");
   }
 
-  // 5. State sections
+  // 5. State sections (order: Transitions → Instructions → Todos)
   for (const [name, state] of Object.entries(fsm.states)) {
     lines.push(`## State: ${name}`);
+    lines.push("");
+
+    // Transitions (first — gives quick overview of state's exits)
+    lines.push("### Transitions");
+    lines.push("");
+    const entries = Object.entries(state.transitions);
+    if (entries.length === 0) {
+      lines.push("(none)");
+    } else {
+      for (const [label, target] of entries) {
+        lines.push(`- ${label} \u2192 ${target}`);
+      }
+    }
     lines.push("");
 
     // Instructions (skip for delegation states with no prompt)
@@ -66,7 +79,7 @@ export function serializeMarkdown(fsm: Fsm, opts?: SerializeMarkdownOptions): st
       lines.push("");
     }
 
-    // Todos (only if present)
+    // Todos (last)
     if (state.todos && state.todos.length > 0) {
       lines.push("### Todos");
       lines.push("");
@@ -75,19 +88,6 @@ export function serializeMarkdown(fsm: Fsm, opts?: SerializeMarkdownOptions): st
       }
       lines.push("");
     }
-
-    // Transitions
-    lines.push("### Transitions");
-    lines.push("");
-    const entries = Object.entries(state.transitions);
-    if (entries.length === 0) {
-      lines.push("(none)");
-    } else {
-      for (const [label, target] of entries) {
-        lines.push(`- ${label} \u2192 ${target}`);
-      }
-    }
-    lines.push("");
   }
 
   return lines.join("\n");
@@ -192,6 +192,20 @@ export function serializeRawYamlToMarkdown(
       lines.push("");
     }
 
+    // Transitions (first)
+    lines.push("### Transitions");
+    lines.push("");
+    const transitions = state.transitions ?? {};
+    const entries = Object.entries(transitions);
+    if (entries.length === 0) {
+      lines.push("(none)");
+    } else {
+      for (const [label, target] of entries) {
+        lines.push(`- ${label} \u2192 ${target}`);
+      }
+    }
+    lines.push("");
+
     // Instructions (prompt)
     if (state.prompt) {
       lines.push("### Instructions");
@@ -225,20 +239,6 @@ export function serializeRawYamlToMarkdown(
       lines.push("</freeflow>");
       lines.push("");
     }
-
-    // Transitions
-    lines.push("### Transitions");
-    lines.push("");
-    const transitions = state.transitions ?? {};
-    const entries = Object.entries(transitions);
-    if (entries.length === 0) {
-      lines.push("(none)");
-    } else {
-      for (const [label, target] of entries) {
-        lines.push(`- ${label} \u2192 ${target}`);
-      }
-    }
-    lines.push("");
   }
 
   return lines.join("\n");

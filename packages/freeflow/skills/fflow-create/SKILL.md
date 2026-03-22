@@ -111,6 +111,17 @@ Default to agent-agnostic workflows:
 - Put universal rules in `guide`, not in state prompts.
 - Don't reference agent-specific tools or features in prompts unless necessary.
 
+### Heading levels in prompts
+
+State prompts are rendered under `## State: xxx` in the markdown workflow format.
+To avoid heading conflicts, use these levels inside prompts:
+
+- `###` for top-level sections within a state prompt
+- `####` for sub-sections
+- `**bold text**` for inline emphasis instead of deeper headings
+
+This ensures the markdown renders correctly when the workflow is converted to `.workflow.md`.
+
 ## Workflow Reuse
 
 Workflows can reuse states and guides from other workflow YAMLs. When the user wants to

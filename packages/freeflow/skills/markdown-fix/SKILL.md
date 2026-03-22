@@ -24,7 +24,7 @@ initial: start         # required — name of the initial state
 allowed_tools:         # optional — list of allowed tool names
   - Read
   - Write
-extends_guide: ./base  # optional — path to a base workflow for guide inheritance
+# extends_guide is NOT in frontmatter — it appears as a <freeflow extends-guide="..."> tag in the ## Guide section
 ---
 ```
 
@@ -33,10 +33,10 @@ extends_guide: ./base  # optional — path to a base workflow for guide inherita
 1. **`# <Title> Workflow`** — h1 heading, the workflow title
 2. **`## State Machine`** — contains a mermaid `stateDiagram-v2` code block (decorative, auto-generated from transitions)
 3. **`## Guide`** (optional) — workflow-level instructions that apply to all states; supports full markdown
-4. **`## State: <name>`** — one section per state, containing:
-   - **`### Instructions`** (required for non-workflow states) — the state prompt, supports full markdown
-   - **`### Todos`** (optional) — bulleted list of todo items
+4. **`## State: <name>`** — one section per state, containing (in this order):
    - **`### Transitions`** (required) — bulleted list of transitions or `(none)` for terminal states
+   - **`### Instructions`** (required for non-workflow states) — the state prompt, supports full markdown. Headings inside prompts should start at `###` then `####` then `**bold**`.
+   - **`### Todos`** (optional) — bulleted list of todo items
 
 ### Transition Format
 
