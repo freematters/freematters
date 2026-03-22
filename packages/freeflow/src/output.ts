@@ -10,6 +10,7 @@ export interface StateCard {
   todos: string[] | null;
   transitions: Record<string, string>;
   guide?: string;
+  subagent?: boolean;
 }
 
 export function stateCardFromFsm(stateName: string, fsmState: FsmState): StateCard {
@@ -21,6 +22,9 @@ export function stateCardFromFsm(stateName: string, fsmState: FsmState): StateCa
   };
   if (fsmState.guide) {
     card.guide = fsmState.guide;
+  }
+  if (fsmState.subagent) {
+    card.subagent = fsmState.subagent;
   }
   return card;
 }
@@ -66,6 +70,53 @@ export function formatStateCard(card: StateCard, fsmGuide?: string): string {
         "Only terminal states (no transitions) end the workflow.",
     );
   }
+
+  return lines.join("\n");
+}
+
+// --- Subagent Dispatch ---
+
+export function formatSubagentDispatch(
+  card: StateCard,
+  runId: string,
+  fsmGuide?: string,
+): string {
+  const lines: string[] = [];
+
+  const guide = card.guide ?? fsmGuide;
+  if (guide) {
+    lines.push(guide);
+    lines.push("");
+  }
+
+  lines.push(`You are in **${card.state}** state. This state uses subagent execution.`);
+  lines.push("");
+  lines.push("Spawn a subagent with the following instructions:");
+  lines.push(`1. Run \`fflow current --run-id ${runId}\` to get your instructions`);
+  lines.push("2. Execute the instructions fully");
+  lines.push("3. When done, report back using this exact format:");
+  lines.push("");
+  lines.push("## Execution Summary");
+  lines.push("<describe what was accomplished>");
+  lines.push("");
+  lines.push("## Proposed Transition");
+  lines.push('label: "<transition label>"');
+  lines.push("reason: <why this transition>");
+  lines.push("");
+
+  const entries = Object.entries(card.transitions);
+  if (entries.length > 0) {
+    lines.push("Valid transitions from this state:");
+    for (const [label, target] of entries) {
+      lines.push(`  ${label} → ${target}`);
+    }
+    lines.push("");
+  }
+
+  lines.push(
+    "After the subagent reports back, validate the proposed transition label against the valid transitions above, then run:",
+  );
+  lines.push(`  fflow goto <target> --run-id ${runId} --on "<label>"`);
 
   return lines.join("\n");
 }
