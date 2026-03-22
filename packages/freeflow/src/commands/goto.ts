@@ -1,6 +1,7 @@
 import { CliError } from "../errors.js";
 import { loadFsm } from "../fsm.js";
 import {
+  formatLiteCard,
   formatStateCard,
   handleError,
   jsonSuccess,
@@ -29,6 +30,9 @@ export function goto(args: GotoArgs): void {
 
     const meta = store.readMeta(args.runId);
     const fsm = loadFsm(meta.fsm_path);
+    const isLite = meta.lite === true;
+
+    let alreadyVisited = false;
 
     const result = store.withLock(args.runId, () => {
       const snapshot = store.readSnapshot(args.runId);
@@ -73,6 +77,11 @@ ${labels}`,
         );
       }
 
+      // Track visited states for lite mode
+      const visitedSet = new Set(snapshot.visited_states ?? []);
+      alreadyVisited = visitedSet.has(args.target);
+      visitedSet.add(args.target);
+
       const isDone = args.target === "done";
       const newStatus: RunStatus = isDone ? "completed" : "active";
 
@@ -86,7 +95,11 @@ ${labels}`,
           actor: "agent",
           reason: isDone ? "done_auto" : null,
         },
-        { run_status: newStatus, state: args.target },
+        {
+          run_status: newStatus,
+          state: args.target,
+          visited_states: [...visitedSet],
+        },
         { lockHeld: true },
       );
 
@@ -125,6 +138,8 @@ ${labels}`,
         data.completion_reason = "done_auto";
       }
       printJson(jsonSuccess("Transition complete", data));
+    } else if (isLite && alreadyVisited) {
+      process.stdout.write(`${formatLiteCard(card)}\n`);
     } else {
       process.stdout.write(`${formatStateCard(card)}\n`);
     }
