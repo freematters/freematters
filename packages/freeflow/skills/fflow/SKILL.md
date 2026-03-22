@@ -11,6 +11,13 @@ Initialize a new workflow run from a workflow YAML file.
 
 `/fflow PATH` — where PATH is the workflow YAML file to run.
 
+### Lite mode
+
+If the user requests lite mode (e.g., `/fflow --lite PATH` or "start in lite mode"),
+add `--lite` to the `fflow start` command. In lite mode, re-entered states show only
+transitions and todos instead of the full prompt, reducing token cost. The agent can
+call `fflow current` to retrieve full instructions when needed.
+
 ## Process
 
 1. **Check for active run** — If there is a remembered `run_id` from a previous `/fflow` in this conversation, run `fflow current --run-id <run_id>`. If the current state is **not** `done`, prompt the user with question:
@@ -24,7 +31,7 @@ Initialize a new workflow run from a workflow YAML file.
 3. **Run the CLI command:**
 
 ```bash
-fflow start <PATH> --run-id <workflow-name>-$(date)
+fflow start <PATH> --run-id <workflow-name>-$(date) [--lite]
 ```
 
 Never omit `--run-id`. The run ID is needed for all subsequent commands. PATH can be a workflow name (e.g. `spec-gen`) or a full path. The CLI resolves it automatically.
