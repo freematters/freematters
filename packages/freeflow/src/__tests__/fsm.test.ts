@@ -1,6 +1,9 @@
 import { writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import { FsmError, loadFsm } from "../fsm.js";
 import {
   MINIMAL_FSM,
@@ -759,5 +762,60 @@ states:
 describe("loadFsm — file errors", () => {
   test("non-existent file throws", () => {
     expect(() => loadFsm("/tmp/does-not-exist.yaml")).toThrow();
+  });
+});
+
+// --- Markdown workflow loading ---
+
+describe("loadFsm — markdown workflows", () => {
+  const fixturesDir = join(__dirname, "fixtures");
+
+  test("loads a .workflow.md file and returns a valid Fsm matching equivalent YAML", () => {
+    const mdPath = join(fixturesDir, "simple.workflow.md");
+    const fsm = loadFsm(mdPath);
+
+    expect(fsm.version).toBe(1);
+    expect(fsm.initial).toBe("start");
+    expect(fsm.guide).toBe("Minimal workflow guide.");
+    expect(Object.keys(fsm.states)).toEqual(expect.arrayContaining(["start", "done"]));
+    expect(fsm.states.start.prompt).toBe("Begin here.");
+    expect(fsm.states.start.transitions).toEqual({ next: "done" });
+    expect(fsm.states.done.prompt).toBe("Finished.");
+    expect(fsm.states.done.transitions).toEqual({});
+  });
+
+  test("markdown workflows go through the same resolution pipeline", () => {
+    // The child-from-yaml.workflow.md uses from: to reference a YAML workflow
+    // This tests resolveRefs works with markdown-loaded docs
+    const mdPath = join(fixturesDir, "child-from-yaml.workflow.md");
+    const fsm = loadFsm(mdPath);
+
+    expect(fsm.version).toBe(1);
+    expect(fsm.initial).toBe("start");
+    // The start state should have its prompt merged with base via {{base}}
+    expect(fsm.states.start.prompt).toContain("Custom start with base.");
+    expect(fsm.states.start.prompt).toContain("Base start prompt.");
+  });
+
+  test("from: references from a markdown workflow to a YAML workflow resolve correctly", () => {
+    const mdPath = join(fixturesDir, "child-from-yaml.workflow.md");
+    const fsm = loadFsm(mdPath);
+
+    // The from: reference is to ./base#start (a YAML workflow)
+    // After merge, the start state should have inherited base's todos
+    expect(fsm.states.start.todos).toEqual(["Base todo 1", "Base todo 2"]);
+    // Transitions from the child override
+    expect(fsm.states.start.transitions).toEqual({ next: "done" });
+  });
+
+  test("from: references from a YAML workflow to a markdown workflow resolve correctly", () => {
+    const yamlPath = join(fixturesDir, "child-from-md.workflow.yaml");
+    const fsm = loadFsm(yamlPath);
+
+    expect(fsm.version).toBe(1);
+    expect(fsm.initial).toBe("start");
+    // The start state should have its prompt inherited from the .workflow.md file
+    expect(fsm.states.start.prompt).toBe("Begin here.");
+    expect(fsm.states.start.transitions).toEqual({ next: "done" });
   });
 });
