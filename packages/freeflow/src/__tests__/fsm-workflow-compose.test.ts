@@ -139,8 +139,9 @@ describe("workflow composition — multiple and nested", () => {
     expect(fsm.states["outer/done"].transitions).toEqual({ completed: "done" });
 
     const mermaid = fsmToMermaid(fsm.states, fsm.initial);
-    expect(mermaid).toContain("[*] --> outer/mid-start");
-    expect(mermaid).toContain("outer/nested/inner-start --> outer/nested/done: next");
+    expect(mermaid).toContain("[*] --> outer_mid_start");
+    expect(mermaid).toContain("outer_mid_start: outer/mid-start");
+    expect(mermaid).toContain("outer_nested_inner_start --> outer_nested_done: next");
   });
 });
 

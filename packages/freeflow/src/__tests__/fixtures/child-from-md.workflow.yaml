@@ -1,0 +1,10 @@
+version: 1
+initial: start
+states:
+  start:
+    from: "./simple.workflow.md#start"
+    transitions:
+      next: done
+  done:
+    prompt: "Done from YAML child."
+    transitions: {}

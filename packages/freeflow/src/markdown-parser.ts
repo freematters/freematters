@@ -1,0 +1,472 @@
+import { load as yamlLoad } from "js-yaml";
+import type { Root, RootContent } from "mdast";
+import remarkFrontmatter from "remark-frontmatter";
+import remarkParse from "remark-parse";
+import { unified } from "unified";
+import { FsmError } from "./fsm.js";
+
+// --- Helpers ---
+
+function fail(message: string): never {
+  throw new FsmError("SCHEMA_INVALID", message);
+}
+
+/**
+ * Stringify AST nodes back to markdown text (simple approach).
+ * We walk through children and reconstruct text content.
+ */
+function nodesToMarkdown(nodes: RootContent[]): string {
+  const lines: string[] = [];
+  for (const node of nodes) {
+    lines.push(nodeToText(node));
+  }
+  return lines.join("\n\n").trim();
+}
+
+function nodeToText(node: RootContent): string {
+  switch (node.type) {
+    case "paragraph":
+      return inlineToText(node);
+    case "list":
+      return node.children
+        .map((li) => {
+          const text = li.children.map((c) => nodeToText(c as RootContent)).join("\n");
+          return `- ${text}`;
+        })
+        .join("\n");
+    case "code":
+      return `\`\`\`${node.lang ?? ""}\n${node.value}\n\`\`\``;
+    case "blockquote":
+      return node.children.map((c) => `> ${nodeToText(c as RootContent)}`).join("\n");
+    case "heading": {
+      const prefix = "#".repeat(node.depth);
+      return `${prefix} ${inlineToText(node)}`;
+    }
+    case "html":
+      return node.value;
+    case "thematicBreak":
+      return "---";
+    default:
+      if ("value" in node) return (node as { value: string }).value;
+      if ("children" in node) {
+        return (node as { children: RootContent[] }).children
+          .map((c) => nodeToText(c))
+          .join("");
+      }
+      return "";
+  }
+}
+
+// biome-ignore lint/suspicious/noExplicitAny: mdast node types are complex unions
+function inlineToText(node: any): string {
+  if (!node.children) return "";
+  return node.children
+    .map((child: RootContent) => {
+      switch (child.type) {
+        case "text":
+          return child.value;
+        case "strong":
+          return `**${inlineToText(child)}**`;
+        case "emphasis":
+          return `*${inlineToText(child)}*`;
+        case "inlineCode":
+          return `\`${child.value}\``;
+        case "link":
+          return `[${inlineToText(child)}](${child.url})`;
+        case "html":
+          return child.value;
+        default:
+          if ("value" in child) return (child as unknown as { value: string }).value;
+          if ("children" in child) return inlineToText(child);
+          return "";
+      }
+    })
+    .join("");
+}
+
+// --- HTML node joining ---
+
+const APPEND_TODOS_OPEN_RE = /^<freeflow\s+append-todos\s*>/i;
+
+/**
+ * Join fragmented `<freeflow append-todos>...</freeflow>` html nodes.
+ * remark may split the block into separate html nodes when blank lines
+ * separate the opening tag, content, and closing tag. This function
+ * detects an open `<freeflow append-todos>` node and accumulates
+ * subsequent html nodes until `</freeflow>` is found, then emits
+ * the joined content as a single html node.
+ */
+function joinConsecutiveHtmlNodes(nodes: RootContent[]): RootContent[] {
+  const result: RootContent[] = [];
+  let collecting = false;
+  let htmlBuf: string[] = [];
+  let bufStart: RootContent | null = null;
+
+  for (const node of nodes) {
+    if (collecting) {
+      if (node.type === "html") {
+        htmlBuf.push((node as { value: string }).value);
+        if ((node as { value: string }).value.trim() === "</freeflow>") {
+          // Emit joined node
+          result.push({
+            ...bufStart,
+            type: "html",
+            value: htmlBuf.join("\n"),
+          } as RootContent);
+          collecting = false;
+          htmlBuf = [];
+          bufStart = null;
+        }
+      } else {
+        // Non-html node while collecting — flush as-is (malformed tag)
+        for (const line of htmlBuf) {
+          result.push({ ...bufStart, type: "html", value: line } as RootContent);
+        }
+        collecting = false;
+        htmlBuf = [];
+        bufStart = null;
+        result.push(node);
+      }
+      continue;
+    }
+
+    if (
+      node.type === "html" &&
+      APPEND_TODOS_OPEN_RE.test((node as { value: string }).value.trim()) &&
+      !(node as { value: string }).value.includes("</freeflow>")
+    ) {
+      // Start collecting: open tag without matching close
+      collecting = true;
+      bufStart = node;
+      htmlBuf = [(node as { value: string }).value];
+      continue;
+    }
+
+    result.push(node);
+  }
+
+  // Flush any remaining collected nodes (unclosed tag)
+  if (collecting) {
+    for (const line of htmlBuf) {
+      result.push({ ...bufStart, type: "html", value: line } as RootContent);
+    }
+  }
+
+  return result;
+}
+
+// --- Freeflow tag parsing ---
+
+// Matches both self-closing and content-bearing freeflow tags:
+//   <freeflow from="x">          (self-closing without /)
+//   <freeflow from="x"/>         (self-closing with /)
+//   <freeflow from="x">...</freeflow>  (with content — content is ignored)
+const FREEFLOW_ATTR_RE =
+  /^<freeflow\s+(from|workflow|extends-guide)="([^"]+)"[^>]*>(?:[\s\S]*<\/freeflow>)?$/;
+
+function isFreeflowAttrTag(text: string): { attr: string; value: string } | null {
+  const m = text.trim().match(FREEFLOW_ATTR_RE);
+  if (m) return { attr: m[1], value: m[2] };
+  return null;
+}
+
+// --- Section splitting ---
+
+interface Section {
+  heading: string;
+  depth: number;
+  nodes: RootContent[];
+}
+
+function splitBySections(root: Root, targetDepth: number): Section[] {
+  const sections: Section[] = [];
+  let current: Section | null = null;
+
+  for (const node of root.children) {
+    if (node.type === "yaml") continue; // frontmatter handled separately
+
+    if (node.type === "heading" && node.depth === targetDepth) {
+      const text = inlineToText(node);
+      current = { heading: text, depth: node.depth, nodes: [] };
+      sections.push(current);
+    } else if (current) {
+      current.nodes.push(node);
+    }
+    // nodes before any heading at target depth are ignored (title heading)
+  }
+
+  return sections;
+}
+
+// --- Transition parsing ---
+
+const TRANSITION_RE = /^(.+?)\s*(?:→|->)\s*(.+)$/;
+
+function parseTransitions(
+  stateName: string,
+  nodes: RootContent[],
+): Record<string, string> {
+  const transitions: Record<string, string> = {};
+
+  // Check for (none) marker
+  const text = nodesToMarkdown(nodes).trim();
+  if (text === "(none)" || text === "") {
+    return {};
+  }
+
+  // Expect list items
+  for (const node of nodes) {
+    if (node.type === "list") {
+      for (const li of node.children) {
+        const itemText = li.children
+          .map((c) => nodeToText(c as RootContent))
+          .join("")
+          .trim();
+
+        if (itemText === "(none)") return {};
+
+        const m = itemText.match(TRANSITION_RE);
+        if (!m) {
+          fail(`state "${stateName}": invalid transition format: "${itemText}"`);
+        }
+        transitions[m[1].trim()] = m[2].trim();
+      }
+    } else if (node.type === "paragraph") {
+      const pText = inlineToText(node).trim();
+      if (pText === "(none)") return {};
+      // A paragraph that's not (none) in transitions section — could be malformed
+      fail(`state "${stateName}": invalid transition format: "${pText}"`);
+    }
+  }
+
+  return transitions;
+}
+
+// --- Append-todos extraction ---
+
+const LIST_ITEM_RE = /^[-*]\s+(.+)$/;
+
+function parseAppendTodosContent(raw: string): string[] {
+  const items: string[] = [];
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const m = trimmed.match(LIST_ITEM_RE);
+    if (m) {
+      items.push(m[1].trim());
+    }
+  }
+  return items;
+}
+
+// --- Main parser ---
+
+/**
+ * Extract the h1 title from a markdown workflow string.
+ * Returns the text of the first h1 heading, or undefined if none.
+ */
+export function extractMarkdownTitle(content: string): string | undefined {
+  const tree = unified()
+    .use(remarkParse)
+    .use(remarkFrontmatter, ["yaml"])
+    .parse(content);
+
+  for (const node of tree.children) {
+    if (node.type === "heading" && node.depth === 1) {
+      return inlineToText(node);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Parse a markdown workflow string into a raw document object.
+ * The returned object has the same shape as yamlLoad() output,
+ * ready for resolveWorkflowStates/resolveRefs/validation.
+ */
+export function parseMarkdownWorkflow(content: string): Record<string, unknown> {
+  const tree = unified()
+    .use(remarkParse)
+    .use(remarkFrontmatter, ["yaml"])
+    .parse(content);
+
+  // 1. Extract frontmatter
+  const yamlNode = tree.children.find((n) => n.type === "yaml");
+  if (!yamlNode || yamlNode.type !== "yaml") {
+    fail("missing frontmatter (YAML front matter block is required)");
+  }
+
+  const frontmatter = yamlLoad(yamlNode.value) as Record<string, unknown>;
+  if (!frontmatter || typeof frontmatter !== "object") {
+    fail("frontmatter must be a YAML mapping");
+  }
+
+  const doc: Record<string, unknown> = {};
+
+  // Copy frontmatter fields
+  if (frontmatter.version !== undefined) doc.version = frontmatter.version;
+  if (frontmatter.initial !== undefined) doc.initial = frontmatter.initial;
+  if (frontmatter.allowed_tools !== undefined)
+    doc.allowed_tools = frontmatter.allowed_tools;
+  if (frontmatter.extends_guide !== undefined)
+    doc.extends_guide = frontmatter.extends_guide;
+
+  // 2. Split top-level sections (depth 2)
+  const sections = splitBySections(tree, 2);
+
+  const states: Record<string, Record<string, unknown>> = {};
+
+  for (const section of sections) {
+    // Skip State Machine section
+    if (section.heading === "State Machine") {
+      continue;
+    }
+
+    // Guide section — extract extends-guide tags, then capture remaining as guide text
+    if (section.heading === "Guide" && section.depth === 2) {
+      const guideNodes: RootContent[] = [];
+      for (const node of section.nodes) {
+        if (node.type === "html") {
+          const tagInfo = isFreeflowAttrTag(node.value.trim());
+          if (tagInfo && tagInfo.attr === "extends-guide") {
+            doc.extends_guide = tagInfo.value;
+            continue;
+          }
+        }
+        guideNodes.push(node);
+      }
+      const guideText = nodesToMarkdown(guideNodes);
+      if (guideText.length > 0) {
+        doc.guide = guideText;
+      }
+      continue;
+    }
+
+    // State sections
+    const stateMatch = section.heading.match(/^State:\s*(.+)$/);
+    if (!stateMatch) continue;
+
+    const stateName = stateMatch[1].trim();
+    const state: Record<string, unknown> = {};
+
+    // Look for freeflow tags and subsections within the state
+    // Pre-join consecutive html nodes so that <freeflow append-todos> blocks
+    // split across multiple nodes (due to blank lines) are reassembled.
+    const stateNodes = joinConsecutiveHtmlNodes(section.nodes);
+
+    // Extract freeflow tags first
+    const filteredNodes: RootContent[] = [];
+
+    for (const node of stateNodes) {
+      if (node.type === "html") {
+        const val = node.value.trim();
+
+        // Check for self-closing freeflow tags (single-line)
+        const tagInfo = isFreeflowAttrTag(val);
+        if (tagInfo) {
+          if (tagInfo.attr === "from") {
+            state.from = tagInfo.value;
+          } else if (tagInfo.attr === "workflow") {
+            state.workflow = tagInfo.value;
+          }
+          continue;
+        }
+
+        // Check for append-todos block (entire block or joined fragments)
+        const appendMatch = val.match(
+          /^<freeflow\s+append-todos\s*>([\s\S]*?)<\/freeflow>$/,
+        );
+        if (appendMatch) {
+          state.append_todos = parseAppendTodosContent(appendMatch[1]);
+          continue;
+        }
+
+        // Skip stray closing tags (shouldn't happen after joining, but defensive)
+        if (val === "</freeflow>") {
+          continue;
+        }
+      }
+
+      filteredNodes.push(node);
+    }
+
+    // If this is a workflow state, it should not have prompt
+    if (state.workflow !== undefined) {
+      // Parse sub-sections for transitions only
+      const subSections = splitBySubSections(filteredNodes);
+      for (const sub of subSections) {
+        if (sub.heading === "Transitions" || sub.heading === "Transitions:") {
+          state.transitions = parseTransitions(stateName, sub.nodes);
+        }
+      }
+      states[stateName] = state;
+      continue;
+    }
+
+    // Parse sub-sections (### level)
+    const subSections = splitBySubSections(filteredNodes);
+
+    let hasInstructions = false;
+    for (const sub of subSections) {
+      if (sub.heading === "Instructions" || sub.heading === "Instructions:") {
+        hasInstructions = true;
+        state.prompt = nodesToMarkdown(sub.nodes);
+      } else if (sub.heading === "Todos" || sub.heading === "Todos:") {
+        state.todos = extractTodoItems(sub.nodes);
+      } else if (sub.heading === "Transitions" || sub.heading === "Transitions:") {
+        state.transitions = parseTransitions(stateName, sub.nodes);
+      }
+    }
+
+    if (!hasInstructions && state.from === undefined) {
+      fail(`state "${stateName}": missing Instructions section`);
+    }
+
+    states[stateName] = state;
+  }
+
+  doc.states = states;
+  return doc;
+}
+
+// --- Sub-section splitting (### level within a ## State section) ---
+
+interface SubSection {
+  heading: string;
+  nodes: RootContent[];
+}
+
+function splitBySubSections(nodes: RootContent[]): SubSection[] {
+  const subs: SubSection[] = [];
+  let current: SubSection | null = null;
+
+  for (const node of nodes) {
+    if (node.type === "heading" && node.depth === 3) {
+      const text = inlineToText(node);
+      current = { heading: text, nodes: [] };
+      subs.push(current);
+    } else if (current) {
+      current.nodes.push(node);
+    }
+  }
+
+  return subs;
+}
+
+// --- Todo extraction ---
+
+function extractTodoItems(nodes: RootContent[]): string[] {
+  const items: string[] = [];
+  for (const node of nodes) {
+    if (node.type === "list") {
+      for (const li of node.children) {
+        const text = li.children
+          .map((c) => nodeToText(c as RootContent))
+          .join("")
+          .trim();
+        if (text) items.push(text);
+      }
+    }
+  }
+  return items;
+}

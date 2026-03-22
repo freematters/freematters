@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { load as yamlLoad } from "js-yaml";
+import { parseMarkdownWorkflow } from "./markdown-parser.js";
 import { resolveWorkflow } from "./resolve-workflow.js";
 
 // --- Types ---
@@ -399,7 +400,9 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
   visited.add(absPath);
 
   const raw = readFileSync(absPath, "utf-8");
-  const doc = yamlLoad(raw);
+  const doc = absPath.endsWith(".workflow.md")
+    ? parseMarkdownWorkflow(raw)
+    : yamlLoad(raw);
 
   if (
     doc === null ||
@@ -407,7 +410,7 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
     typeof doc !== "object" ||
     Array.isArray(doc)
   ) {
-    fail("YAML must be a mapping");
+    fail("document must be a YAML or Markdown mapping");
   }
 
   const obj = doc as Record<string, unknown>;

@@ -16,20 +16,25 @@ function searchDirs(): string[] {
 }
 
 function hasWorkflowExtension(name: string): boolean {
-  return [".workflow.yaml", ".workflow.yml", ".fsm.yaml", ".fsm.yml"].some((ext) =>
-    name.endsWith(ext),
-  );
+  return [
+    ".workflow.yaml",
+    ".workflow.yml",
+    ".fsm.yaml",
+    ".fsm.yml",
+    ".workflow.md",
+  ].some((ext) => name.endsWith(ext));
 }
 
 /**
- * Resolve a workflow name or path to an absolute workflow YAML file path.
+ * Resolve a workflow name or path to an absolute workflow file path.
  *
  * Resolution rules:
  * 1. If the input is an existing file (absolute or relative), return it.
- * 2. Search for `<name>/workflow.yaml` in directories:
+ * 2. Search for `<name>/workflow.yaml` or `<name>/workflow.md` in directories:
  *    - .freeflow/workflows/  (project-local)
  *    - ~/.freeflow/workflows/ (user-global)
  *    - <freeflow-package>/workflows/ (bundled)
+ *    If both formats exist in the same directory, throw WORKFLOW_AMBIGUOUS.
  * 3. If not found anywhere, throw with WORKFLOW_NOT_FOUND.
  */
 export function resolveWorkflow(input: string): string {
@@ -45,7 +50,7 @@ export function resolveWorkflow(input: string): string {
       });
     }
     // Bare name with extension — not supported in directory format
-    const bareName = input.replace(/\.(workflow|fsm)\.ya?ml$/, "");
+    const bareName = input.replace(/\.(workflow|fsm)\.(ya?ml|md)$/, "");
     throw new CliError(
       "WORKFLOW_NOT_FOUND",
       `Flat filename format is no longer supported. Use the bare workflow name instead (e.g. "${bareName}").`,
@@ -73,10 +78,34 @@ export function resolveWorkflow(input: string): string {
 }
 
 /**
- * Probe a directory for a workflow file at `<baseName>/workflow.yaml`.
+ * Probe a directory for a workflow file at `<baseName>/workflow.yaml`,
+ * `<baseName>/workflow.yml`, or `<baseName>/workflow.md`.
+ * If two or more exist, throw WORKFLOW_AMBIGUOUS.
  * Returns absolute path if found, undefined otherwise.
  */
 function probeDir(dir: string, baseName: string): string | undefined {
-  const candidate = join(dir, baseName, "workflow.yaml");
-  return existsSync(candidate) ? candidate : undefined;
+  const yamlCandidate = join(dir, baseName, "workflow.yaml");
+  const ymlCandidate = join(dir, baseName, "workflow.yml");
+  const mdCandidate = join(dir, baseName, "workflow.md");
+  const hasYaml = existsSync(yamlCandidate);
+  const hasYml = existsSync(ymlCandidate);
+  const hasMd = existsSync(mdCandidate);
+
+  const foundFiles: string[] = [];
+  if (hasYaml) foundFiles.push("workflow.yaml");
+  if (hasYml) foundFiles.push("workflow.yml");
+  if (hasMd) foundFiles.push("workflow.md");
+  if (foundFiles.length >= 2) {
+    const wfDir = join(dir, baseName);
+    throw new CliError(
+      "WORKFLOW_AMBIGUOUS",
+      `Ambiguous workflow "${baseName}": found both ${foundFiles.join(" and ")} in ${wfDir}. Remove one.`,
+      { context: { fsmPath: baseName } },
+    );
+  }
+
+  if (hasYaml) return yamlCandidate;
+  if (hasYml) return ymlCandidate;
+  if (hasMd) return mdCandidate;
+  return undefined;
 }

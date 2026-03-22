@@ -14,6 +14,7 @@ import { goto } from "./commands/goto.js";
 import { history } from "./commands/history.js";
 import { install } from "./commands/install.js";
 import { list } from "./commands/list.js";
+import { convert } from "./commands/markdown/convert.js";
 import { run as runCmd } from "./commands/run.js";
 import { start } from "./commands/start.js";
 import { validate } from "./commands/validate.js";
@@ -218,6 +219,32 @@ program
       model: opts.model as string | undefined,
       verbose: (opts.verbose as boolean) ?? false,
     });
+  });
+
+// Markdown subcommands
+const markdownCmd = program
+  .command("markdown")
+  .description("markdown workflow format utilities");
+
+markdownCmd
+  .command("convert")
+  .description("convert between YAML and Markdown workflow formats")
+  .argument("<file>", "path to .workflow.yaml or .workflow.md file")
+  .option(
+    "-o, --output <path>",
+    "output file path (default: same basename, swapped extension)",
+  )
+  .action((file: string, opts: Record<string, unknown>, cmd: Command) => {
+    const { json } = getGlobalOpts(cmd);
+    try {
+      convert({
+        filePath: resolve(file),
+        output: opts.output as string | undefined,
+        json: json ?? false,
+      });
+    } catch (err: unknown) {
+      handleError(err, json ?? false);
+    }
   });
 
 // Hidden hook commands (not shown in --help)

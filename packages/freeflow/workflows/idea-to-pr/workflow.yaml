@@ -20,7 +20,7 @@ guide: |
   Idea-to-PR — end-to-end pipeline from rough idea to merged pull request.
   Composes spec-gen, spec-to-code, and pr-lifecycle into a single workflow.
 
-  ## Mode selection
+  #### Mode selection
 
   After the spec is complete, the user chooses a mode:
   - **Full auto**: spec-to-code runs in fast-forward mode (no intermediate approvals),
@@ -30,7 +30,7 @@ guide: |
 
   Remember the user's mode choice — it determines behavior in later states.
 
-  ## Fast-forward propagation
+  #### Fast-forward propagation
 
   When the user chose "full auto" mode:
   - In spec-to-code's setup state, select "fast forward" when prompted.
@@ -46,7 +46,7 @@ states:
 
   decide:
     prompt: |
-      ## Choose Next Step
+      #### Choose Next Step
 
       The spec is complete. Read `summary.md` from the spec directory and present
       a brief overview of what was generated.
@@ -71,7 +71,7 @@ states:
 
   confirm-pr:
     prompt: |
-      ## Ready for PR
+      #### Ready for PR
 
       Implementation is complete. Read `./specs/<slug>/implementation-summary.md`
       and present the key results.
@@ -93,7 +93,7 @@ states:
 
   done:
     prompt: |
-      ## Workflow Complete
+      #### Workflow Complete
 
       Present a final summary of what was accomplished:
       - Phases completed (spec only / spec + implementation / spec + implementation + PR)
