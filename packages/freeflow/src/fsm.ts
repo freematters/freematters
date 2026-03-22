@@ -10,6 +10,7 @@ export interface FsmState {
   todos?: string[];
   transitions: Record<string, string>;
   guide?: string;
+  subagent?: boolean;
 }
 
 export interface Fsm {
@@ -159,6 +160,11 @@ function resolveRefs(
       const base = Array.isArray(state.todos) ? state.todos : [];
       state.todos = [...base, ...(state.append_todos as unknown[])];
       state.append_todos = undefined;
+    }
+
+    // Merge subagent: inherit from base if not overridden locally
+    if (state.subagent === undefined && baseState.subagent !== undefined) {
+      state.subagent = baseState.subagent;
     }
 
     // Remove from field after merge
@@ -549,6 +555,12 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
     }
     if (typeof s.guide === "string" && s.guide.length > 0) {
       states[name].guide = s.guide;
+    }
+    if (s.subagent !== undefined && s.subagent !== null) {
+      if (typeof s.subagent !== "boolean") {
+        fail(`state "${name}": "subagent" must be a boolean`);
+      }
+      states[name].subagent = s.subagent;
     }
   }
 

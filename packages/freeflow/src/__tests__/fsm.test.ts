@@ -682,6 +682,80 @@ states:
   });
 });
 
+describe("loadFsm — subagent flag", () => {
+  test("schema accepts subagent: true", () => {
+    const p = writeYaml(
+      "valid-subagent-true.yaml",
+      `
+version: 1
+guide: "Subagent workflow"
+initial: start
+states:
+  start:
+    prompt: "Do things."
+    subagent: true
+    transitions:
+      next: done
+  done:
+    prompt: "Done."
+    transitions: {}
+`,
+    );
+    const fsm = loadFsm(p);
+    expect(fsm.states.start.subagent).toBe(true);
+  });
+
+  test("schema accepts subagent: false", () => {
+    const p = writeYaml(
+      "valid-subagent-false.yaml",
+      `
+version: 1
+guide: "Subagent workflow"
+initial: start
+states:
+  start:
+    prompt: "Do things."
+    subagent: false
+    transitions:
+      next: done
+  done:
+    prompt: "Done."
+    transitions: {}
+`,
+    );
+    const fsm = loadFsm(p);
+    expect(fsm.states.start.subagent).toBe(false);
+  });
+
+  test("schema rejects non-boolean subagent", () => {
+    expectSchemaInvalid(
+      `
+version: 1
+guide: "x"
+initial: start
+states:
+  start:
+    prompt: "x"
+    subagent: "yes"
+    transitions:
+      go: done
+  done:
+    prompt: "x"
+    transitions: {}
+`,
+      "invalid-subagent-string.yaml",
+      /subagent.*boolean/,
+    );
+  });
+
+  test("schema accepts missing subagent (backward compat)", () => {
+    const p = writeYaml("valid-no-subagent.yaml", MINIMAL_FSM);
+    const fsm = loadFsm(p);
+    expect(fsm.states.start.subagent).toBeUndefined();
+    expect(fsm.states.done.subagent).toBeUndefined();
+  });
+});
+
 describe("loadFsm — file errors", () => {
   test("non-existent file throws", () => {
     expect(() => loadFsm("/tmp/does-not-exist.yaml")).toThrow();

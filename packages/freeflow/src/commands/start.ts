@@ -3,6 +3,7 @@ import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import {
   formatStateCard,
+  formatSubagentDispatch,
   fsmToMermaid,
   handleError,
   jsonSuccess,
@@ -74,14 +75,18 @@ export function start(args: StartArgs): void {
           run_status: "active",
           total_states: Object.keys(fsm.states).length,
           mermaid,
+          ...(card.subagent ? { subagent: true } : {}),
         }),
       );
     } else {
       const header = fsm.guide ? `FSM started. ${fsm.guide}` : "FSM started.";
+      const cardOutput = card.subagent
+        ? formatSubagentDispatch(card, runId, fsm.guide)
+        : formatStateCard(card);
       process.stdout.write(`${header}
 run_id: ${runId}
 
-${formatStateCard(card)}
+${cardOutput}
 `);
     }
   } catch (err: unknown) {

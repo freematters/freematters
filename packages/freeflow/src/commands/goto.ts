@@ -4,6 +4,7 @@ import {
   formatDuration,
   formatLiteCard,
   formatStateCard,
+  formatSubagentDispatch,
   handleError,
   jsonSuccess,
   printJson,
@@ -133,11 +134,15 @@ ${labels}`,
         run_status: result.newStatus,
         transition_label: args.on,
         time_in_previous_state: timeInPrevState,
+        ...(card.subagent ? { subagent: true } : {}),
       };
       if (result.isDone) {
         data.completion_reason = "done_auto";
       }
       printJson(jsonSuccess("Transition complete", data));
+    } else if (card.subagent) {
+      const cardOutput = formatSubagentDispatch(card, args.runId);
+      process.stdout.write(`${cardOutput}\n`);
     } else if (isLite && result.alreadyVisited) {
       process.stdout.write(`${formatLiteCard(card)}\n`);
     } else {
