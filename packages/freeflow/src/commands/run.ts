@@ -258,7 +258,11 @@ function fsmGotoHandler(
 
         const card = stateCardFromFsm(args.target, targetState);
         let text =
-          lite && alreadyVisited ? formatLiteCard(card) : formatStateCard(card);
+          lite && alreadyVisited
+            ? formatLiteCard(card, {
+                currentHint: "Call the `fsm_current` tool to review full instructions.",
+              })
+            : formatStateCard(card);
         if (isTerminal) {
           text += "\n\nThis is a terminal state. The workflow is complete.";
         }

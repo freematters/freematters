@@ -81,6 +81,9 @@ describe("run --lite: fsm_goto returns lite card on re-visit", () => {
     expect(result.content[0].text).toContain("Re-entering");
     expect(result.content[0].text).toContain("Instructions unchanged");
     expect(result.content[0].text).not.toContain("Your instructions:");
+    // MCP path should reference fsm_current tool, not fflow CLI
+    expect(result.content[0].text).toContain("fsm_current");
+    expect(result.content[0].text).not.toContain("fflow current");
   });
 
   test("visited_states tracked in snapshot", async () => {
