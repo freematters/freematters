@@ -1,0 +1,21 @@
+{
+  "name": "freematters-channels",
+  "owner": { "name": "freematters" },
+  "plugins": [
+    {
+      "name": "slack",
+      "source": "./dist/slack",
+      "description": "Slack channel for Claude Code — chat bridge with access control"
+    },
+    {
+      "name": "notion",
+      "source": "./dist/notion",
+      "description": "Notion channel for Claude Code — page and database change notifications"
+    },
+    {
+      "name": "github-issues",
+      "source": "./dist/github-issues",
+      "description": "GitHub Issues channel for Claude Code — issue and comment notifications"
+    }
+  ]
+}

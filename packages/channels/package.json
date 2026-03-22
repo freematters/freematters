@@ -1,0 +1,34 @@
+{
+  "name": "@freematters/channels",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsx scripts/build-plugin.ts",
+    "build:slack": "tsx scripts/build-plugin.ts slack",
+    "build:notion": "tsx scripts/build-plugin.ts notion",
+    "build:github-issues": "tsx scripts/build-plugin.ts github-issues",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "biome check --write ."
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@notionhq/client": "^5.14.0",
+    "@octokit/rest": "^22.0.1",
+    "@slack/socket-mode": "^2.0.6",
+    "@slack/web-api": "^7.15.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.0",
+    "@types/node": "^22.0.0",
+    "esbuild": "^0.27.3",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

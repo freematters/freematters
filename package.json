@@ -4,8 +4,8 @@
   "type": "module",
   "workspaces": ["packages/*"],
   "scripts": {
-    "build": "npm run build -w packages/freeflow",
-    "test": "npm run test -w packages/freeflow",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
     "test:integration": "npm run test:integration -w packages/freeflow",
     "test:claude": "npm run test:claude -w packages/freeflow",
     "check": "biome check --write --error-on-warnings .",
