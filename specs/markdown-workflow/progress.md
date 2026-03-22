@@ -17,3 +17,9 @@
 - **What was built**: Updated `probeDir()` to discover `.workflow.md` files and throw `WORKFLOW_AMBIGUOUS` when both formats exist. Added `.workflow.md` to `hasWorkflowExtension()`.
 - **Tests**: 5 tests added, all passing (+ 8 existing pass)
 - **Notes**: YAML checked first, then MD. Flat filename regex updated for `.workflow.md`.
+
+## Step 1: Markdown Parser
+- **Files changed**: `src/markdown-parser.ts` (new), `src/__tests__/markdown-parser.test.ts` (new), `package.json` (deps added)
+- **What was built**: `parseMarkdownWorkflow(content)` that produces the same raw doc shape as `yamlLoad()`. Parses frontmatter, guide, states (instructions/todos/transitions), `<freeflow>` tags.
+- **Tests**: 14 tests added (11 valid cases, 3 error cases), all passing
+- **Notes**: Added `unified`, `remark-parse`, `remark-frontmatter`, `yaml`, `@types/mdast` deps. Supports both `→` and `->` separators.
