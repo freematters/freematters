@@ -35,6 +35,8 @@ export interface RunArgs {
   verbose?: boolean;
   stay?: boolean;
   lite?: boolean;
+  gateway?: string;
+  apiKey?: string;
 }
 
 export interface RunCoreOptions {
@@ -554,17 +556,90 @@ export async function runCore(
 
 export async function run(args: RunArgs): Promise<void> {
   try {
-    await runCore({
-      fsmPath: args.fsmPath,
-      runId: args.runId,
-      root: args.root,
-      prompt: args.prompt,
-      model: args.model,
-      verbose: args.verbose,
-      stay: args.stay,
-      lite: args.lite,
-    });
+    if (args.gateway) {
+      await runViaGateway(args);
+    } else {
+      await runCore({
+        fsmPath: args.fsmPath,
+        runId: args.runId,
+        root: args.root,
+        prompt: args.prompt,
+        model: args.model,
+        verbose: args.verbose,
+        stay: args.stay,
+        lite: args.lite,
+      });
+    }
   } catch (err: unknown) {
     handleError(err, args.json);
   }
+}
+
+async function runViaGateway(args: RunArgs): Promise<void> {
+  const { GatewayCliClient } = await import("../gateway/cli-client.js");
+  const rl = createInterface({ input: process.stdin, output: process.stderr });
+
+  const client = new GatewayCliClient({
+    gatewayUrl: args.gateway as string,
+    apiKey: args.apiKey,
+  });
+
+  log(`Connecting to gateway: ${args.gateway}`, c.cyan);
+  await client.connect();
+  log("Connected to gateway", c.green);
+
+  let currentRunId: string | undefined;
+  let done = false;
+
+  client.on("run_created", (msg) => {
+    currentRunId = msg.run_id;
+    log(`run=${msg.run_id}`, c.cyan);
+  });
+
+  client.on("run_started", (msg) => {
+    log(`state=${msg.state} (initial)`, c.green);
+  });
+
+  client.on("agent_output", (msg) => {
+    process.stdout.write(msg.content);
+    if (!msg.stream) {
+      process.stdout.write("\n");
+    }
+  });
+
+  client.on("state_changed", (msg) => {
+    log(`state: ${msg.from} → ${msg.to}`, c.green);
+  });
+
+  client.on("run_completed", (msg) => {
+    log(`run finished: ${msg.status}`, c.green);
+    done = true;
+    rl.close();
+  });
+
+  client.on("error", (msg) => {
+    log(`error: ${msg.message}`, c.red);
+  });
+
+  // Create the run
+  client.createRun(args.fsmPath, args.runId, args.prompt);
+
+  // Forward stdin as user_input
+  rl.on("line", (line) => {
+    if (currentRunId) {
+      client.sendInput(currentRunId, line);
+    }
+  });
+
+  // Wait until run completes
+  await new Promise<void>((resolve) => {
+    if (done) {
+      resolve();
+      return;
+    }
+    client.on("run_completed", () => resolve());
+    client.on("close", () => resolve());
+  });
+
+  client.close();
 }

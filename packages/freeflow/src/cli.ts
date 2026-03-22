@@ -90,6 +90,8 @@ program
   .option("--verbose", "show tool calls and agent messages in output")
   .option("--stay", "stay and accept user input after workflow completes")
   .option("--lite", "enable lite mode (abbreviated output on re-visited states)")
+  .option("--gateway <url>", "connect to remote Gateway instead of local execution")
+  .option("--api-key <key>", "API key for Gateway authentication")
   .action(async (_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     const { run: runCmd } = await import("./commands/run.js");
@@ -103,6 +105,8 @@ program
       verbose: (opts.verbose as boolean) ?? false,
       stay: (opts.stay as boolean) ?? false,
       lite: (opts.lite as boolean) ?? false,
+      gateway: opts.gateway as string | undefined,
+      apiKey: opts.apiKey as string | undefined,
     });
   });
 
