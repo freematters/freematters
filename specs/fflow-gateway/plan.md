@@ -15,7 +15,7 @@ graph LR
 ## Checklist
 
 - [x] Step 1: Define Message Types and Protocols
-- [ ] Step 2: Extend Store with Gateway Fields
+- [x] Step 2: Extend Store with Gateway Fields
 - [ ] Step 3: Implement Gateway Server
 - [ ] Step 4: Implement Agent Daemon
 - [ ] Step 5: Extend CLI with --gateway Support
