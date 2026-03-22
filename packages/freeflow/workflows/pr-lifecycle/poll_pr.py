@@ -189,19 +189,16 @@ def extract_bot_review_threads(threads: list[dict]) -> list[dict]:
 
 
 def find_unhandled_bot_mentions(
-    owner: str, repo: str, pr: int, threads: list[dict] | None = None,
-    wf_dir: Path | None = None,
+    owner: str, repo: str, pr: int, threads: list[dict] | None = None
 ) -> list[BotMention]:
     """
     Scan for unhandled @bot mentions in:
       1. Inline review threads (from pre-fetched threads)
       2. Issue/PR-level comments (REST API)
-      3. PR review bodies (the review submission message)
 
     Dedup:
       - Inline threads: handled if a subsequent note starts with '[from bot]'
       - Issue comments: handled if the comment has a 🚀 (rocket) reaction
-      - Review bodies: handled if the review ID is in WF_DIR/handled_reviews.json
     """
     mentions: list[BotMention] = []
 
@@ -278,50 +275,6 @@ def find_unhandled_bot_mentions(
             author=comment.get("user", {}).get("login", "unknown"),
         ))
 
-    # --- 3. PR review bodies ---
-    # Review submission messages (e.g., "COMMENTED" reviews with @bot in the body)
-    # are separate from inline thread comments and issue comments.
-    # Dedup via handled_reviews.json in WF_DIR (reviews don't support reactions).
-    handled_reviews: set[int] = set()
-    if wf_dir:
-        handled_file = wf_dir / "handled_reviews.json"
-        if handled_file.exists():
-            try:
-                handled_reviews = set(json.loads(handled_file.read_text()))
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-    all_reviews: list[dict] = []
-    page = 1
-    while True:
-        reviews_data, rc = gh_api(
-            f"repos/{owner}/{repo}/pulls/{pr}/reviews?per_page=100&page={page}"
-        )
-        if rc != 0 or not reviews_data or not isinstance(reviews_data, list):
-            break
-        all_reviews.extend(reviews_data)
-        if len(reviews_data) < 100:
-            break
-        page += 1
-
-    for review in all_reviews:
-        body = review.get("body", "") or ""
-        if not body or body.startswith("[from bot]"):
-            continue
-        if review.get("user", {}).get("type") == "Bot":
-            continue
-        if "@bot" not in body.lower():
-            continue
-        review_id = review.get("id")
-        if review_id in handled_reviews:
-            continue
-        mentions.append(BotMention(
-            source="review_body",
-            comment_body=body,
-            comment_id=review_id,
-            author=review.get("user", {}).get("login", "unknown"),
-        ))
-
     return mentions
 
 
@@ -375,7 +328,7 @@ def poll_once(
     bot_review_threads = extract_bot_review_threads(raw_threads)
 
     # 5. @bot mentions
-    mentions = find_unhandled_bot_mentions(owner, repo, pr, threads=raw_threads, wf_dir=wf_dir)
+    mentions = find_unhandled_bot_mentions(owner, repo, pr, threads=raw_threads)
 
     # Write status file every cycle
     write_pr_status(
