@@ -151,6 +151,16 @@ states:
     prompt: |
       Rebase onto the latest target branch.
 
+      ## Pre-check: verify PR is still open
+
+      The target branch may have been updated because THIS PR was just merged.
+      Before rebasing, wait 2 seconds and then check if the PR was already merged:
+      ```bash
+      sleep 2
+      gh pr view <pr_number> --json state --jq '.state'
+      ```
+      If the state is `MERGED` or `CLOSED`, skip the rebase and transition to `PR merged`.
+
       ## Steps
 
       1. Fetch the latest target branch:
@@ -166,11 +176,13 @@ states:
       4. Run lint/format/unit tests locally to confirm the rebase doesn't break anything
          (refer to project CLAUDE.md for check commands).
     todos:
+      - Check if PR was merged before rebasing
       - Fetch latest target branch
       - Rebase and resolve any conflicts
       - Run lint/format/unit tests to verify
     transitions:
       rebased: push
+      PR merged: done
 
   address:
     prompt: |
@@ -292,4 +304,23 @@ states:
       - Final status (merged or closed)
       - Total `@bot` interactions handled
       - Brief overview of main fixes applied
+
+      ## Worktree cleanup
+
+      Check if you are running inside a git worktree:
+      ```bash
+      git rev-parse --git-dir
+      ```
+      If the output contains `.git/worktrees/` (not just `.git`), you are in a worktree.
+
+      If in a worktree, print cleanup instructions for the user but do NOT execute them
+      (removing the worktree from within it breaks the session):
+      ```
+      To clean up the worktree, run from the main repo:
+        cd <main_repo_root>
+        git worktree remove <worktree_path>
+        git branch -d <branch_name>
+      ```
+
+      Do NOT attempt to remove the worktree yourself.
     transitions: {}
