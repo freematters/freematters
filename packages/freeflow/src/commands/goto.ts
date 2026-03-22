@@ -1,6 +1,7 @@
 import { CliError } from "../errors.js";
 import { loadFsm } from "../fsm.js";
 import {
+  formatDuration,
   formatLiteCard,
   formatStateCard,
   handleError,
@@ -75,10 +76,15 @@ ${labels}`,
         );
       }
 
-      // Track visited states for lite mode
-      const visitedSet = new Set(snapshot.visited_states ?? []);
-      const alreadyVisited = visitedSet.has(args.target);
-      visitedSet.add(args.target);
+      // Track visited states only in lite mode
+      let alreadyVisited = false;
+      let visitedStates: string[] | undefined;
+      if (isLite) {
+        const visitedSet = new Set(snapshot.visited_states ?? []);
+        alreadyVisited = visitedSet.has(args.target);
+        visitedSet.add(args.target);
+        visitedStates = [...visitedSet];
+      }
 
       const isDone = args.target === "done";
       const newStatus: RunStatus = isDone ? "completed" : "active";
@@ -96,7 +102,7 @@ ${labels}`,
         {
           run_status: newStatus,
           state: args.target,
-          visited_states: [...visitedSet],
+          ...(visitedStates !== undefined && { visited_states: visitedStates }),
         },
         { lockHeld: true },
       );
@@ -114,11 +120,7 @@ ${labels}`,
       const curEvent = events[events.length - 1];
       const elapsed =
         new Date(curEvent.ts).getTime() - new Date(prevEvent.ts).getTime();
-      if (elapsed < 1000) timeInPrevState = `${elapsed}ms`;
-      else if (elapsed < 60_000) timeInPrevState = `${(elapsed / 1000).toFixed(1)}s`;
-      else if (elapsed < 3_600_000)
-        timeInPrevState = `${(elapsed / 60_000).toFixed(1)}m`;
-      else timeInPrevState = `${(elapsed / 3_600_000).toFixed(1)}h`;
+      timeInPrevState = formatDuration(elapsed);
     }
 
     if (args.json) {
