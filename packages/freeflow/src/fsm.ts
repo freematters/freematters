@@ -162,6 +162,11 @@ function resolveRefs(
       state.append_todos = undefined;
     }
 
+    // Merge subagent: inherit from base if not overridden locally
+    if (state.subagent === undefined && baseState.subagent !== undefined) {
+      state.subagent = baseState.subagent;
+    }
+
     // Remove from field after merge
     state.from = undefined;
   }
@@ -551,8 +556,11 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
     if (typeof s.guide === "string" && s.guide.length > 0) {
       states[name].guide = s.guide;
     }
-    if (s.subagent === true) {
-      states[name].subagent = true;
+    if (s.subagent !== undefined && s.subagent !== null) {
+      if (typeof s.subagent !== "boolean") {
+        fail(`state "${name}": "subagent" must be a boolean`);
+      }
+      states[name].subagent = s.subagent;
     }
   }
 
