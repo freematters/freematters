@@ -18,7 +18,7 @@ graph LR
 
 - [ ] Step 1: Markdown Parser
 - [x] Step 2: Markdown Serializer
-- [ ] Step 3: YAML Serializer
+- [x] Step 3: YAML Serializer
 - [ ] Step 4: Loader Integration
 - [ ] Step 5: Convert Command
 - [ ] Step 6: Workflow Resolution
