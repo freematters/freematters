@@ -213,6 +213,7 @@ states:
       ## What to address (priority order)
 
       1. **`@bot` mentions** (highest priority — user requests):
+         - React with 👀 (eyes) on each `@bot` comment immediately to acknowledge receipt
          - Read the mention details from `pr_status.json` (`mentions` array)
          - For code change requests: make the requested modifications
          - For questions: prepare an answer (will be posted in push state)
@@ -249,6 +250,7 @@ states:
       If upon inspection there is nothing to address, transition back to polling.
     todos:
       - Read WF_DIR/pr_status.json for mentions and bot review threads
+      - React with 👀 on each @bot comment to acknowledge receipt
       - Handle @bot mentions (code changes or prepare answers)
       - Fix blocker-severity bot review comments
       - Run lint/format/unit tests to verify

@@ -89,6 +89,7 @@ program
   .option("--model <model>", "Claude model to use")
   .option("--verbose", "show tool calls and agent messages in output")
   .option("--stay", "stay and accept user input after workflow completes")
+  .option("--lite", "enable lite mode (abbreviated output on re-visited states)")
   .action(async (_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     const { run: runCmd } = await import("./commands/run.js");
@@ -101,6 +102,7 @@ program
       model: opts.model as string | undefined,
       verbose: (opts.verbose as boolean) ?? false,
       stay: (opts.stay as boolean) ?? false,
+      lite: (opts.lite as boolean) ?? false,
     });
   });
 
