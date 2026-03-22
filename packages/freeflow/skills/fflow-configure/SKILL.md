@@ -1,5 +1,5 @@
 ---
-name: configure
+name: fflow-configure
 description: Configure FreeFlow settings like hook enablement. Use when the user wants to enable/disable freeflow features (e.g., "enable tool hook", "disable the post tool use hook").
 ---
 
