@@ -134,7 +134,7 @@ ${labels}`,
         run_status: result.newStatus,
         transition_label: args.on,
         time_in_previous_state: timeInPrevState,
-        subagent: card.subagent ?? false,
+        ...(card.subagent ? { subagent: true } : {}),
       };
       if (result.isDone) {
         data.completion_reason = "done_auto";

@@ -75,7 +75,7 @@ export function start(args: StartArgs): void {
           run_status: "active",
           total_states: Object.keys(fsm.states).length,
           mermaid,
-          subagent: card.subagent ?? false,
+          ...(card.subagent ? { subagent: true } : {}),
         }),
       );
     } else {
