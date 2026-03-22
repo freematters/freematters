@@ -41,3 +41,9 @@
 - **What was built**: 9 round-trip integration tests: YAML→MD→YAML (3), MD→YAML→MD (2), cross-format `from:` refs (2), complex workflow round-trips (2).
 - **Tests**: 9 tests added, all passing (218 total)
 - **Notes**: Uses `normalizeWhitespace()` for semantic comparison. State-level guide excluded from YAML→MD→YAML comparison (by design, it merges into Instructions).
+
+## Step 5: Convert Command
+- **Files changed**: `src/commands/markdown/convert.ts` (new), `src/__tests__/commands/markdown-convert.test.ts` (new), `src/cli.ts` (modified)
+- **What was built**: `fflow markdown convert <file> [-o <output>] [-j]` CLI command. Auto-detects direction by extension, loads with `loadFsm()`, serializes to opposite format.
+- **Tests**: 7 tests added, all passing (225 total)
+- **Notes**: Default output: same basename with swapped extension. `ARGS_INVALID` for unsupported extensions.
