@@ -22,6 +22,7 @@ export interface RunMeta {
   created_at: string;
   version: number;
   session_id?: string;
+  lite?: boolean;
 }
 
 export interface StoreEvent {
@@ -43,6 +44,7 @@ export interface Snapshot {
   state: string;
   last_seq: number;
   updated_at: string;
+  visited_states?: string[];
 }
 
 export interface EventInput {
@@ -58,6 +60,7 @@ export interface EventInput {
 export interface SnapshotInput {
   run_status: RunStatus;
   state: string;
+  visited_states?: string[];
 }
 
 // --- Helpers ---
@@ -241,12 +244,14 @@ export class Store {
       appendFileSync(this.eventsPath(runId), `${JSON.stringify(event)}\n`, "utf-8");
 
       // Write snapshot
+      const visitedStates = snapshotInput.visited_states ?? currentSnap?.visited_states;
       const snapshot: Snapshot = {
         run_id: runId,
         run_status: snapshotInput.run_status,
         state: snapshotInput.state,
         last_seq: event.seq,
         updated_at: now,
+        ...(visitedStates ? { visited_states: visitedStates } : {}),
       };
       writeFileSync(
         this.snapshotPath(runId),

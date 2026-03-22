@@ -20,6 +20,7 @@ export interface StartArgs {
   runId?: string;
   root: string;
   json: boolean;
+  lite?: boolean;
 }
 
 export function start(args: StartArgs): void {
@@ -41,6 +42,10 @@ export function start(args: StartArgs): void {
       throw err;
     }
 
+    if (args.lite) {
+      store.updateMeta(runId, { lite: true });
+    }
+
     store.commit(
       runId,
       {
@@ -51,7 +56,11 @@ export function start(args: StartArgs): void {
         actor: "system",
         reason: null,
       },
-      { run_status: "active", state: fsm.initial },
+      {
+        run_status: "active",
+        state: fsm.initial,
+        ...(args.lite ? { visited_states: [fsm.initial] } : {}),
+      },
     );
 
     const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
