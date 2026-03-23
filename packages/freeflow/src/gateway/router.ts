@@ -1,4 +1,5 @@
 import type WebSocket from "ws";
+import type { GatewayToClient } from "./types.js";
 
 interface DaemonInfo {
   ws: WebSocket;
@@ -11,10 +12,14 @@ interface ClientInfo {
   subscribedRun?: string;
 }
 
+/** Maximum number of buffered messages per run. */
+const MAX_BUFFER_SIZE = 1000;
+
 export class Router {
   private daemons = new Map<string, DaemonInfo>();
   private clients = new Map<string, ClientInfo>();
   private runToDaemon = new Map<string, string>();
+  private outputBuffers = new Map<string, GatewayToClient[]>();
 
   // --- Daemon management ---
 
@@ -96,5 +101,31 @@ export class Router {
       if (info.ws === ws) return id;
     }
     return undefined;
+  }
+
+  // --- Output buffering ---
+
+  /** Buffer a message for a run (used for replay on reconnect). */
+  bufferMessage(runId: string, msg: GatewayToClient): void {
+    let buffer = this.outputBuffers.get(runId);
+    if (!buffer) {
+      buffer = [];
+      this.outputBuffers.set(runId, buffer);
+    }
+    buffer.push(msg);
+    // Evict oldest messages when buffer exceeds limit
+    if (buffer.length > MAX_BUFFER_SIZE) {
+      buffer.splice(0, buffer.length - MAX_BUFFER_SIZE);
+    }
+  }
+
+  /** Get buffered messages for a run. */
+  getBufferedMessages(runId: string): GatewayToClient[] {
+    return this.outputBuffers.get(runId) ?? [];
+  }
+
+  /** Clear the buffer for a run. */
+  clearBuffer(runId: string): void {
+    this.outputBuffers.delete(runId);
   }
 }

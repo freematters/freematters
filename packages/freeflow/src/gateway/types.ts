@@ -61,10 +61,12 @@ export interface DaemonConfig {
 
 // --- Agent Handle ---
 
+export type AgentStatus = "starting" | "running" | "idle" | "stopped";
+
 export interface AgentHandle {
   run_id: string;
   session_id: string;
-  status: "starting" | "running" | "idle" | "stopped";
+  status: AgentStatus;
   last_activity: Date;
 }
 

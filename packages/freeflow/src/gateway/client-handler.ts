@@ -132,6 +132,12 @@ export class ClientHandler {
     msg: Extract<ClientToGateway, { type: "subscribe" }>,
   ): void {
     this.router.subscribeClient(clientId, ws, msg.run_id);
+
+    // Replay buffered output for the run
+    const buffered = this.router.getBufferedMessages(msg.run_id);
+    for (const bufferedMsg of buffered) {
+      this.send(ws, bufferedMsg);
+    }
   }
 
   // --- REST support ---
