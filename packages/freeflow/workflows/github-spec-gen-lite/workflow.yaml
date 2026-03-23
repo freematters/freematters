@@ -1,0 +1,221 @@
+# GitHub Spec-Gen Lite — Simplified GitHub Issue-driven spec-gen workflow
+#
+# Lite variant of github-spec-gen that produces simplified design and plan
+# artifacts while keeping all other workflow phases unchanged.
+#
+# Key differences from github-spec-gen:
+#   - design.md: 4 sections (Overview, Goal & Constraints, Architecture & Components, E2E Testing)
+#   - plan.md: exactly 2 steps (Implement the feature + E2E test)
+#
+# Flow:
+#
+#   create-issue
+#       |           \
+#   requirements <-- > research
+#       |
+#     design <-- > requirements (gaps)
+#       |
+#      plan <-- > design (revision)
+#       |
+#     e2e-gen
+#       |
+#     done
+#
+#   Fast forward: requirements -> design -> plan -> e2e-gen -> done (no intermediate approvals)
+
+version: 1.1
+extends_guide: ../github-spec-gen/workflow.yaml
+guide: |
+  {{base}}
+
+initial: create-issue
+
+states:
+  create-issue:
+    from: "../github-spec-gen/workflow.yaml#create-issue"
+
+  requirements:
+    from: "../github-spec-gen/workflow.yaml#requirements"
+
+  research:
+    from: "../github-spec-gen/workflow.yaml#research"
+
+  design:
+    from: "../spec-gen/workflow.yaml#design"
+    prompt: |
+      ## Detailed Design (Lite)
+
+      Produce a standalone, comprehensive design.md artifact.
+      "Standalone" means it MUST be fully understandable on its own without other artifacts.
+
+      **This is the lite variant.** Skip the "Design approaches" step — proceed directly
+      to the full design.
+
+      Required sections (exactly 4):
+      1. **Overview** — one-paragraph summary of what we're building and why
+      2. **Goal & Constraints** — derived from requirements and codebase exploration.
+         Goal: list of feature requirements (what the implementation must deliver).
+         Constraints: list of MUST NOTs (boundaries the implementation must not violate).
+      3. **Architecture & Components** — merged section covering:
+         - High-level architecture with a Mermaid diagram
+         - Component responsibilities, API surface, and how components interact
+         - Key data structures, schemas, state, and their relationships
+         - Integration test cases verifying module boundaries. Format each test case as:
+           - **Given**: preconditions and setup
+           - **When**: the action or interaction under test
+           - **Then**: expected outcome
+      4. **E2E Testing** — describe key end-to-end scenarios as user journeys. Read
+         `@packages/freeflow/docs/e2e-testing-design.md` for the verifier-executor model.
+         Format each as a named scenario with numbered steps mixing user actions,
+         system responses, and verification points:
+         ```
+         **Scenario: <name>**
+         1. User does X
+         2. System shows Y
+         3. User does Z
+         4. **Verify:** expected side effect
+         ```
+         **CRITICAL**: If e2e testing was required in requirements, every command, process,
+         or API referenced in the e2e scenarios MUST be covered by a component in the design.
+
+      Do NOT include an "Error Handling" section — keep to exactly 4 sections.
+
+      Constraints:
+      - You MUST derive Goal & Constraints from requirements and codebase exploration.
+        The design document replaces requirements as the authoritative spec.
+      - You MUST include Mermaid diagrams for architecture and data flow.
+      - You MUST iterate on feedback until the user explicitly approves the complete design.
+
+      Troubleshooting:
+      - If design reveals complexity beyond the original scope, break into smaller components,
+        focus on core functionality first, and suggest phased implementation.
+        Return to requirements to re-scope if needed.
+
+      **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT wait for user
+      approval. Complete the design document, then immediately transition to plan.
+
+      **Normal mode**: You MUST NOT proceed to planning until the user explicitly approves the design.
+      If significant gaps are found, offer to return to requirements or research.
+
+      ### GitHub Adaptation
+
+      Skip the "Design approaches" step (Step 1) — proceed directly to the full design.
+
+      **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT poll
+      for approval. Complete the design, post it as an artifact comment, update the status
+      checklist, and immediately transition to plan.
+
+      Before writing, read requirements and research from the local artifact cache:
+      ```bash
+      ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
+      ```
+      Use the Read tool on `$ARTIFACTS/requirements.md` and any files in `$ARTIFACTS/research/`.
+
+      Write the design to the local cache and post it per the artifact creation guide.
+      Ask for feedback via comment (approve / request changes / requirements gaps). Poll for reply.
+      Use in-place edit for revisions per the guide.
+
+      On approval, update the issue body status checklist: check off "design".
+    todos:
+      - Post design as issue comment (skip design approaches step)
+      - Get user approval via issue comment (skip in fast-forward mode)
+    transitions:
+      design approved: plan
+      gaps found: requirements
+
+  plan:
+    from: "../spec-gen/workflow.yaml#plan"
+    prompt: |
+      ## Implementation Plan (Lite)
+
+      Produce a plan.md artifact — a simplified 2-step implementation plan.
+
+      **This is the lite variant.** Instead of N steps (one per component), produce
+      exactly 2 steps: "Implement the feature" and "E2E test".
+
+      Required format:
+      ```markdown
+      # Implementation Plan: <Feature Name>
+
+      ## Checklist
+      - [ ] Step 1: Implement the feature
+      - [ ] Step 2: E2E test
+
+      ---
+
+      ## Step 1: Implement the feature
+
+      **Depends on**: none
+
+      **Objective**: Implement all components described in design.md.
+
+      **Sub-items**:
+      - <bullet referencing design component 1>
+      - <bullet referencing design component 2>
+      - ...
+
+      **Related Files**: <all files from design>
+
+      **Test Requirements**: <integration tests from design>
+
+      ---
+
+      ## Step 2: E2E test
+
+      **Depends on**: Step 1
+
+      **Objective**: Run e2e tests to validate the implementation.
+      ```
+
+      Step 1 sub-items MUST reference the specific components from design.md's
+      Architecture & Components section. Each bullet should describe what to implement
+      for that component.
+
+      E2E testing is handled by the e2e-gen state after plan approval — but Step 2
+      in the plan ensures spec-to-code will run e2e tests during implementation.
+
+      **CRITICAL: E2E completeness check.** If design.md has an E2E Testing section,
+      verify that EVERY command, server process, or setup step referenced in the e2e
+      scenarios has a corresponding sub-item in Step 1.
+
+      Constraints:
+      - Exactly 2 steps. Do NOT add more steps.
+      - You MUST NOT duplicate design details — reference design.md sections instead.
+      - You MUST present the plan to the user and iterate on feedback until approved.
+
+      **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT wait for user
+      approval. Complete the plan, then immediately transition to e2e-gen.
+
+      **Normal mode**: You MUST NOT proceed until the user explicitly approves the implementation plan.
+
+      ### GitHub Adaptation
+
+      **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT poll
+      for approval. Complete the plan, post it as an artifact comment, update the status
+      checklist and plan task list in the issue body, and immediately transition to e2e-gen.
+
+      Read the design from the local artifact cache:
+      ```bash
+      ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
+      ```
+      Use the Read tool on `$ARTIFACTS/design.md`.
+
+      Write the plan to the local cache and post it per the artifact creation guide.
+      Also update the issue body to add the plan steps as a `## Plan` task checklist.
+      Update the issue body status checklist: check off "plan".
+
+      Ask for feedback via comment (approve / request changes / design revision). Poll for reply.
+      Use in-place edit for revisions per the guide. Also update the issue body plan
+      checklist when revising.
+    todos:
+      - Post plan as issue comment with plan checklist in issue body
+      - Get user approval via issue comment (skip in fast-forward mode)
+    transitions:
+      plan approved: e2e-gen
+      needs design revision: design
+
+  e2e-gen:
+    from: "../github-spec-gen/workflow.yaml#e2e-gen"
+
+  done:
+    from: "../github-spec-gen/workflow.yaml#done"

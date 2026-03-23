@@ -1,0 +1,63 @@
+# Issue-to-PR Lite — end-to-end pipeline from GitHub issue to merged pull request.
+#
+# Lite variant that uses github-spec-gen-lite for simplified design and plan
+# artifacts while keeping all other phases identical to issue-to-pr.
+#
+# Flow:
+#
+#   start --> spec (github-spec-gen-lite)
+#                  |
+#               decide
+#              /   |   \
+#        auto  ff   stop
+#          |    |      |
+#          |  confirm  done
+#          |  -implement
+#          |    |
+#          implement (spec-to-code)
+#               |
+#           confirm-pr
+#          (auto skips)
+#             /    \
+#        submit-pr  done
+#      (github-pr-lifecycle)
+#             |
+#           done
+
+version: 1.2
+extends_guide: ../issue-to-pr/workflow.yaml
+guide: |
+  {{base}}
+
+initial: start
+
+states:
+  start:
+    from: "../issue-to-pr/workflow.yaml#start"
+
+  spec:
+    workflow: ../github-spec-gen-lite/workflow.yaml
+    transitions:
+      completed: decide
+
+  decide:
+    from: "../issue-to-pr/workflow.yaml#decide"
+
+  confirm-implement:
+    from: "../issue-to-pr/workflow.yaml#confirm-implement"
+
+  implement:
+    workflow: ../spec-to-code/workflow.yaml
+    transitions:
+      completed: confirm-pr
+
+  confirm-pr:
+    from: "../issue-to-pr/workflow.yaml#confirm-pr"
+
+  submit-pr:
+    workflow: ../github-pr-lifecycle/workflow.yaml
+    transitions:
+      completed: done
+
+  done:
+    from: "../issue-to-pr/workflow.yaml#done"
