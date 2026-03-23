@@ -189,7 +189,7 @@ describe("validate all bundled workflows", () => {
     const expectedWorkflows = [
       "spec-gen",
       "spec-to-code",
-      "pr-lifecycle",
+      "github-pr-lifecycle",
       "code-review",
       "github-spec-gen",
       "release",

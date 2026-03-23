@@ -29,4 +29,4 @@ Do NOT execute the cleanup yourself — removing the worktree from within it bre
 
 Then proceed with the workflow:
 
-/fflow pr-lifecycle
+/fflow github-pr-lifecycle

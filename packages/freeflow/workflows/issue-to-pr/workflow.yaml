@@ -223,7 +223,7 @@ states:
       stop here: done
 
   submit-pr:
-    workflow: ../pr-lifecycle/workflow.yaml
+    workflow: ../github-pr-lifecycle/workflow.yaml
     transitions:
       completed: done
 

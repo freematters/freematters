@@ -72,7 +72,7 @@ describe("issue-to-pr workflow — schema validation", () => {
     }
   });
 
-  test("pr-lifecycle states expanded under submit-pr/ prefix", () => {
+  test("github-pr-lifecycle states expanded under submit-pr/ prefix", () => {
     fsm = loadFsm(WORKFLOW);
     const prStates = ["submit-pr/create-pr", "submit-pr/poll"];
     for (const name of prStates) {
