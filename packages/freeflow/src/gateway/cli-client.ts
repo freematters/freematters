@@ -63,8 +63,15 @@ export class GatewayCliClient extends EventEmitter<GatewayEventMap> {
 
       ws.on("error", (err) => {
         if (!this.ws) {
-          // Connection failed
-          reject(err);
+          // Connection failed — check for auth errors
+          const message = err instanceof Error ? err.message : String(err);
+          if (message.includes("401")) {
+            reject(new Error("Authentication failed: Missing API key"));
+          } else if (message.includes("403")) {
+            reject(new Error("Authentication failed: Invalid API key"));
+          } else {
+            reject(err);
+          }
         }
       });
     });
@@ -87,6 +94,15 @@ export class GatewayCliClient extends EventEmitter<GatewayEventMap> {
       type: "user_input",
       run_id: runId,
       input,
+    };
+    this.send(msg);
+  }
+
+  /** Send a subscribe message to attach to an existing run. */
+  subscribe(runId: string): void {
+    const msg: ClientToGateway = {
+      type: "subscribe",
+      run_id: runId,
     };
     this.send(msg);
   }

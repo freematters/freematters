@@ -245,6 +245,23 @@ program
   });
 
 program
+  .command("attach")
+  .description("attach to a running workflow on a remote Gateway")
+  .argument("<run-id>", "run identifier to attach to")
+  .requiredOption("--gateway <url>", "Gateway URL (e.g., http://localhost:8080)")
+  .option("--api-key <key>", "API key for Gateway authentication")
+  .action(async (runId: string, opts: Record<string, unknown>, cmd: Command) => {
+    const { json } = getGlobalOpts(cmd);
+    const { attach } = await import("./commands/attach.js");
+    await attach({
+      runId,
+      gateway: opts.gateway as string,
+      apiKey: opts.apiKey as string | undefined,
+      json: json ?? false,
+    });
+  });
+
+program
   .command("daemon")
   .description("start an Agent Daemon that connects to a Gateway")
   .requiredOption(

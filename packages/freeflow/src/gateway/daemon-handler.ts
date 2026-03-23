@@ -10,6 +10,9 @@ export class DaemonHandler {
   /** Callback invoked when a run completes, allowing ClientHandler to update state. */
   onRunCompleted?: (runId: string, status: string) => void;
 
+  /** Callback invoked when a new daemon registers, allowing pending runs to be dispatched. */
+  onDaemonRegistered?: () => void;
+
   constructor(router: Router) {
     this.router = router;
   }
@@ -80,6 +83,7 @@ export class DaemonHandler {
     const daemonId = `daemon-${randomUUID().slice(0, 8)}`;
     this.router.registerDaemon(daemonId, ws, msg.capacity);
     this.send(ws, { type: "registered", daemon_id: daemonId });
+    this.onDaemonRegistered?.();
   }
 
   private forwardToClients(runId: string, msg: GatewayToClient): void {

@@ -66,6 +66,10 @@ export function createGatewayServer(config: GatewayConfig) {
     );
   };
 
+  daemonHandler.onDaemonRegistered = () => {
+    clientHandler.dispatchPendingRuns();
+  };
+
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
     const path = url.pathname;

@@ -5,7 +5,7 @@ import type { Router } from "./router.js";
 import type { ClientToGateway, GatewayRunStatus } from "./types.js";
 import { isClientMessage } from "./types.js";
 
-const SAFE_WORKFLOW_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/;
+const SAFE_WORKFLOW_PATTERN = /^[a-zA-Z0-9/][a-zA-Z0-9._/-]*$/;
 
 function isValidWorkflowPath(workflow: string): boolean {
   if (!workflow || workflow.includes("..")) return false;
@@ -231,6 +231,31 @@ export class ClientHandler {
     const run = this.runs.get(runId);
     if (run) {
       run.gateway_status = status;
+    }
+  }
+
+  /** Dispatch any pending runs to available daemons. Called when a new daemon registers. */
+  dispatchPendingRuns(): void {
+    for (const run of this.runs.values()) {
+      if (run.gateway_status !== "pending") continue;
+
+      const daemonId = this.router.pickAvailableDaemon();
+      if (!daemonId) break; // no more daemons available
+
+      run.gateway_status = "waiting_daemon";
+      this.router.assignRunToDaemon(run.run_id, daemonId);
+      this.store.updateGatewayInfo(run.run_id, { daemon_id: daemonId });
+
+      const daemonWs = this.router.getDaemon(daemonId)?.ws;
+      if (daemonWs) {
+        this.send(daemonWs, {
+          type: "start_run",
+          run_id: run.run_id,
+          workflow: run.workflow,
+          ...(run.prompt && { prompt: run.prompt }),
+        });
+        run.gateway_status = "starting";
+      }
     }
   }
 
