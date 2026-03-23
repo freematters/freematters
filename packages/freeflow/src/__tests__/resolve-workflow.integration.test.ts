@@ -193,7 +193,6 @@ describe("validate all bundled workflows", () => {
       "code-review",
       "github-spec-gen",
       "release",
-      "gamemaker",
       "verifier",
     ];
     for (const name of expectedWorkflows) {
