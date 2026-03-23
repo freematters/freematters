@@ -227,31 +227,6 @@ program
     });
   });
 
-program
-  .command("gateway")
-  .description("start the fflow gateway HTTP server")
-  .option("--port <port>", "TCP port to listen on", "8080")
-  .option("--host <host>", "host/IP to bind", "0.0.0.0")
-  .option("--api-key <key>", "Bearer token for API auth (auto-generated if omitted)")
-  .option("--store-root <path>", "storage root for runs")
-  .action(async (opts: Record<string, unknown>, cmd: Command) => {
-    const { root } = getGlobalOpts(cmd);
-    const { gateway } = await import("./commands/gateway.js");
-    const shutdown = await gateway({
-      port: Number(opts.port),
-      host: opts.host as string,
-      apiKey: opts.apiKey as string | undefined,
-      storeRoot: (opts.storeRoot as string | undefined) ?? resolveRoot(root),
-    });
-
-    const onSignal = async () => {
-      await shutdown();
-      process.exit(0);
-    };
-    process.on("SIGINT", onSignal);
-    process.on("SIGTERM", onSignal);
-  });
-
 // Markdown subcommands
 const markdownCmd = program
   .command("markdown")
@@ -277,10 +252,6 @@ markdownCmd
       handleError(err, json ?? false);
     }
   });
-
-// Daemon subcommand
-import { buildDaemonCommand } from "./commands/daemon.js";
-buildDaemonCommand(program);
 
 // Hidden hook commands (not shown in --help)
 const hookCmd = program
