@@ -423,12 +423,8 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
 
   const obj = doc as Record<string, unknown>;
 
-  // Resolve workflow: states, from: refs, and extends_guide before validation
-  resolveWorkflowStates(obj, absPath, visited);
-  resolveRefs(obj, absPath, visited);
-  resolveExtendsGuide(obj, absPath, visited);
-
-  // Top-level required fields
+  // Validate version before resolving composability features so that invalid
+  // versions produce the correct error instead of a misleading feature-gate message.
   if (
     obj.version !== 1 &&
     obj.version !== 1.1 &&
@@ -437,6 +433,11 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
   ) {
     fail(`"version" must be 1, 1.1, 1.2, or 1.3, got ${JSON.stringify(obj.version)}`);
   }
+
+  // Resolve workflow: states, from: refs, and extends_guide before field validation
+  resolveWorkflowStates(obj, absPath, visited);
+  resolveRefs(obj, absPath, visited);
+  resolveExtendsGuide(obj, absPath, visited);
 
   if (
     obj.guide !== undefined &&
