@@ -129,14 +129,33 @@ states:
       Run a scheduling loop:
 
       1. Dispatch all ready steps as sub-agents **in parallel**.
-         Each sub-agent runs in its own **git worktree** branched from the feature branch:
+         Each sub-agent runs in its own **git worktree** branched from the feature branch.
+
+         **Worktree creation**: Do NOT use `isolation: "worktree"` on the Agent tool —
+         it branches from the default branch, not the feature branch. Instead:
+         1. Create the worktree manually before dispatching:
+            ```bash
+            git worktree add .claude/worktrees/step-N -b step-N-branch <feature-branch>
+            ```
+         2. Dispatch the sub-agent WITHOUT `isolation: "worktree"`, but tell it to
+            work in the worktree directory (`.claude/worktrees/step-N/`).
+         3. After the agent completes, merge its branch and clean up:
+            ```bash
+            git merge step-N-branch --no-edit
+            git worktree remove .claude/worktrees/step-N --force
+            git branch -D step-N-branch
+            ```
+
+         Sub-agent prompt template:
 
          > You are implementing Step N of ./specs/<slug>/plan.md.
+         > Your working directory is: <worktree-path>
          > Use strict TDD (RED → GREEN → REFACTOR).
          > Read ./specs/<slug>/design.md for component interfaces and data models.
          >
          > 1. Read this step's **Related Files** from plan.md — these are files
          >    to modify or useful for your understanding of the codebase.
+         >    Files marked as "reference" ALREADY EXIST — import from them, do NOT recreate.
          > 2. Read this step's **Test Requirements** from plan.md — these are the
          >    specific test cases assigned to this step. Write failing tests for them (RED).
          >    You MAY add extra tests beyond the listed requirements if you discover
