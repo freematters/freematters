@@ -84,10 +84,7 @@ export class ClientHandler {
       prompt: msg.prompt,
     };
     this.runs.set(runId, runState);
-
-    // Initialize in store
     this.store.initRun(runId, msg.workflow);
-    this.store.updateGatewayInfo(runId, { client_id: clientId });
 
     // Subscribe client to this run
     this.router.subscribeClient(clientId, ws, runId);
@@ -98,20 +95,38 @@ export class ClientHandler {
     // Try to assign to a daemon
     const daemonId = this.router.pickAvailableDaemon();
     if (daemonId) {
-      runState.gateway_status = "waiting_daemon";
-      this.router.assignRunToDaemon(runId, daemonId);
-      this.store.updateGatewayInfo(runId, { daemon_id: daemonId });
+      this.assignRunToDaemon(runId, daemonId, msg.workflow, msg.prompt);
+    } else {
+      // No daemon available — notify client the run is queued
+      this.send(ws, {
+        type: "agent_output",
+        run_id: runId,
+        content: "Waiting for available daemon...",
+      });
+    }
+  }
 
-      const daemonWs = this.router.getDaemon(daemonId)?.ws;
-      if (daemonWs) {
-        this.send(daemonWs, {
-          type: "start_run",
-          run_id: runId,
-          workflow: msg.workflow,
-          ...(msg.prompt && { prompt: msg.prompt }),
-        });
-        runState.gateway_status = "starting";
-      }
+  /** Assign a run to a daemon and send start_run. Shared by create and dispatch-pending. */
+  private assignRunToDaemon(
+    runId: string,
+    daemonId: string,
+    workflow: string,
+    prompt?: string,
+  ): void {
+    const runState = this.runs.get(runId);
+    if (!runState) return;
+    runState.gateway_status = "waiting_daemon";
+    this.router.assignRunToDaemon(runId, daemonId);
+
+    const daemonWs = this.router.getDaemon(daemonId)?.ws;
+    if (daemonWs) {
+      this.send(daemonWs, {
+        type: "start_run",
+        run_id: runId,
+        workflow,
+        ...(prompt && { prompt }),
+      });
+      runState.gateway_status = "starting";
     }
   }
 
@@ -168,25 +183,11 @@ export class ClientHandler {
       prompt,
     };
     this.runs.set(runId, runState);
-    this.store.initRun(runId, workflow);
 
     // Try to assign to a daemon
     const daemonId = this.router.pickAvailableDaemon();
     if (daemonId) {
-      runState.gateway_status = "waiting_daemon";
-      this.router.assignRunToDaemon(runId, daemonId);
-      this.store.updateGatewayInfo(runId, { daemon_id: daemonId });
-
-      const daemonWs = this.router.getDaemon(daemonId)?.ws;
-      if (daemonWs) {
-        this.send(daemonWs, {
-          type: "start_run",
-          run_id: runId,
-          workflow,
-          ...(prompt && { prompt }),
-        });
-        runState.gateway_status = "starting";
-      }
+      this.assignRunToDaemon(runId, daemonId, workflow, prompt);
     }
 
     return { run_id: runId, status: runState.gateway_status };
@@ -242,20 +243,7 @@ export class ClientHandler {
       const daemonId = this.router.pickAvailableDaemon();
       if (!daemonId) break; // no more daemons available
 
-      run.gateway_status = "waiting_daemon";
-      this.router.assignRunToDaemon(run.run_id, daemonId);
-      this.store.updateGatewayInfo(run.run_id, { daemon_id: daemonId });
-
-      const daemonWs = this.router.getDaemon(daemonId)?.ws;
-      if (daemonWs) {
-        this.send(daemonWs, {
-          type: "start_run",
-          run_id: run.run_id,
-          workflow: run.workflow,
-          ...(run.prompt && { prompt: run.prompt }),
-        });
-        run.gateway_status = "starting";
-      }
+      this.assignRunToDaemon(run.run_id, daemonId, run.workflow, run.prompt);
     }
   }
 

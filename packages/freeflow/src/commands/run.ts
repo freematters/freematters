@@ -389,33 +389,44 @@ export async function runCore(
   logFn(`run=${runId} fsm=${opts.fsmPath} model=${model}`, c.cyan);
 
   const store = new Store(opts.root);
-  try {
-    store.initRun(runId, opts.fsmPath, opts.lite);
-  } catch (err: unknown) {
-    if (err instanceof Error && err.message.includes("already exists")) {
-      throw new CliError("RUN_EXISTS", "run already exists, use a different --run-id", {
-        context: { runId },
-      });
+  const runAlreadyExists = store.runExists(runId);
+  if (runAlreadyExists) {
+    // Run was already initialized (e.g., by a gateway). Skip initRun.
+    logFn(`run=${runId} already exists, resuming`, c.cyan);
+  } else {
+    try {
+      store.initRun(runId, opts.fsmPath, opts.lite);
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message.includes("already exists")) {
+        throw new CliError(
+          "RUN_EXISTS",
+          "run already exists, use a different --run-id",
+          {
+            context: { runId },
+          },
+        );
+      }
+      throw err;
     }
-    throw err;
   }
 
-  store.commit(
-    runId,
-    {
-      event: "start",
-      from_state: null,
-      to_state: fsm.initial,
-      on_label: null,
-      actor: "system",
-      reason: null,
-    },
-    {
-      run_status: "active",
-      state: fsm.initial,
-      ...(opts.lite ? { visited_states: [fsm.initial] } : {}),
-    },
-  );
+  if (!runAlreadyExists)
+    store.commit(
+      runId,
+      {
+        event: "start",
+        from_state: null,
+        to_state: fsm.initial,
+        on_label: null,
+        actor: "system",
+        reason: null,
+      },
+      {
+        run_status: "active",
+        state: fsm.initial,
+        ...(opts.lite ? { visited_states: [fsm.initial] } : {}),
+      },
+    );
 
   logFn(`state=${fsm.initial} (initial)`, c.green);
 
