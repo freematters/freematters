@@ -53,19 +53,27 @@ def detect_hostname() -> str | None:
 _hostname: str | None = None
 
 
-def glab_api(endpoint: str, jq: str | None = None, paginate: bool = False) -> str:
+def glab_api(endpoint: str, jq_filter: str | None = None, paginate: bool = False) -> str:
     cmd = ["glab", "api", endpoint]
     if _hostname:
         cmd += ["--hostname", _hostname]
-    if jq:
-        cmd += ["--jq", jq]
     if paginate:
         cmd.append("--paginate")
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         print(f"glab api error: {result.stderr.strip()}", file=sys.stderr)
         sys.exit(1)
-    return result.stdout.strip()
+    output = result.stdout.strip()
+    if jq_filter:
+        jq_result = subprocess.run(
+            ["jq", "-r", jq_filter],
+            input=output, capture_output=True, text=True,
+        )
+        if jq_result.returncode != 0:
+            print(f"jq error: {jq_result.stderr.strip()}", file=sys.stderr)
+            sys.exit(1)
+        return jq_result.stdout.strip()
+    return output
 
 
 def parse_artifact_header(first_line: str) -> tuple[str, str] | None:
@@ -91,12 +99,11 @@ def download_artifacts(project_path: str, iid: int) -> tuple[str, dict[str, str]
     encoded_path = url_quote(project_path, safe="")
 
     # Get issue title
-    title = glab_api(f"projects/{encoded_path}/issues/{iid}", jq=".title")
+    title = glab_api(f"projects/{encoded_path}/issues/{iid}", jq_filter=".title")
 
-    # Fetch all notes
+    # Fetch all notes as JSON array
     raw = glab_api(
         f"projects/{encoded_path}/issues/{iid}/notes",
-        jq=".[] | {body: .body}",
         paginate=True,
     )
 
@@ -104,14 +111,12 @@ def download_artifacts(project_path: str, iid: int) -> tuple[str, dict[str, str]
     if not raw:
         return title, artifacts
 
-    for line in raw.strip().split("\n"):
-        if not line.strip():
-            continue
-        try:
-            note = json.loads(line)
-        except json.JSONDecodeError:
-            continue
+    try:
+        notes = json.loads(raw)
+    except json.JSONDecodeError:
+        return title, artifacts
 
+    for note in notes:
         body: str = note.get("body", "")
         lines = body.split("\n")
         if not lines:
