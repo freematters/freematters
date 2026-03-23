@@ -84,13 +84,16 @@ states:
 
       2. Download spec artifacts from GitLab issue notes:
          ```bash
-         python3 $SCRIPT_DIR/download_spec_gl.py {project_path} {iid} --slug {slug}
+         python3 $SCRIPT_DIR/download_spec_gl.py {project_path} {iid} --slug {slug} --hostname {gitlab_hostname}
          ```
+         Where `{gitlab_hostname}` is the GitLab instance hostname (e.g., `gitlab.corp.example.com`).
+         If not known, omit `--hostname` and the script will auto-detect from git remote.
 
       3. Prepare implementation (add `doing` label, post start note):
          ```bash
-         python3 $SCRIPT_DIR/prepare_implementation_gl.py {project_path} {iid} {slug}
+         python3 $SCRIPT_DIR/prepare_implementation_gl.py {project_path} {iid} {slug} --hostname {gitlab_hostname}
          ```
+         If hostname is not known, omit `--hostname` for auto-detection.
          Returns JSON with `branch_name`. Remember `branch_name` for later states.
 
       **Local mode**: The argument is the spec directory path (e.g., `./specs/my-feature/`).

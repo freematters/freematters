@@ -127,7 +127,7 @@ guide: |
   - Reacts with eyes emoji to every new note
   - Filters for notes from `{issue_creator}` only
   - Prints `NEW_COMMENT: <body>` for each matching note
-  - Persists the note count in `~/.freefsm/runs/{run_id}/comment_count`
+  - Persists the note count in `~/.freeflow/runs/{run_id}/comment_count`
 
   Run the script in the background. When it completes, read the output for the comment.
 

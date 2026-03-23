@@ -30,8 +30,33 @@ ARTIFACT_FILES = {"design.md", "plan.md", "requirements.md", "e2e.md"}
 RESEARCH_PREFIX = "research/"
 
 
+def detect_hostname() -> str | None:
+    """Auto-detect GitLab hostname from git remote origin URL."""
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            url = result.stdout.strip()
+            # SSH: git@hostname:path
+            if "@" in url and "://" not in url:
+                return url.split("@")[1].split(":")[0]
+            # HTTPS: https://hostname/path
+            if "://" in url:
+                return url.split("://")[1].split("/")[0]
+    except Exception:
+        pass
+    return None
+
+
+_hostname: str | None = None
+
+
 def glab_api(endpoint: str, jq: str | None = None, paginate: bool = False) -> str:
     cmd = ["glab", "api", endpoint]
+    if _hostname:
+        cmd += ["--hostname", _hostname]
     if jq:
         cmd += ["--jq", jq]
     if paginate:
@@ -114,7 +139,11 @@ def main() -> None:
     parser.add_argument("iid", type=int, help="Issue iid")
     parser.add_argument("--specs-dir", default="./specs", help="Base specs directory (default: ./specs)")
     parser.add_argument("--slug", required=True, help="Slug for the spec directory")
+    parser.add_argument("--hostname", default=None, help="GitLab hostname (default: auto-detect from git remote)")
     args = parser.parse_args()
+
+    global _hostname
+    _hostname = args.hostname or detect_hostname()
 
     title, artifacts = download_artifacts(args.project_path, args.iid)
 

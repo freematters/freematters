@@ -17,7 +17,7 @@ guide: |
 
   ## Workflow directory
 
-  `WF_DIR = ~/.freefsm/runs/<run_id>/`
+  `WF_DIR = ~/.freeflow/runs/<run_id>/`
 
   This is the workflow's working directory. The poll script writes `mr_status.json` here,
   and other states read it for MR status, CI results, review discussions, and `@bot` mentions.

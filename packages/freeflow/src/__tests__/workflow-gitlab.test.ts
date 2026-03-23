@@ -2,35 +2,10 @@ import { resolve } from "node:path";
 import { describe, expect, test } from "vitest";
 import { type Fsm, loadFsm } from "../fsm.js";
 
-const WORKFLOWS = resolve(
-  import.meta.dirname ?? __dirname,
-  "../../workflows",
-);
+const WORKFLOWS = resolve(import.meta.dirname ?? __dirname, "../../workflows");
 
 function workflow(name: string): string {
   return resolve(WORKFLOWS, name, "workflow.yaml");
-}
-
-/**
- * Walk the FSM from a given state following the specified transition labels.
- * Returns the final state name after all transitions, or throws if a label is missing.
- */
-function walkPath(fsm: Fsm, start: string, labels: string[]): string {
-  let current = start;
-  for (const label of labels) {
-    const state = fsm.states[current];
-    if (!state) {
-      throw new Error(`state "${current}" not found`);
-    }
-    const next = state.transitions[label];
-    if (!next) {
-      throw new Error(
-        `no transition "${label}" from "${current}" (available: ${Object.keys(state.transitions).join(", ")})`,
-      );
-    }
-    current = next;
-  }
-  return current;
 }
 
 // --- gitlab-spec-gen ---
@@ -210,13 +185,7 @@ describe("gitlab-issue-to-mr workflow — composition", () => {
 
   test("inline states exist", () => {
     fsm = loadFsm(workflow("gitlab-issue-to-mr"));
-    const inlineStates = [
-      "start",
-      "decide",
-      "confirm-implement",
-      "confirm-mr",
-      "done",
-    ];
+    const inlineStates = ["start", "decide", "confirm-implement", "confirm-mr", "done"];
     for (const name of inlineStates) {
       expect(fsm.states[name]).toBeDefined();
     }
@@ -287,13 +256,7 @@ describe("issue-to-pr workflow — backward compatibility after rename", () => {
 
   test("still has expected inline states", () => {
     fsm = loadFsm(workflow("issue-to-pr"));
-    const inlineStates = [
-      "start",
-      "decide",
-      "confirm-implement",
-      "confirm-pr",
-      "done",
-    ];
+    const inlineStates = ["start", "decide", "confirm-implement", "confirm-pr", "done"];
     for (const name of inlineStates) {
       expect(fsm.states[name]).toBeDefined();
     }
@@ -335,27 +298,21 @@ describe("research state — transition constraints", () => {
   test("github-spec-gen research has only 'back to requirements'", () => {
     const fsm = loadFsm(workflow("github-spec-gen"));
     const research = fsm.states.research;
-    expect(Object.keys(research.transitions)).toEqual([
-      "back to requirements",
-    ]);
+    expect(Object.keys(research.transitions)).toEqual(["back to requirements"]);
     expect(research.transitions["back to requirements"]).toBe("requirements");
   });
 
   test("gitlab-spec-gen research has only 'back to requirements'", () => {
     const fsm = loadFsm(workflow("gitlab-spec-gen"));
     const research = fsm.states.research;
-    expect(Object.keys(research.transitions)).toEqual([
-      "back to requirements",
-    ]);
+    expect(Object.keys(research.transitions)).toEqual(["back to requirements"]);
     expect(research.transitions["back to requirements"]).toBe("requirements");
   });
 
   test("base spec-gen research has only 'back to requirements'", () => {
     const fsm = loadFsm(workflow("spec-gen"));
     const research = fsm.states.research;
-    expect(Object.keys(research.transitions)).toEqual([
-      "back to requirements",
-    ]);
+    expect(Object.keys(research.transitions)).toEqual(["back to requirements"]);
     expect(research.transitions["back to requirements"]).toBe("requirements");
   });
 });

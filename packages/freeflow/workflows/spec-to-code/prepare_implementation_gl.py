@@ -30,8 +30,33 @@ def run(cmd: str) -> str:
     return result.stdout.strip()
 
 
+def detect_hostname() -> str | None:
+    """Auto-detect GitLab hostname from git remote origin URL."""
+    try:
+        result = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            url = result.stdout.strip()
+            # SSH: git@hostname:path
+            if "@" in url and "://" not in url:
+                return url.split("@")[1].split(":")[0]
+            # HTTPS: https://hostname/path
+            if "://" in url:
+                return url.split("://")[1].split("/")[0]
+    except Exception:
+        pass
+    return None
+
+
+_hostname: str | None = None
+
+
 def glab_api(method: str, endpoint: str, fields: dict[str, str] | None = None) -> str:
     cmd = ["glab", "api"]
+    if _hostname:
+        cmd += ["--hostname", _hostname]
     if method != "GET":
         cmd += ["-X", method]
     cmd.append(endpoint)
@@ -49,7 +74,11 @@ def main() -> None:
     parser.add_argument("project_path", help="GitLab project path (e.g., group/project)")
     parser.add_argument("iid", type=int, help="Issue iid")
     parser.add_argument("slug", help="Slug for the branch name")
+    parser.add_argument("--hostname", default=None, help="GitLab hostname (default: auto-detect from git remote)")
     args = parser.parse_args()
+
+    global _hostname
+    _hostname = args.hostname or detect_hostname()
 
     branch_name = f"issue-{args.iid}-{args.slug}"
     encoded_path = url_quote(args.project_path, safe="")
