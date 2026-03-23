@@ -2,8 +2,9 @@
 # Flow:
 #
 #   create-structure
-#       |           \          \
-#   requirements ← → research   both (requirements + background research)
+#       |           \
+#   requirements ← → research
+#   (+ bg research if 'start with both')
 #       |
 #     design ← → requirements (gaps)
 #       |
@@ -114,24 +115,29 @@ states:
 
       ### Auto-Research Mode
 
-      If you arrived via "start with both":
+      If `research/.auto-research` exists (written on first entry via "start with both"):
 
       1. Read rough-idea.md and auto-infer 2-4 research topics based on the idea's
          technical domain, dependencies, and areas of uncertainty.
       2. Dispatch a background Agent (using `run_in_background: true`) to investigate
-         all topics. The agent writes each topic to `research/<topic>.md` following the
-         standard research structure (Summary, Key Findings, Trade-offs, Recommendations,
-         References). Include Mermaid diagrams for architectures and data flows.
-      3. Begin the Q&A cycle immediately — do NOT wait for research to complete.
+         all topics. The agent follows the same process as the research state — writing
+         each topic to `research/<topic>.md` with the standard structure (Summary,
+         Key Findings, Trade-offs, Recommendations, References) and Mermaid diagrams.
+         The agent MUST write `research/.done` when all topics are complete.
+      3. Write the sentinel file `research/.auto-research` to mark auto-research mode.
+      4. Begin the Q&A cycle immediately — do NOT wait for research to complete.
+
+      On subsequent re-entries to this state, detect auto-research mode by checking
+      for the `research/.auto-research` file (do NOT rely on conversational memory).
 
       Between Q&A rounds (after recording the user's answer, before asking the next
-      question), check if the background research agent has completed. If it has:
+      question), check if `research/.done` exists. If it does:
       - Read the research files in `research/*.md`
       - Present a brief 2-3 line summary per topic to the user
       - Note that full findings are available in the research files
       - Factor the findings into your subsequent questions
 
-      If research has not completed yet, continue Q&A without blocking.
+      If `research/.done` does not exist yet, continue Q&A without blocking.
 
       When you believe you have enough clarity on goals, constraints, and verification criteria,
       present a brief summary of what you've captured and ask the user:

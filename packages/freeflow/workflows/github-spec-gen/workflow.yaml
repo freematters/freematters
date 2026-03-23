@@ -7,8 +7,9 @@
 # Flow:
 #
 #   create-issue
-#       |           \          \
-#   requirements ← → research   both (requirements + background research)
+#       |           \
+#   requirements ← → research
+#   (+ bg research if 'start with both')
 #       |
 #     design ← → requirements (gaps)
 #       |
@@ -258,16 +259,12 @@ states:
 
       ### Auto-Research Mode (GitHub)
 
-      If you arrived via "start with both", the base workflow dispatches a background
-      research agent. In addition to the base auto-research behavior:
-
-      When the background research agent completes:
-      1. Write each research topic to the local artifact cache
-         (`$ARTIFACTS/research/<topic>.md`)
-      2. Post each as a `## research/<topic>.md` artifact comment on the issue,
-         following the artifact creation guide
-      3. Save comment IDs to the tracking file
-      4. Update the issue body status checklist: check off "research"
+      In auto-research mode (see base workflow), the background research agent
+      follows the same process as the research state. When it completes
+      (`research/.done` exists), post the research artifacts to the issue —
+      same as the research state's GitHub Adaptation (write to local cache,
+      post as artifact comments, save comment IDs, check off "research" in
+      the status checklist).
 
       The brief summaries surfaced during Q&A are posted as part of the next
       Q&A comment — not as separate comments.
