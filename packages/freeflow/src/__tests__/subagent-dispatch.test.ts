@@ -1,8 +1,16 @@
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { loadFsm } from "../fsm.js";
 import { runCli, runCliJson } from "./e2e/helpers.js";
 import { cleanupTempDir, createTempDir } from "./fixtures.js";
+
+// biome-ignore lint/style/noNonNullAssertion: dirname is always defined for file modules
+const FIXTURES = join(import.meta.dirname!, "fixtures");
+
+function fixture(name: string): string {
+  return join(FIXTURES, name);
+}
 
 /** Workflow where the initial state is a subagent state */
 const SUBAGENT_INITIAL_FSM = `
@@ -169,5 +177,23 @@ describe("mixed workflow: normal and subagent states", () => {
     expect(gotoDone.exitCode).toBe(0);
     expect(gotoDone.stdout).toContain("terminal state");
     expect(gotoDone.stdout).not.toContain("subagent execution");
+  });
+});
+
+// ─── from: inheritance of subagent flag ───────────────────────────
+
+describe("subagent — from: inheritance", () => {
+  test("child inherits subagent: true from base when not overridden", () => {
+    const fsm = loadFsm(fixture("child-inherit-subagent.workflow.yaml"));
+    expect(fsm.states.start.subagent).toBe(true);
+  });
+});
+
+// ─── from: override of subagent flag ──────────────────────────────
+
+describe("subagent — from: override", () => {
+  test("child overrides subagent: true with subagent: false", () => {
+    const fsm = loadFsm(fixture("child-override-subagent.workflow.yaml"));
+    expect(fsm.states.start.subagent).toBe(false);
   });
 });
