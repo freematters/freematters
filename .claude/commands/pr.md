@@ -27,6 +27,14 @@ To clean up the worktree, run:
 ```
 Do NOT execute the cleanup yourself — removing the worktree from within it breaks the session.
 
-Then proceed with the workflow:
+Then detect the platform and start the appropriate workflow:
 
-/fflow github-pr-lifecycle
+```bash
+REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
+```
+
+If `REMOTE_URL` contains `gitlab`:
+  /fflow gitlab-mr-lifecycle
+
+Otherwise (GitHub or unknown):
+  /fflow github-pr-lifecycle
