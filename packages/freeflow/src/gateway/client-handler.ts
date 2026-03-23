@@ -130,6 +130,13 @@ export class ClientHandler {
   }
 
   private handleUserInput(msg: Extract<ClientToGateway, { type: "user_input" }>): void {
+    // Buffer user input so it appears in replay on reconnect
+    this.router.bufferMessage(msg.run_id, {
+      type: "agent_output",
+      run_id: msg.run_id,
+      content: `> ${msg.input}`,
+    });
+
     const daemonWs = this.router.getDaemonWsForRun(msg.run_id);
     if (daemonWs) {
       this.send(daemonWs, {
