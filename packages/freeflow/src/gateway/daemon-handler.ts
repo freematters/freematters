@@ -4,6 +4,17 @@ import type { Router } from "./router.js";
 import type { DaemonToGateway, GatewayToClient } from "./types.js";
 import { isDaemonMessage } from "./types.js";
 
+/** Strip stack traces and file paths from error messages before forwarding to clients. */
+function sanitizeErrorMessage(message: string): string {
+  // Remove stack traces (lines starting with "    at ")
+  const lines = message.split("\n");
+  const sanitized = lines.filter((line) => !line.match(/^\s+at\s+/));
+  let result = sanitized.join("\n").trim();
+  // Remove absolute file paths (e.g. /home/user/project/src/file.ts:42:10)
+  result = result.replace(/\/[^\s:]+\.[a-zA-Z]+:\d+:\d+/g, "<path>");
+  return result || "Internal error";
+}
+
 export class DaemonHandler {
   private router: Router;
 
@@ -70,7 +81,7 @@ export class DaemonHandler {
         this.forwardToClients(runId, {
           type: "error",
           run_id: runId,
-          message: msg.message,
+          message: sanitizeErrorMessage(msg.message),
         });
         break;
     }

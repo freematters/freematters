@@ -627,10 +627,15 @@ async function runViaGateway(args: RunArgs): Promise<void> {
     log(`state: ${msg.from} → ${msg.to}`, c.green);
   });
 
-  client.on("run_completed", (msg) => {
-    log(`run finished: ${msg.status}`, c.green);
-    done = true;
-    rl.close();
+  // Wait until run completes (single listener handles both logging and resolution)
+  const completedPromise = new Promise<void>((resolve) => {
+    client.on("run_completed", (msg) => {
+      log(`run finished: ${msg.status}`, c.green);
+      done = true;
+      rl.close();
+      resolve();
+    });
+    client.on("close", () => resolve());
   });
 
   client.on("error", (msg) => {
@@ -648,14 +653,9 @@ async function runViaGateway(args: RunArgs): Promise<void> {
   });
 
   // Wait until run completes
-  await new Promise<void>((resolve) => {
-    if (done) {
-      resolve();
-      return;
-    }
-    client.on("run_completed", () => resolve());
-    client.on("close", () => resolve());
-  });
+  if (!done) {
+    await completedPromise;
+  }
 
   client.close();
 }

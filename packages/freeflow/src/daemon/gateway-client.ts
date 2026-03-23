@@ -23,6 +23,7 @@ export class GatewayClient {
   private reconnectAttempts = 0;
   private lastRegisterMsg: DaemonToGateway | null = null;
   private lastCapacity = 0;
+  private lastDaemonId = "";
 
   /** Called when a message should be "sent" — allows interception in tests. */
   onSend: ((msg: DaemonToGateway) => void) | null = null;
@@ -43,6 +44,7 @@ export class GatewayClient {
   connect(daemonId: string, capacity: number): void {
     this.closed = false;
     this.lastCapacity = capacity;
+    this.lastDaemonId = daemonId;
     const registerMsg: DaemonToGateway = {
       type: "register",
       daemon_id: daemonId,
@@ -107,10 +109,10 @@ export class GatewayClient {
     const delay = DEFAULT_RECONNECT_DELAY_MS * this.reconnectAttempts;
     setTimeout(() => {
       if (this.closed) return;
-      // Re-register with a fresh register message (server assigns new ID)
+      // Re-register with the original daemon_id (server assigns new ID)
       const registerMsg: DaemonToGateway = {
         type: "register",
-        daemon_id: "reconnect",
+        daemon_id: this.lastDaemonId,
         capacity: this.lastCapacity,
       };
       this.lastRegisterMsg = registerMsg;

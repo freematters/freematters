@@ -32,6 +32,7 @@ export class AgentPool {
   private config: AgentPoolConfig;
   private agents: Map<string, AgentHandle> = new Map();
   private processes: Map<string, ChildProcess> = new Map();
+  private activeCount = 0;
 
   /** Called when an agent produces output. */
   onOutput: ((runId: string, content: string, stream?: boolean) => void) | null = null;
@@ -54,12 +55,7 @@ export class AgentPool {
    * When the child exits, `onComplete` is called with the appropriate status.
    */
   async startAgent(args: StartAgentArgs): Promise<AgentHandle> {
-    // Check capacity (count non-stopped agents)
-    const activeCount = [...this.agents.values()].filter(
-      (a) => a.status !== "stopped",
-    ).length;
-
-    if (activeCount >= this.config.max_agents) {
+    if (this.activeCount >= this.config.max_agents) {
       throw new Error(
         `Agent pool at capacity (${this.config.max_agents}). Cannot start new agent.`,
       );
@@ -73,6 +69,7 @@ export class AgentPool {
     };
 
     this.agents.set(args.run_id, handle);
+    this.activeCount++;
 
     // Build child process arguments
     const childArgs = [
@@ -140,6 +137,13 @@ export class AgentPool {
   updateStatus(runId: string, status: AgentStatus): void {
     const agent = this.agents.get(runId);
     if (agent) {
+      const wasStopped = agent.status === "stopped";
+      const isStopped = status === "stopped";
+      if (!wasStopped && isStopped) {
+        this.activeCount--;
+      } else if (wasStopped && !isStopped) {
+        this.activeCount++;
+      }
       agent.status = status;
       agent.last_activity = new Date();
     }
@@ -180,6 +184,10 @@ export class AgentPool {
    * Remove an agent from the pool.
    */
   removeAgent(runId: string): void {
+    const agent = this.agents.get(runId);
+    if (agent && agent.status !== "stopped") {
+      this.activeCount--;
+    }
     const child = this.processes.get(runId);
     if (child) {
       try {
@@ -209,5 +217,6 @@ export class AgentPool {
     }
     this.agents.clear();
     this.processes.clear();
+    this.activeCount = 0;
   }
 }

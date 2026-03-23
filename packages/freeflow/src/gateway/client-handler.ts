@@ -250,19 +250,11 @@ export class ClientHandler {
     workflow: string;
     gateway_status: GatewayRunStatus;
   }> {
-    const result: Array<{
-      run_id: string;
-      workflow: string;
-      gateway_status: GatewayRunStatus;
-    }> = [];
-    for (const run of this.runs.values()) {
-      result.push({
-        run_id: run.run_id,
-        workflow: run.workflow,
-        gateway_status: run.gateway_status,
-      });
-    }
-    return result;
+    return [...this.runs.values()].map((run) => ({
+      run_id: run.run_id,
+      workflow: run.workflow,
+      gateway_status: run.gateway_status,
+    }));
   }
 
   getRun(runId: string): RunState | undefined {
