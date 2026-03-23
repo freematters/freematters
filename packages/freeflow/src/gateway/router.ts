@@ -12,8 +12,6 @@ interface ClientInfo {
   subscribedRun?: string;
 }
 
-/** Maximum number of buffered messages per run. */
-const MAX_BUFFER_SIZE = 1000;
 
 export class Router {
   private daemons = new Map<string, DaemonInfo>();
@@ -113,10 +111,6 @@ export class Router {
       this.outputBuffers.set(runId, buffer);
     }
     buffer.push(msg);
-    // Evict oldest messages when buffer exceeds limit
-    if (buffer.length > MAX_BUFFER_SIZE) {
-      buffer.splice(0, buffer.length - MAX_BUFFER_SIZE);
-    }
   }
 
   /** Get buffered messages for a run. */
