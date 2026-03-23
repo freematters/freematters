@@ -51,7 +51,6 @@ vi.mock("ws", () => {
   return { default: MockWS };
 });
 
-
 // Import after mocking
 const { createDaemon } = await import("../index.js");
 const { AgentPool } = await import("../agent-pool.js");
@@ -267,4 +266,3 @@ describe("createDaemon", () => {
     expect(daemon.getAgents()).toEqual([]);
   });
 });
-
