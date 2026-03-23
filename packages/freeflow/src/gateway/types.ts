@@ -57,6 +57,10 @@ export interface DaemonConfig {
   api_key: string;
   max_agents: number;
   agent_idle_timeout_ms: number;
+  /** The freeflow storage root directory. */
+  store_root: string;
+  /** Path to the fflow CLI entry point (e.g., dist/cli.js). */
+  cli_path: string;
 }
 
 // --- Agent Handle ---

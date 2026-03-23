@@ -63,6 +63,8 @@ function makeConfig(overrides: Partial<DaemonConfig> = {}): DaemonConfig {
     api_key: "test-key",
     max_agents: 5,
     agent_idle_timeout_ms: 300000,
+    store_root: "/tmp/freeflow-test",
+    cli_path: "/tmp/fake-cli.js",
     ...overrides,
   };
 }
@@ -141,7 +143,12 @@ describe("GatewayClient", () => {
 
 describe("AgentPool", () => {
   it("creates a new agent for a run", async () => {
-    const pool = new AgentPool({ max_agents: 5, agent_idle_timeout_ms: 300000 });
+    const pool = new AgentPool({
+      max_agents: 5,
+      agent_idle_timeout_ms: 300000,
+      store_root: "/tmp/freeflow-test",
+      cli_path: "/tmp/fake-cli.js",
+    });
 
     const handle = await pool.startAgent({
       run_id: "run-123",
@@ -157,7 +164,12 @@ describe("AgentPool", () => {
   });
 
   it("tracks agent status transitions", async () => {
-    const pool = new AgentPool({ max_agents: 5, agent_idle_timeout_ms: 300000 });
+    const pool = new AgentPool({
+      max_agents: 5,
+      agent_idle_timeout_ms: 300000,
+      store_root: "/tmp/freeflow-test",
+      cli_path: "/tmp/fake-cli.js",
+    });
 
     const handle = await pool.startAgent({
       run_id: "run-456",
@@ -177,7 +189,12 @@ describe("AgentPool", () => {
   });
 
   it("rejects when pool is full", async () => {
-    const pool = new AgentPool({ max_agents: 1, agent_idle_timeout_ms: 300000 });
+    const pool = new AgentPool({
+      max_agents: 1,
+      agent_idle_timeout_ms: 300000,
+      store_root: "/tmp/freeflow-test",
+      cli_path: "/tmp/fake-cli.js",
+    });
 
     await pool.startAgent({ run_id: "run-1", workflow: "a.yml" });
 
@@ -187,7 +204,12 @@ describe("AgentPool", () => {
   });
 
   it("returns all agents", async () => {
-    const pool = new AgentPool({ max_agents: 5, agent_idle_timeout_ms: 300000 });
+    const pool = new AgentPool({
+      max_agents: 5,
+      agent_idle_timeout_ms: 300000,
+      store_root: "/tmp/freeflow-test",
+      cli_path: "/tmp/fake-cli.js",
+    });
 
     await pool.startAgent({ run_id: "run-a", workflow: "a.yml" });
     await pool.startAgent({ run_id: "run-b", workflow: "b.yml" });
@@ -198,7 +220,12 @@ describe("AgentPool", () => {
   });
 
   it("forwards user input to agent", async () => {
-    const pool = new AgentPool({ max_agents: 5, agent_idle_timeout_ms: 300000 });
+    const pool = new AgentPool({
+      max_agents: 5,
+      agent_idle_timeout_ms: 300000,
+      store_root: "/tmp/freeflow-test",
+      cli_path: "/tmp/fake-cli.js",
+    });
 
     await pool.startAgent({ run_id: "run-input", workflow: "a.yml" });
     pool.updateStatus("run-input", "running");
@@ -208,7 +235,12 @@ describe("AgentPool", () => {
   });
 
   it("removes stopped agents", async () => {
-    const pool = new AgentPool({ max_agents: 5, agent_idle_timeout_ms: 300000 });
+    const pool = new AgentPool({
+      max_agents: 5,
+      agent_idle_timeout_ms: 300000,
+      store_root: "/tmp/freeflow-test",
+      cli_path: "/tmp/fake-cli.js",
+    });
 
     await pool.startAgent({ run_id: "run-rm", workflow: "a.yml" });
     expect(pool.getAgent("run-rm")).toBeDefined();

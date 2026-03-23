@@ -30,6 +30,8 @@ export function createDaemon(config: DaemonConfig): Daemon {
   const pool = new AgentPool({
     max_agents: config.max_agents,
     agent_idle_timeout_ms: config.agent_idle_timeout_ms,
+    store_root: config.store_root,
+    cli_path: config.cli_path,
   });
 
   // Wire up pool events → gateway messages

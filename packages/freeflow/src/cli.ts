@@ -227,6 +227,43 @@ program
     });
   });
 
+program
+  .command("gateway")
+  .description("start the fflow Gateway server")
+  .option("--port <port>", "listening port", "8080")
+  .option("--host <host>", "listening host", "0.0.0.0")
+  .option("--api-key <key>", "API key (auto-generated if omitted)")
+  .option("--store-root <path>", "freeflow storage root")
+  .action(async (opts: Record<string, unknown>) => {
+    const { gateway } = await import("./commands/gateway.js");
+    await gateway({
+      port: Number.parseInt(opts.port as string, 10) || 8080,
+      host: (opts.host as string) ?? "0.0.0.0",
+      apiKey: opts.apiKey as string | undefined,
+      storeRoot: opts.storeRoot as string | undefined,
+    });
+  });
+
+program
+  .command("daemon")
+  .description("start an Agent Daemon that connects to a Gateway")
+  .requiredOption(
+    "--gateway <url>",
+    "Gateway WebSocket URL (e.g., ws://localhost:8080/ws/daemon)",
+  )
+  .option("--api-key <key>", "API key for Gateway authentication")
+  .option("--max-agents <n>", "maximum number of concurrent agents", "10")
+  .option("--store-root <path>", "freeflow storage root")
+  .action(async (opts: Record<string, unknown>) => {
+    const { startDaemon } = await import("./commands/daemon.js");
+    await startDaemon({
+      gateway: opts.gateway as string,
+      apiKey: opts.apiKey as string | undefined,
+      maxAgents: opts.maxAgents as string | undefined,
+      storeRoot: opts.storeRoot as string | undefined,
+    });
+  });
+
 // Markdown subcommands
 const markdownCmd = program
   .command("markdown")
