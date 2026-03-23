@@ -19,7 +19,7 @@ graph LR
 - [x] Step 3: Implement Gateway Server
 - [x] Step 4: Implement Agent Daemon
 - [x] Step 5: Extend CLI with --gateway Support
-- [ ] Step 6: Integration Tests
+- [x] Step 6: Integration Tests
 
 ---
 

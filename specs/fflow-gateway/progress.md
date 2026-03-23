@@ -29,3 +29,9 @@
 - **What was built**: GatewayCliClient with EventEmitter-based typed events, WebSocket connection, create/input/abort methods, reconnection logic. CLI run command extended with --gateway and --api-key options
 - **Tests**: 13 tests added (CLI options, connection/auth, input forwarding, message handling, user input routing integration, reconnection), all passing
 - **Notes**: None — no spec deviations
+
+## Step 6: Integration Tests
+- **Files changed**: `packages/freeflow/src/__tests__/gateway-integration.test.ts` (created), `packages/freeflow/src/gateway/router.ts` (modified), `packages/freeflow/src/gateway/daemon-handler.ts` (modified), `packages/freeflow/src/gateway/client-handler.ts` (modified), `packages/freeflow/src/gateway/types.ts` (modified)
+- **What was built**: Full-stack integration tests for disconnection handling. Added output buffering in Router (max 1000 messages/run), buffering on forward in DaemonHandler, replay on subscribe in ClientHandler
+- **Tests**: 2 integration tests added (workflow continues after disconnect + output replay on reconnect, REST accessible after disconnect), all passing
+- **Notes**: None — implementation matches design.md Test 4 exactly
