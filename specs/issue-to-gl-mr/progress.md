@@ -18,6 +18,18 @@
 - **Tests**: Script-level
 - **Notes**: Simpler than GitHub version — thread resolution via REST PUT, CI status embedded in MR object
 
+## Step 2: Create `gitlab-spec-gen` workflow
+- **Files changed**: `workflows/gitlab-spec-gen/workflow.yaml` (new)
+- **What was built**: GitLab-specific spec-gen workflow using `extends_guide` + `from:` to inherit spec-gen states, with `### GitLab Adaptation` sections replacing all `gh` CLI with `glab` equivalents. Artifact storage via GitLab notes, polling via `poll_issue_gl.py`, award emoji reactions.
+- **Tests**: 278 passing
+- **Notes**: Research state only has `back to requirements` transition (no `proceed to design`)
+
+## Step 4: Create `gitlab-mr-lifecycle` workflow
+- **Files changed**: `workflows/gitlab-mr-lifecycle/workflow.yaml` (new)
+- **What was built**: GitLab MR monitoring workflow with 7 states (create-mr, poll, fix, rebase, address, push, done). Uses native GitLab rebase API, REST thread resolution (no GraphQL), CI status embedded in MR object.
+- **Tests**: 278 passing
+- **Notes**: Simpler than GitHub variant — REST PUT for thread resolution, native rebase API
+
 ## Step 7: Modify `spec-to-code` for GitLab issue mode
 - **Files changed**: `workflows/spec-to-code/workflow.yaml` (modified), `download_spec_gl.py` (new), `prepare_implementation_gl.py` (new)
 - **What was built**: Platform detection in setup state, GitLab-specific sections in implement/done states, GitLab variants of download_spec and prepare_implementation scripts
