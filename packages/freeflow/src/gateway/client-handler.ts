@@ -84,7 +84,6 @@ export class ClientHandler {
       prompt: msg.prompt,
     };
     this.runs.set(runId, runState);
-    this.store.initRun(runId, msg.workflow);
 
     // Subscribe client to this run
     this.router.subscribeClient(clientId, ws, runId);
