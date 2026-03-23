@@ -17,6 +17,8 @@ interface RunState {
   workflow: string;
   gateway_status: GatewayRunStatus;
   prompt?: string;
+  /** The client that created this run — used for ownership checks on mutations. */
+  owner_client_id?: string;
 }
 
 export class ClientHandler {
@@ -47,6 +49,12 @@ export class ClientHandler {
 
     ws.on("close", () => {
       this.router.removeClient(clientId);
+      // Clear ownership so a reconnecting client can re-subscribe
+      for (const run of this.runs.values()) {
+        if (run.owner_client_id === clientId) {
+          run.owner_client_id = undefined;
+        }
+      }
     });
   }
 
@@ -56,10 +64,10 @@ export class ClientHandler {
         this.handleCreateRun(clientId, ws, msg);
         break;
       case "user_input":
-        this.handleUserInput(msg);
+        this.handleUserInput(clientId, ws, msg);
         break;
       case "abort_run":
-        this.handleAbortRun(msg);
+        this.handleAbortRun(clientId, ws, msg);
         break;
       case "subscribe":
         this.handleSubscribe(clientId, ws, msg);
@@ -82,6 +90,7 @@ export class ClientHandler {
       workflow: msg.workflow,
       gateway_status: "pending",
       prompt: msg.prompt,
+      owner_client_id: clientId,
     };
     this.runs.set(runId, runState);
 
@@ -129,7 +138,21 @@ export class ClientHandler {
     }
   }
 
-  private handleUserInput(msg: Extract<ClientToGateway, { type: "user_input" }>): void {
+  private handleUserInput(
+    clientId: string,
+    ws: WebSocket,
+    msg: Extract<ClientToGateway, { type: "user_input" }>,
+  ): void {
+    const run = this.runs.get(msg.run_id);
+    if (run?.owner_client_id && run.owner_client_id !== clientId) {
+      this.sendError(
+        ws,
+        msg.run_id,
+        "Not authorized: only the run owner can send input",
+      );
+      return;
+    }
+
     // Buffer user input so it appears in replay on reconnect
     this.router.bufferMessage(msg.run_id, {
       type: "user_input",
@@ -147,8 +170,16 @@ export class ClientHandler {
     }
   }
 
-  private handleAbortRun(msg: Extract<ClientToGateway, { type: "abort_run" }>): void {
+  private handleAbortRun(
+    clientId: string,
+    ws: WebSocket,
+    msg: Extract<ClientToGateway, { type: "abort_run" }>,
+  ): void {
     const run = this.runs.get(msg.run_id);
+    if (run?.owner_client_id && run.owner_client_id !== clientId) {
+      this.sendError(ws, msg.run_id, "Not authorized: only the run owner can abort");
+      return;
+    }
     if (run) {
       run.gateway_status = "aborted";
     }
@@ -163,6 +194,21 @@ export class ClientHandler {
     ws: WebSocket,
     msg: Extract<ClientToGateway, { type: "subscribe" }>,
   ): void {
+    const run = this.runs.get(msg.run_id);
+    if (run?.owner_client_id && run.owner_client_id !== clientId) {
+      this.sendError(
+        ws,
+        msg.run_id,
+        "Not authorized: only the run owner can subscribe",
+      );
+      return;
+    }
+
+    // If the run has no owner (e.g. previous owner disconnected), claim ownership
+    if (run && !run.owner_client_id) {
+      run.owner_client_id = clientId;
+    }
+
     this.router.subscribeClient(clientId, ws, msg.run_id);
 
     // Replay buffered output for the run

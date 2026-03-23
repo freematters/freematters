@@ -53,7 +53,7 @@ vi.mock("ws", () => {
 });
 
 // Import after mocking
-const { createDaemon } = await import("../index.js");
+const { createDaemon, createDaemonForTest } = await import("../index.js");
 const { AgentPool } = await import("../agent-pool.js");
 const { GatewayClient } = await import("../gateway-client.js");
 
@@ -273,11 +273,11 @@ describe("createDaemon", () => {
 describe("Run Creation Flow (integration)", () => {
   it("daemon receives start_run and spawns agent", async () => {
     const config = makeConfig();
-    const daemon = createDaemon(config);
+    const daemon = createDaemonForTest(config);
 
     // Collect messages the daemon wants to send to gateway
     const outgoing: DaemonToGateway[] = [];
-    daemon._gatewayClient.onSend = (msg) => outgoing.push(msg);
+    daemon.gatewayClient.onSend = (msg) => outgoing.push(msg);
 
     // Start daemon (registers with gateway)
     daemon.start();
@@ -288,7 +288,7 @@ describe("Run Creation Flow (integration)", () => {
     expect(registerMsg?.type).toBe("register");
 
     // Simulate gateway sending start_run
-    daemon._gatewayClient.handleIncoming({
+    daemon.gatewayClient.handleIncoming({
       type: "start_run",
       run_id: "run-integration-1",
       workflow: "test.fsm.yml",
@@ -315,13 +315,13 @@ describe("Run Creation Flow (integration)", () => {
 
   it("forwards user_input to the correct agent", async () => {
     const config = makeConfig();
-    const daemon = createDaemon(config);
-    daemon._gatewayClient.onSend = () => {};
+    const daemon = createDaemonForTest(config);
+    daemon.gatewayClient.onSend = () => {};
 
     daemon.start();
 
     // Start an agent
-    daemon._gatewayClient.handleIncoming({
+    daemon.gatewayClient.handleIncoming({
       type: "start_run",
       run_id: "run-input-test",
       workflow: "test.fsm.yml",
@@ -329,7 +329,7 @@ describe("Run Creation Flow (integration)", () => {
     await new Promise((r) => setTimeout(r, 10));
 
     // Should not throw when forwarding input
-    daemon._gatewayClient.handleIncoming({
+    daemon.gatewayClient.handleIncoming({
       type: "user_input",
       run_id: "run-input-test",
       input: "hello agent",
@@ -340,13 +340,13 @@ describe("Run Creation Flow (integration)", () => {
 
   it("handles abort_run by stopping the agent", async () => {
     const config = makeConfig();
-    const daemon = createDaemon(config);
-    daemon._gatewayClient.onSend = () => {};
+    const daemon = createDaemonForTest(config);
+    daemon.gatewayClient.onSend = () => {};
 
     daemon.start();
 
     // Start an agent
-    daemon._gatewayClient.handleIncoming({
+    daemon.gatewayClient.handleIncoming({
       type: "start_run",
       run_id: "run-abort-test",
       workflow: "test.fsm.yml",
@@ -354,7 +354,7 @@ describe("Run Creation Flow (integration)", () => {
     await new Promise((r) => setTimeout(r, 10));
 
     // Abort it
-    daemon._gatewayClient.handleIncoming({
+    daemon.gatewayClient.handleIncoming({
       type: "abort_run",
       run_id: "run-abort-test",
     });

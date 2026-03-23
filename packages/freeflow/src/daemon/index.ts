@@ -17,16 +17,47 @@ export interface Daemon {
   start(): void;
   stop(): void;
   getAgents(): AgentHandle[];
-  /** Exposed for testing — the underlying gateway client. */
-  _gatewayClient: GatewayClient;
+}
+
+export interface CreateDaemonOptions {
+  /** Optional factory for creating a GatewayClient (used for testing). */
+  gatewayClientFactory?: (config: DaemonConfig) => GatewayClient;
+}
+
+/** Extended interface for testing — provides access to the gateway client via dependency injection. */
+export interface DaemonTestHandle extends Daemon {
+  gatewayClient: GatewayClient;
 }
 
 /**
  * Create a daemon instance that connects to a Gateway and manages agents.
  */
-export function createDaemon(config: DaemonConfig): Daemon {
+export function createDaemon(
+  config: DaemonConfig,
+  options?: CreateDaemonOptions,
+): Daemon {
+  return _createDaemonInternal(config, options);
+}
+
+/**
+ * Create a daemon with an exposed gateway client for testing.
+ * Production code should use `createDaemon` instead.
+ */
+export function createDaemonForTest(
+  config: DaemonConfig,
+  options?: CreateDaemonOptions,
+): DaemonTestHandle {
+  return _createDaemonInternal(config, options);
+}
+
+function _createDaemonInternal(
+  config: DaemonConfig,
+  options?: CreateDaemonOptions,
+): DaemonTestHandle {
   const daemonId = `daemon-${randomUUID().slice(0, 8)}`;
-  const client = new GatewayClient(config);
+  const factory =
+    options?.gatewayClientFactory ?? ((c: DaemonConfig) => new GatewayClient(c));
+  const client = factory(config);
   const pool = new AgentPool({
     max_agents: config.max_agents,
     agent_idle_timeout_ms: config.agent_idle_timeout_ms,
@@ -118,6 +149,6 @@ export function createDaemon(config: DaemonConfig): Daemon {
       return pool.getAgents();
     },
 
-    _gatewayClient: client,
+    gatewayClient: client,
   };
 }
