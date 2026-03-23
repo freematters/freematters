@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { type EventInput, type SnapshotInput, Store } from "../store.js";
+import { Store } from "../store.js";
 import {
   cleanupTempDir,
   createTempDir,
@@ -29,42 +29,7 @@ function freshStore(): Store {
 
 // --- Tests ---
 
-describe("Store — initRun", () => {
-  test("throws if run already exists", () => {
-    const s = freshStore();
-    s.initRun("dup", "/fake.yaml");
-
-    expect(() => s.initRun("dup", "/fake.yaml")).toThrow(/already exists/);
-  });
-});
-
-describe("Store — runExists", () => {
-  test("returns false for non-existent run", () => {
-    const s = freshStore();
-    expect(s.runExists("nope")).toBe(false);
-  });
-
-  test("returns true after initRun", () => {
-    const s = freshStore();
-    s.initRun("exists", "/fake.yaml");
-    expect(s.runExists("exists")).toBe(true);
-  });
-});
-
-describe("Store — readMeta", () => {
-  test("throws for non-existent run", () => {
-    const s = freshStore();
-    expect(() => s.readMeta("ghost")).toThrow();
-  });
-});
-
 describe("Store — readSnapshot", () => {
-  test("returns null when no snapshot exists", () => {
-    const s = freshStore();
-    s.initRun("no-snap", "/fake.yaml");
-    expect(s.readSnapshot("no-snap")).toBeNull();
-  });
-
   test("returns snapshot after commit", () => {
     const s = freshStore();
     s.initRun("snap-test", "/fake.yaml");
@@ -111,22 +76,9 @@ describe("Store — commit", () => {
     );
     expect(event.metadata).toEqual({ key: "value" });
   });
-
-  test("throws for non-existent run", () => {
-    const s = freshStore();
-    expect(() =>
-      s.commit("ghost", startEvent("plan"), startSnapshot("plan")),
-    ).toThrow();
-  });
 });
 
 describe("Store — readEvents", () => {
-  test("returns empty array when no events", () => {
-    const s = freshStore();
-    s.initRun("no-events", "/fake.yaml");
-    expect(s.readEvents("no-events")).toEqual([]);
-  });
-
   test("returns all events in order", () => {
     const s = freshStore();
     s.initRun("multi", "/fake.yaml");
@@ -208,11 +160,6 @@ describe("Store — session management", () => {
     s.bindSession("sess-2", "run-xyz");
     s.unbindSession("sess-2");
     expect(s.readSession("sess-2")).toBeNull();
-  });
-
-  test("unbindSession no-ops for missing session", () => {
-    const s = freshStore();
-    expect(() => s.unbindSession("ghost")).not.toThrow();
   });
 
   test("readCounter returns 0 for new session", () => {

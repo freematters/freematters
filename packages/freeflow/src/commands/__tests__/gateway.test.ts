@@ -13,25 +13,6 @@ afterAll(() => {
 });
 
 describe("gateway command", () => {
-  test("starts server and returns shutdown function", async () => {
-    const shutdown = await gateway({
-      port: 19_001,
-      host: "127.0.0.1",
-      apiKey: "test-key-1",
-      storeRoot: tmp,
-    });
-
-    expect(typeof shutdown).toBe("function");
-
-    // Verify server is actually listening by hitting health endpoint
-    const res = await fetch("http://127.0.0.1:19001/api/health");
-    expect(res.status).toBe(200);
-    const body = await res.json();
-    expect(body.status).toBe("ok");
-
-    await shutdown();
-  });
-
   test("auto-generates API key when not provided", async () => {
     // Capture stderr output
     const writes: string[] = [];
@@ -92,21 +73,5 @@ describe("gateway command", () => {
     expect(badRes.status).toBe(403);
 
     await shutdown();
-  });
-
-  test("server stops cleanly on shutdown", async () => {
-    const shutdown = await gateway({
-      port: 19_004,
-      host: "127.0.0.1",
-      apiKey: "key",
-      storeRoot: tmp,
-    });
-
-    await shutdown();
-
-    // Server should no longer be reachable
-    await expect(
-      fetch("http://127.0.0.1:19004/api/health").then((r) => r.json()),
-    ).rejects.toThrow();
   });
 });

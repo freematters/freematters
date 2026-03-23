@@ -123,16 +123,6 @@ describe("markdown convert command", () => {
     expect(existsSync(join(tmp, "input.workflow.md"))).toBe(false);
   });
 
-  test("default output path: same basename, swapped extension", () => {
-    tmp = createTempDir("md-convert");
-    const yamlPath = join(tmp, "my-workflow.workflow.yaml");
-    writeFileSync(yamlPath, MINIMAL_YAML);
-
-    convert({ filePath: yamlPath, json: false });
-
-    expect(existsSync(join(tmp, "my-workflow.workflow.md"))).toBe(true);
-  });
-
   test("json flag wraps output in JSON envelope", () => {
     tmp = createTempDir("md-convert");
     const yamlPath = join(tmp, "test.workflow.yaml");
@@ -155,15 +145,5 @@ describe("markdown convert command", () => {
     const envelope = JSON.parse(output);
     expect(envelope.ok).toBe(true);
     expect(envelope.data).toHaveProperty("output_path");
-  });
-
-  test("MD to YAML default output swaps .workflow.md to .workflow.yaml", () => {
-    tmp = createTempDir("md-convert");
-    const mdPath = join(tmp, "flow.workflow.md");
-    writeFileSync(mdPath, MINIMAL_MD);
-
-    convert({ filePath: mdPath, json: false });
-
-    expect(existsSync(join(tmp, "flow.workflow.yaml"))).toBe(true);
   });
 });

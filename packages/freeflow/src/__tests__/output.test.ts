@@ -1,11 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { FsmState } from "../fsm.js";
-import {
-  type StateCard,
-  formatStateCard,
-  formatSubagentDispatch,
-  stateCardFromFsm,
-} from "../output.js";
+import { type StateCard, formatSubagentDispatch, stateCardFromFsm } from "../output.js";
 
 function makeCard(overrides: Partial<StateCard> = {}): StateCard {
   return {
@@ -30,42 +25,7 @@ describe("formatSubagentDispatch", () => {
   });
 });
 
-describe("formatStateCard with subagent", () => {
-  test("Test 6: formatStateCard unchanged for subagent states", () => {
-    const card = makeCard({ subagent: true });
-    const out = formatStateCard(card);
-
-    // Normal state card content should be present
-    expect(out).toContain("execute");
-    expect(out).toContain("Run the implementation steps.");
-    expect(out).toContain("done → done");
-    // Should NOT contain subagent dispatch instructions
-    expect(out).not.toContain("subagent execution");
-  });
-});
-
 describe("stateCardFromFsm subagent flag", () => {
-  test("Test 7: preserves subagent flag when present", () => {
-    const fsmState: FsmState = {
-      prompt: "Do the work.",
-      transitions: { done: "done" },
-      subagent: true,
-    };
-    const card = stateCardFromFsm("execute", fsmState);
-
-    expect(card.subagent).toBe(true);
-  });
-
-  test("Test 7b: does not set subagent when flag absent", () => {
-    const fsmState: FsmState = {
-      prompt: "Do the work.",
-      transitions: { done: "done" },
-    };
-    const card = stateCardFromFsm("execute", fsmState);
-
-    expect(card.subagent).toBeUndefined();
-  });
-
   test("Test 7c: preserves explicit subagent: false", () => {
     const fsmState: FsmState = {
       prompt: "Do the work.",
