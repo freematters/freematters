@@ -9,7 +9,7 @@
 #   create-issue
 #       |           \
 #   requirements ← → research
-#       |
+#       |        ←──┘
 #     design ← → requirements (gaps)
 #       |
 #      plan ← → design (revision)
@@ -277,8 +277,7 @@ states:
       After completing research:
       1. Update the issue body status checklist: check off "research".
       2. Post transition options as an issue comment:
-         - "Back to requirements"
-         - "Proceed to design"
+         - "Back to requirements" — clarify requirements with research findings
       3. Poll for the user's choice via comment reply.
 
   design:

@@ -4,7 +4,7 @@
 #   create-structure
 #       |           \
 #   requirements ← → research
-#       |
+#       |        ←──┘
 #     design ← → requirements (gaps)
 #       |
 #      plan ← → design (revision)
@@ -25,6 +25,7 @@ guide: |
   - User-driven flow: You MUST NOT proceed to the next state without explicit user confirmation.
     At each transition point, present the options and wait for the user's choice.
   - Iterative: The user can move between requirements and research at any time.
+    Research always returns to requirements (not directly to design).
     You MUST always offer this option at state transitions.
   - Record as you go: You MUST persist artifacts incrementally. You MUST NOT batch-write
     content at the end of a phase.
@@ -164,13 +165,11 @@ states:
         available information, and ask the user for additional context. Do not block progress.
 
       When research is sufficient, ask the user:
-      - "Back to requirements" — clarify requirements → requirements
-      - "Proceed to design" → design
+      - "Back to requirements" — clarify requirements with research findings
 
       You MUST NOT proceed until the user confirms research is sufficient.
     transitions:
       back to requirements: requirements
-      proceed to design: design
 
   design:
     prompt: |
