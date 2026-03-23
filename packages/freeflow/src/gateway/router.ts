@@ -15,6 +15,7 @@ export class Router {
   private daemons = new Map<string, DaemonInfo>();
   private clients = new Map<string, ClientInfo>();
   private runToDaemon = new Map<string, string>();
+  private outputBuffers = new Map<string, unknown[]>();
 
   // --- Daemon management ---
 
@@ -96,5 +97,24 @@ export class Router {
       if (info.ws === ws) return id;
     }
     return undefined;
+  }
+
+  // --- Output buffer management ---
+
+  appendBuffer(runId: string, msg: unknown): void {
+    let buf = this.outputBuffers.get(runId);
+    if (!buf) {
+      buf = [];
+      this.outputBuffers.set(runId, buf);
+    }
+    buf.push(msg);
+  }
+
+  getBuffer(runId: string): unknown[] {
+    return this.outputBuffers.get(runId) ?? [];
+  }
+
+  clearBuffer(runId: string): void {
+    this.outputBuffers.delete(runId);
   }
 }

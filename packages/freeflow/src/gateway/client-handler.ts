@@ -5,6 +5,13 @@ import type { Router } from "./router.js";
 import type { ClientToGateway, GatewayRunStatus } from "./types.js";
 import { isClientMessage } from "./types.js";
 
+const SAFE_WORKFLOW_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/;
+
+function isValidWorkflowPath(workflow: string): boolean {
+  if (!workflow || workflow.includes("..")) return false;
+  return SAFE_WORKFLOW_PATTERN.test(workflow);
+}
+
 interface RunState {
   run_id: string;
   workflow: string;
@@ -65,6 +72,10 @@ export class ClientHandler {
     ws: WebSocket,
     msg: Extract<ClientToGateway, { type: "create_run" }>,
   ): void {
+    if (!isValidWorkflowPath(msg.workflow)) {
+      this.sendError(ws, undefined, "Invalid workflow path");
+      return;
+    }
     const runId = msg.run_id ?? randomUUID();
     const runState: RunState = {
       run_id: runId,
@@ -139,7 +150,10 @@ export class ClientHandler {
   createRun(
     workflow: string,
     prompt?: string,
-  ): { run_id: string; status: GatewayRunStatus } {
+  ): { run_id: string; status: GatewayRunStatus } | { error: string } {
+    if (!isValidWorkflowPath(workflow)) {
+      return { error: "Invalid workflow path" };
+    }
     const runId = randomUUID();
     const runState: RunState = {
       run_id: runId,
@@ -149,7 +163,27 @@ export class ClientHandler {
     };
     this.runs.set(runId, runState);
     this.store.initRun(runId, workflow);
-    return { run_id: runId, status: "pending" };
+
+    // Try to assign to a daemon
+    const daemonId = this.router.pickAvailableDaemon();
+    if (daemonId) {
+      runState.gateway_status = "waiting_daemon";
+      this.router.assignRunToDaemon(runId, daemonId);
+      this.store.updateGatewayInfo(runId, { daemon_id: daemonId });
+
+      const daemonWs = this.router.getDaemon(daemonId)?.ws;
+      if (daemonWs) {
+        this.send(daemonWs, {
+          type: "start_run",
+          run_id: runId,
+          workflow,
+          ...(prompt && { prompt }),
+        });
+        runState.gateway_status = "starting";
+      }
+    }
+
+    return { run_id: runId, status: runState.gateway_status };
   }
 
   listRuns(): Array<{
@@ -180,7 +214,18 @@ export class ClientHandler {
     const run = this.runs.get(runId);
     if (!run) return undefined;
     run.gateway_status = "aborted";
+    const daemonWs = this.router.getDaemonWsForRun(runId);
+    if (daemonWs) {
+      this.send(daemonWs, { type: "abort_run", run_id: runId });
+    }
     return { run_id: runId, status: "aborted" };
+  }
+
+  updateRunStatus(runId: string, status: GatewayRunStatus): void {
+    const run = this.runs.get(runId);
+    if (run) {
+      run.gateway_status = status;
+    }
   }
 
   // --- Helpers ---
