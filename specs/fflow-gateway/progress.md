@@ -35,3 +35,8 @@
 - **What was built**: Full-stack integration tests for disconnection handling. Added output buffering in Router (max 1000 messages/run), buffering on forward in DaemonHandler, replay on subscribe in ClientHandler
 - **Tests**: 2 integration tests added (workflow continues after disconnect + output replay on reconnect, REST accessible after disconnect), all passing
 - **Notes**: None — implementation matches design.md Test 4 exactly
+
+## E2E Testing
+- **Result**: Skipped — e2e.md exists but requires `fflow gateway` and `fflow daemon` CLI subcommands that are not part of the implementation plan (plan covers library modules only). All 4 design.md integration test cases are covered by unit/integration tests (214 passing).
+- **Attempts**: 0
+- **Notes**: E2E test plan should be revisited after CLI subcommands for gateway/daemon are added
