@@ -6,3 +6,4 @@ dist/
 .worktrees/
 docs/plans/
 specs/fflow-gateway/
+specs/issue-to-gl-mr/
