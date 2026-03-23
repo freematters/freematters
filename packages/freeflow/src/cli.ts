@@ -90,6 +90,8 @@ program
   .option("--verbose", "show tool calls and agent messages in output")
   .option("--stay", "stay and accept user input after workflow completes")
   .option("--lite", "enable lite mode (abbreviated output on re-visited states)")
+  .option("--gateway <url>", "connect to remote Gateway instead of local execution")
+  .option("--api-key <key>", "API key for Gateway authentication")
   .action(async (_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
     const { run: runCmd } = await import("./commands/run.js");
@@ -103,6 +105,8 @@ program
       verbose: (opts.verbose as boolean) ?? false,
       stay: (opts.stay as boolean) ?? false,
       lite: (opts.lite as boolean) ?? false,
+      gateway: opts.gateway as string | undefined,
+      apiKey: opts.apiKey as string | undefined,
     });
   });
 
@@ -220,6 +224,60 @@ program
       json: json ?? false,
       model: opts.model as string | undefined,
       verbose: (opts.verbose as boolean) ?? false,
+    });
+  });
+
+program
+  .command("gateway")
+  .description("start the fflow Gateway server")
+  .option("--port <port>", "listening port", "8080")
+  .option("--host <host>", "listening host", "0.0.0.0")
+  .option("--api-key <key>", "API key (auto-generated if omitted)")
+  .option("--store-root <path>", "freeflow storage root")
+  .action(async (opts: Record<string, unknown>) => {
+    const { gateway } = await import("./commands/gateway.js");
+    await gateway({
+      port: Number.parseInt(opts.port as string, 10) || 8080,
+      host: (opts.host as string) ?? "0.0.0.0",
+      apiKey: opts.apiKey as string | undefined,
+      storeRoot: opts.storeRoot as string | undefined,
+    });
+  });
+
+program
+  .command("attach")
+  .description("attach to a running workflow on a remote Gateway")
+  .argument("<run-id>", "run identifier to attach to")
+  .requiredOption("--gateway <url>", "Gateway URL (e.g., http://localhost:8080)")
+  .option("--api-key <key>", "API key for Gateway authentication")
+  .action(async (runId: string, opts: Record<string, unknown>, cmd: Command) => {
+    const { json } = getGlobalOpts(cmd);
+    const { attach } = await import("./commands/attach.js");
+    await attach({
+      runId,
+      gateway: opts.gateway as string,
+      apiKey: opts.apiKey as string | undefined,
+      json: json ?? false,
+    });
+  });
+
+program
+  .command("daemon")
+  .description("start an Agent Daemon that connects to a Gateway")
+  .requiredOption(
+    "--gateway <url>",
+    "Gateway WebSocket URL (e.g., ws://localhost:8080/ws/daemon)",
+  )
+  .option("--api-key <key>", "API key for Gateway authentication")
+  .option("--max-agents <n>", "maximum number of concurrent agents", "10")
+  .option("--store-root <path>", "freeflow storage root")
+  .action(async (opts: Record<string, unknown>) => {
+    const { startDaemon } = await import("./commands/daemon.js");
+    await startDaemon({
+      gateway: opts.gateway as string,
+      apiKey: opts.apiKey as string | undefined,
+      maxAgents: opts.maxAgents as string | undefined,
+      storeRoot: opts.storeRoot as string | undefined,
     });
   });
 

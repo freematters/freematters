@@ -40,6 +40,10 @@ Never omit `--run-id`. The run ID is needed for all subsequent commands. PATH ca
 
 5. **Flow CLI output**
 
+> **WARNING — DO NOT TRUNCATE CLI OUTPUT**
+>
+> `fflow start`, `fflow goto`, and `fflow current` output **state cards** that contain critical workflow instructions. You MUST read the **complete, untruncated** output of these commands. NEVER pipe them through `tail`, `head`, or any other tool that truncates output. NEVER use a line-limit or byte-limit on their output. Truncating the output will cause you to miss **guide rules**, **state instructions**, and **transition definitions**, which will lead to incorrect workflow execution.
+
 `fflow start` will output the initial state card. `fflow goto` will output the new state card. if the target state is `done`, the workflow is completed.
 
 The state card consists of instructions, todos and valid state transitions, follow the instructions and transition to the correct state based on the output of your actions.
