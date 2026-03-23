@@ -278,6 +278,10 @@ markdownCmd
     }
   });
 
+// Daemon subcommand
+import { buildDaemonCommand } from "./commands/daemon.js";
+buildDaemonCommand(program);
+
 // Hidden hook commands (not shown in --help)
 const hookCmd = program
   .command("_hook", { hidden: true })
