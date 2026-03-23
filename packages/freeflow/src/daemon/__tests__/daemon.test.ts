@@ -1,3 +1,4 @@
+import { EventEmitter, Readable, Writable } from "node:stream";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AgentHandle,
@@ -50,6 +51,29 @@ vi.mock("ws", () => {
     return mock;
   }
   return { default: MockWS };
+});
+
+// Mock child_process.spawn so agents don't spawn real processes that exit immediately
+vi.mock("node:child_process", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("node:child_process")>();
+  return {
+    ...orig,
+    spawn: (_cmd: string, _args: string[], _opts: unknown) => {
+      const child = new EventEmitter() as EventEmitter & {
+        stdin: Writable;
+        stdout: Readable;
+        stderr: Readable;
+        pid: number;
+        kill: () => boolean;
+      };
+      child.stdin = new Writable({ write(_c, _e, cb) { cb(); } });
+      child.stdout = new Readable({ read() {} });
+      child.stderr = new Readable({ read() {} });
+      child.pid = 99999;
+      child.kill = () => true;
+      return child;
+    },
+  };
 });
 
 // Import after mocking
