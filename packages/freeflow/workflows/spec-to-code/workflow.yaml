@@ -25,8 +25,10 @@ guide: |
   Testing: integration-first (system boundaries, real dependencies). Unit tests only
   for complex single-module logic. No mocking internal modules.
 
-  Issue mode (`owner/repo#N`): prefix comments with `[from bot]`, push after each
-  commit, update issue checklist. Remember `owner`, `repo`, `issue_number`, `branch_name`.
+  Issue mode (`owner/repo#N` for GitHub, GitLab issue URL or `project/path#N` for GitLab):
+  prefix comments with `[from bot]`, push after each commit, update issue checklist.
+  GitHub: remember `owner`, `repo`, `issue_number`, `branch_name`.
+  GitLab: remember `project_path`, `iid`, `branch_name`.
 
 initial: setup
 
@@ -39,14 +41,21 @@ states:
 
       ### 1. Detect mode
 
-      Check if the argument matches `owner/repo#N` (regex: `[\w.-]+/[\w.-]+#\d+`).
-      - If yes → **issue mode**. Remember `source_mode = "issue"`, parse `owner`, `repo`, `issue_number`.
+      Check the argument format to determine the source mode and platform:
+
+      - **GitLab issue mode**: The argument is a GitLab issue URL (contains `gitlab` in hostname)
+        or a `project/path#N` format where the project path contains more than one `/` segment
+        (e.g., `group/subgroup/project#42`), or the parent workflow has set `platform = "gitlab"`.
+        Remember `source_mode = "issue"`, `platform = "gitlab"`, parse `project_path` and `iid`.
+        Derive a concise `slug` from the issue title.
+      - **GitHub issue mode**: The argument matches `owner/repo#N` (regex: `[\w.-]+/[\w.-]+#\d+`).
+        Remember `source_mode = "issue"`, `platform = "github"`, parse `owner`, `repo`, `issue_number`.
         Derive a concise `slug` from the issue title — a short, meaningful identifier (lowercase letters, digits, and hyphens only).
-      - If no → **local mode**. Remember `source_mode = "local"`. The argument is the spec directory path.
+      - **Local mode**: Neither of the above. Remember `source_mode = "local"`. The argument is the spec directory path.
 
       ### 2. Load spec
 
-      **Issue mode**:
+      **Issue mode (GitHub)**:
 
       1. Validate the issue exists and has the `spec-ready` label:
          ```bash
@@ -62,6 +71,25 @@ states:
       3. Prepare implementation (add `doing` label, post start comment):
          ```bash
          python3 $SCRIPT_DIR/prepare_implementation.py {owner} {repo} {issue_number} {slug}
+         ```
+         Returns JSON with `branch_name`. Remember `branch_name` for later states.
+
+      **Issue mode (GitLab)**:
+
+      1. Validate the issue exists and has the `spec-ready` label:
+         ```bash
+         glab api "projects/$(echo {project_path} | python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read().strip(),safe=\"\"))')/issues/{iid}" --jq '[.labels[]]'
+         ```
+         If no `spec-ready` label, warn the user and ask if they want to proceed anyway.
+
+      2. Download spec artifacts from GitLab issue notes:
+         ```bash
+         python3 $SCRIPT_DIR/download_spec_gl.py {project_path} {iid} --slug {slug}
+         ```
+
+      3. Prepare implementation (add `doing` label, post start note):
+         ```bash
+         python3 $SCRIPT_DIR/prepare_implementation_gl.py {project_path} {iid} {slug}
          ```
          Returns JSON with `branch_name`. Remember `branch_name` for later states.
 
@@ -190,9 +218,9 @@ states:
 
       3. Repeat until all steps are complete or no more steps can be dispatched.
 
-      #### Issue mode additional steps
+      #### Issue mode additional steps (GitHub)
 
-      If `source_mode == "issue"`, also after each step is merged:
+      If `source_mode == "issue"` and `platform == "github"`, also after each step is merged:
 
       6. Push to remote:
          ```bash
@@ -206,6 +234,27 @@ states:
          - **Commit**: https://github.com/{owner}/{repo}/commit/{sha}
          - **Files changed**: <list of key files>
          - **Tests**: <count> added, all passing
+         ```
+
+      #### Issue mode additional steps (GitLab)
+
+      If `source_mode == "issue"` and `platform == "gitlab"`, also after each step is merged:
+
+      6. Push to remote:
+         ```bash
+         git push -u origin {branch_name}   # first push
+         git push                            # subsequent pushes
+         ```
+      7. Update the issue description checklist for each completed step via:
+         ```bash
+         glab issue update {iid} --description "<updated body>"
+         ```
+      8. Post a `[from bot]` progress note per step via:
+         ```bash
+         glab issue note {iid} --message "[from bot] Step N/M complete: <step title>
+         - **Commit**: {sha}
+         - **Files changed**: <list of key files>
+         - **Tests**: <count> added, all passing"
          ```
 
       Then proceed to the next wave. Repeat until all steps are complete.
@@ -370,9 +419,9 @@ states:
       If the workflow was started because the spec was missing, remind the user to run
       the spec-gen workflow (`/fflow spec-gen`) first.
 
-      ### Issue mode additional steps
+      ### Issue mode additional steps (GitHub)
 
-      If `source_mode == "issue"`, also:
+      If `source_mode == "issue"` and `platform == "github"`, also:
 
       1. Ensure all commits are pushed to remote:
          ```bash
@@ -404,5 +453,40 @@ states:
          gh issue edit {issue_number} --repo {owner}/{repo} --remove-label doing
          gh label create done --repo {owner}/{repo} --description "Implementation complete" --color 0E8A16 2>/dev/null || true
          gh issue edit {issue_number} --repo {owner}/{repo} --add-label done
+         ```
+
+      ### Issue mode additional steps (GitLab)
+
+      If `source_mode == "issue"` and `platform == "gitlab"`, also:
+
+      1. Ensure all commits are pushed to remote:
+         ```bash
+         git push
+         ```
+
+      2. Post the implementation summary as a `[from bot]` note on the issue:
+         ```bash
+         glab issue note {iid} --message "[from bot] ## implementation-summary.md
+
+         {full content of implementation-summary.md}
+
+         ---
+         **Branch**: \`{branch_name}\`
+         Ready for MR — run \`/mr\` to create a merge request."
+         ```
+
+      3. Write `./specs/<slug>/source-issue` containing the GitLab issue reference
+         (e.g., `project/path#42`) so that mr-lifecycle can link the MR to the issue.
+
+      4. Update the issue description's Summary section to reflect e2e results.
+         Re-read the current issue description via `glab api`, then update the
+         `### E2E Testing` subsection with the actual result. Update via:
+         ```bash
+         glab issue update {iid} --description "<updated description>"
+         ```
+
+      5. Remove `doing` label and add `done` label to the issue via glab api:
+         ```bash
+         glab api -X PUT "projects/{encoded_project_path}/issues/{iid}" -f "remove_labels=doing" -f "add_labels=done"
          ```
     transitions: {}
