@@ -23,8 +23,8 @@ import sys
 from urllib.parse import quote as url_quote
 
 
-def run(cmd: str) -> str:
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+def run(cmd: list[str]) -> str:
+    result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip())
     return result.stdout.strip()
@@ -85,10 +85,10 @@ def main() -> None:
 
     # 1. Create working branch (or switch to it if it already exists)
     try:
-        run(f"git checkout -b {branch_name}")
+        run(["git", "checkout", "-b", branch_name])
     except RuntimeError:
         try:
-            run(f"git checkout {branch_name}")
+            run(["git", "checkout", branch_name])
         except RuntimeError:
             # Already on this branch (e.g. in a worktree), continue
             pass
