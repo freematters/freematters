@@ -321,7 +321,7 @@ states:
 
       ### 2. Review (parallel sub-agents + aggregator)
 
-      Dispatch three review sub-agents **in parallel**, each reviewing `git diff <base>...HEAD`:
+      Dispatch four review sub-agents **in parallel**, each reviewing `git diff <base>...HEAD`:
 
       **Sub-agent A — Spec Compliance**
       > Read ./specs/<slug>/design.md and ./specs/<slug>/progress.md.
@@ -335,12 +335,16 @@ states:
       > Review for: edge cases, bugs, injection risks, secrets handling.
       > Run the full test suite and linter.
 
+      **Sub-agent D — Performance**
+      > Read your review instructions from: packages/freeflow/workflows/code-review/agents/performance.md
+      > Follow the instructions there.
+
       Each sub-agent classifies issues as:
       - 🔴 **Major** — must fix (bugs, security, spec violations)
       - 🟠 **Medium** — should fix (YAGNI/KISS, poor error handling, architectural issues)
       - 🟡 **Minor** — nice to fix but not blocking (style, naming)
 
-      Then dispatch an **aggregator sub-agent** to combine the three reports:
+      Then dispatch an **aggregator sub-agent** to combine the four reports:
 
       > Deduplicate overlapping findings. Resolve conflicting severities (use higher).
       > Produce a single report: verdict (PASS/FAIL), issues by severity, total counts.
