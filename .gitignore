@@ -5,4 +5,3 @@ dist/
 .fc-worktrees/
 .worktrees/
 docs/plans/
-specs/fflow-goto-output-truncated/
