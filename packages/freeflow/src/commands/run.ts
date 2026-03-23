@@ -612,15 +612,15 @@ async function runViaGateway(args: RunArgs): Promise<void> {
   });
 
   client.on("agent_output", (msg) => {
-    if (msg.content.startsWith("> ")) {
-      // User input replay — show in bright white
-      process.stdout.write(`\x1b[1;37m${msg.content}\x1b[0m`);
-    } else {
-      process.stdout.write(msg.content);
-    }
+    process.stdout.write(msg.content);
     if (!msg.stream) {
       process.stdout.write("\n");
     }
+  });
+
+  client.on("user_input", (msg) => {
+    // Replay of user input — show in bright white
+    process.stdout.write(`\x1b[1;37m> ${msg.input}\x1b[0m\n`);
   });
 
   client.on("state_changed", (msg) => {
