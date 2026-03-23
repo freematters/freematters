@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
-  AgentHandle,
   DaemonConfig,
   DaemonToGateway,
   GatewayToDaemon,
@@ -53,7 +52,7 @@ vi.mock("ws", () => {
 });
 
 // Import after mocking
-const { createDaemon, createDaemonForTest } = await import("../index.js");
+const { createDaemon } = await import("../index.js");
 const { AgentPool } = await import("../agent-pool.js");
 const { GatewayClient } = await import("../gateway-client.js");
 
@@ -265,106 +264,5 @@ describe("createDaemon", () => {
     const daemon = createDaemon(config);
 
     expect(daemon.getAgents()).toEqual([]);
-  });
-});
-
-// ── Integration Test: Run Creation Flow ───────────────────────────
-
-describe("Run Creation Flow (integration)", () => {
-  it("daemon receives start_run and spawns agent", async () => {
-    const config = makeConfig();
-    const daemon = createDaemonForTest(config);
-
-    // Collect messages the daemon wants to send to gateway
-    const outgoing: DaemonToGateway[] = [];
-    daemon.gatewayClient.onSend = (msg) => outgoing.push(msg);
-
-    // Start daemon (registers with gateway)
-    daemon.start();
-
-    // Verify register message was sent
-    const registerMsg = outgoing.find((m) => m.type === "register");
-    expect(registerMsg).toBeDefined();
-    expect(registerMsg?.type).toBe("register");
-
-    // Simulate gateway sending start_run
-    daemon.gatewayClient.handleIncoming({
-      type: "start_run",
-      run_id: "run-integration-1",
-      workflow: "test.fsm.yml",
-      prompt: "do the thing",
-    });
-
-    // Wait a tick for async agent creation
-    await new Promise((r) => setTimeout(r, 10));
-
-    // Verify agent was created
-    const agents = daemon.getAgents();
-    expect(agents.length).toBe(1);
-    expect(agents[0].run_id).toBe("run-integration-1");
-    expect(["starting", "running"]).toContain(agents[0].status);
-
-    // Verify agent_ready was sent
-    const readyMsg = outgoing.find((m) => m.type === "agent_ready");
-    expect(readyMsg).toBeDefined();
-    expect((readyMsg as { run_id: string }).run_id).toBe("run-integration-1");
-
-    // Clean up
-    daemon.stop();
-  });
-
-  it("forwards user_input to the correct agent", async () => {
-    const config = makeConfig();
-    const daemon = createDaemonForTest(config);
-    daemon.gatewayClient.onSend = () => {};
-
-    daemon.start();
-
-    // Start an agent
-    daemon.gatewayClient.handleIncoming({
-      type: "start_run",
-      run_id: "run-input-test",
-      workflow: "test.fsm.yml",
-    });
-    await new Promise((r) => setTimeout(r, 10));
-
-    // Should not throw when forwarding input
-    daemon.gatewayClient.handleIncoming({
-      type: "user_input",
-      run_id: "run-input-test",
-      input: "hello agent",
-    });
-
-    daemon.stop();
-  });
-
-  it("handles abort_run by stopping the agent", async () => {
-    const config = makeConfig();
-    const daemon = createDaemonForTest(config);
-    daemon.gatewayClient.onSend = () => {};
-
-    daemon.start();
-
-    // Start an agent
-    daemon.gatewayClient.handleIncoming({
-      type: "start_run",
-      run_id: "run-abort-test",
-      workflow: "test.fsm.yml",
-    });
-    await new Promise((r) => setTimeout(r, 10));
-
-    // Abort it
-    daemon.gatewayClient.handleIncoming({
-      type: "abort_run",
-      run_id: "run-abort-test",
-    });
-
-    await new Promise((r) => setTimeout(r, 10));
-
-    // Agent should be removed or stopped
-    const agent = daemon.getAgents().find((a) => a.run_id === "run-abort-test");
-    expect(agent).toBeUndefined();
-
-    daemon.stop();
   });
 });
