@@ -13,7 +13,7 @@ export function computeDiff(oldContent: string, newContent: string): string {
   const m = oldLines.length;
   const n = newLines.length;
 
-  // O(n) space LCS using two-row DP
+  // Two-row DP for LCS values (O(n) row space) + O(m×n) direction table for backtracking
   let prev = new Array<number>(n + 1).fill(0);
   let curr = new Array<number>(n + 1).fill(0);
 

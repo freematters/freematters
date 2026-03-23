@@ -572,7 +572,7 @@ export function createHttpHandler(
         const content = fs.readFileSync(entry.filePath, "utf-8");
         const responseData: Record<string, unknown> = {
           content,
-          filePath: entry.filePath,
+          fileName: path.basename(entry.filePath),
           readonly: entry.readonly,
         };
         if (defaultName) {
@@ -633,6 +633,10 @@ export function createHttpHandler(
               }
             }
 
+            if (typeof parsed.content !== "string") {
+              sendJson(res, 400, { error: "content must be a string" });
+              return;
+            }
             fs.writeFileSync(entry.filePath, parsed.content);
 
             if (gitOps) {

@@ -215,6 +215,9 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
         const data = result.data as { token: string; url: string };
         const filePath = params.filePath as string;
         const resolvedPath = path.resolve(filePath);
+        if (gitOpsMap.has(data.token)) {
+          return;
+        }
         fileWatcher.watch(resolvedPath, (changedPath: string, newContent: string) => {
           const contentHash = crypto
             .createHash("sha256")

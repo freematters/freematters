@@ -84,7 +84,7 @@ export function App() {
   const [copiedMd, setCopiedMd] = useState<boolean>(false);
   const [typingTrigger, setTypingTrigger] = useState<number>(0);
   const [showHelp, setShowHelp] = useState<boolean>(false);
-  const [filePath, setFilePath] = useState<string>("");
+  const [fileName, setFilePath] = useState<string>("");
   const [hoverLine, setHoverLine] = useState<number | null>(null);
   const [blameEntries, setBlameEntries] = useState<BlameEntry[]>([]);
   const [blameTooltip, setBlameTooltip] = useState<{
@@ -168,7 +168,7 @@ export function App() {
         mergeBaseRef.current = data.content;
         setDirty(false);
         setReadonly(data.readonly);
-        setFilePath(data.filePath);
+        setFilePath(data.fileName);
         if (data.readonlyToken) {
           setReadonlyToken(data.readonlyToken);
         }
@@ -1205,7 +1205,7 @@ export function App() {
         />
       )}
       {showHelp && token && (
-        <HelpPanel filePath={filePath} token={token} onClose={handleCloseHelp} />
+        <HelpPanel fileName={fileName} token={token} onClose={handleCloseHelp} />
       )}
       {conflictData !== null && (
         <div className="modal-overlay">

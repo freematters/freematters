@@ -289,7 +289,7 @@ describe("E2E Scenario 3: HTTP API Routes", () => {
     expect(res.statusCode).toBe(200);
     const data = JSON.parse(res.body);
     expect(data.content).toContain("# API Test");
-    expect(data.filePath).toBe(testFilePath);
+    expect(data.fileName).toBe(path.basename(testFilePath));
     expect(data.readonly).toBe(false);
   });
 

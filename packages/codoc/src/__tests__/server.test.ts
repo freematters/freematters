@@ -195,7 +195,7 @@ describe("HTTP Server", () => {
     expect(res.statusCode).toBe(200);
     const data = JSON.parse(res.body);
     expect(data.content).toContain("# Hello World");
-    expect(data.filePath).toBe(testFilePath);
+    expect(data.fileName).toBe(path.basename(testFilePath));
   });
 
   it("GET /api/file/:token should return 404 for unknown token", async () => {

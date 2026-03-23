@@ -15,7 +15,7 @@ async function runShare(file: string): Promise<void> {
   try {
     const response = await client.send({
       method: "share",
-      params: { filePath, readonly: true },
+      params: { filePath, readonly: false },
     });
     if (!response.ok) {
       console.error(`Error: ${response.error}`);

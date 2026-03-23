@@ -1,6 +1,6 @@
 export interface FileData {
   content: string;
-  filePath: string;
+  fileName: string;
   readonly: boolean;
   readonlyToken?: string;
 }

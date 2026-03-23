@@ -1,5 +1,5 @@
 interface HelpPanelProps {
-  filePath: string;
+  fileName: string;
   token: string;
   onClose: () => void;
 }
@@ -17,7 +17,7 @@ function CopyButton(props: { text: string }) {
 }
 
 export function HelpPanel(props: HelpPanelProps) {
-  const { filePath, token, onClose } = props;
+  const { fileName, token, onClose } = props;
 
   const baseUrl = window.location.origin;
   const editCmd = `bash <(curl -sf ${baseUrl}/codoc.sh) edit ${token} <author>`;
@@ -47,7 +47,7 @@ export function HelpPanel(props: HelpPanelProps) {
 
         <div className="help-section">
           <h3>Edit in Terminal (local)</h3>
-          <pre className="help-pre">{`vim ${filePath}`}</pre>
+          <pre className="help-pre">{`vim ${fileName}`}</pre>
         </div>
 
         <div className="help-section">
