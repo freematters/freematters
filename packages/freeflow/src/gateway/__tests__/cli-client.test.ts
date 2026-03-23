@@ -84,11 +84,8 @@ function createMockGateway(apiKey?: string): {
 
 describe("CLI --gateway and --api-key options", () => {
   test("RunArgs interface includes gateway and apiKey fields", async () => {
-    const mod = await import("../../commands/run.js");
-    // Verify the type exists by constructing a valid RunArgs object
-    const args: (typeof mod)["RunArgs"] extends never
-      ? never
-      : import("../../commands/run.js").RunArgs = {
+    // Type-level check: constructing a RunArgs with gateway fields compiles
+    const args: import("../../commands/run.js").RunArgs = {
       fsmPath: "test.yaml",
       root: "/tmp",
       json: false,
