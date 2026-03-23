@@ -30,8 +30,20 @@
 - **Tests**: 278 passing
 - **Notes**: Simpler than GitHub variant — REST PUT for thread resolution, native rebase API
 
+## Step 6: Create `gitlab-issue-to-mr` composition workflow
+- **Files changed**: `workflows/gitlab-issue-to-mr/workflow.yaml` (new)
+- **What was built**: End-to-end GitLab workflow composing `gitlab-spec-gen` + `spec-to-code` + `gitlab-mr-lifecycle`. 8 states: start, spec, decide, confirm-implement, implement, confirm-mr, submit-mr, done. Auto-detects GitLab hostname from git remote.
+- **Tests**: 309 passing (10 new composition tests)
+- **Notes**: Follows issue-to-pr pattern exactly, with glab CLI throughout
+
 ## Step 7: Modify `spec-to-code` for GitLab issue mode
 - **Files changed**: `workflows/spec-to-code/workflow.yaml` (modified), `download_spec_gl.py` (new), `prepare_implementation_gl.py` (new)
 - **What was built**: Platform detection in setup state, GitLab-specific sections in implement/done states, GitLab variants of download_spec and prepare_implementation scripts
 - **Tests**: 278 passing, no regression
 - **Notes**: GitHub issue mode preserved unchanged; GitLab mode uses `glab api` throughout
+
+## Step 8: Integration tests
+- **Files changed**: `src/__tests__/workflow-gitlab.test.ts` (new)
+- **What was built**: 31 integration tests covering all new/modified workflows: gitlab-spec-gen (6), gitlab-mr-lifecycle (4), gitlab-issue-to-mr composition (10), github-pr-lifecycle rename (3), issue-to-pr backward compat (5), research transition constraints (3)
+- **Tests**: 309 passing (31 new)
+- **Notes**: All FSM schema validation, composition expansion, and transition constraint tests pass

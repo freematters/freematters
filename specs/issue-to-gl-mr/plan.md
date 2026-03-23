@@ -19,9 +19,9 @@ graph LR
 - [x] Step 3: Create `poll_issue_gl.py` polling script
 - [x] Step 4: Create `gitlab-mr-lifecycle` workflow
 - [x] Step 5: Create `poll_mr_gl.py` polling script
-- [ ] Step 6: Create `gitlab-issue-to-mr` composition workflow
+- [x] Step 6: Create `gitlab-issue-to-mr` composition workflow
 - [x] Step 7: Modify `spec-to-code` for GitLab issue mode
-- [ ] Step 8: Integration tests
+- [x] Step 8: Integration tests
 
 ---
 
