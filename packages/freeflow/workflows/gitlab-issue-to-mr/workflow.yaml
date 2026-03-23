@@ -108,14 +108,13 @@ states:
          ```
       2. Verify the issue exists:
          ```bash
-         glab api "projects/$ENCODED_PATH/issues/$ISSUE_IID" --jq '.title' --hostname "$GITLAB_HOST"
+         glab api "projects/$ENCODED_PATH/issues/$ISSUE_IID" --hostname "$GITLAB_HOST" | jq -r '.title'
          ```
          If this fails, report the error and stop.
       3. Fetch issue context:
          ```bash
          glab api "projects/$ENCODED_PATH/issues/$ISSUE_IID" \
-           --jq '{title: .title, description: .description, creator: .author.username, labels: .labels}' \
-           --hostname "$GITLAB_HOST"
+           --hostname "$GITLAB_HOST" | jq '{title: .title, description: .description, creator: .author.username, labels: .labels}'
          ```
       4. Extract and remember: `project_path`, `issue_iid`, `issue_creator` = `.creator`.
       5. Derive `slug` from the issue title (lowercase, hyphens, no special chars).

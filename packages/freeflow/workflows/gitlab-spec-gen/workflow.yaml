@@ -71,7 +71,7 @@ guide: |
   2. Post the local file as an issue note and capture the note ID:
      ```bash
      NOTE_ID=$(glab api -X POST "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes" \
-       -f body=@"$ARTIFACTS/<filename>" --jq '.id')
+       -F body=@"$ARTIFACTS/<filename>" | jq -r '.id')
      ```
 
   3. Save the note ID to the tracking file:
@@ -91,7 +91,7 @@ guide: |
      ```bash
      NOTE_ID=$(jq -r '.["<filename>"]' "$IDS_FILE")
      glab api -X PUT "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes/$NOTE_ID" \
-       -f body=@"$ARTIFACTS/<filename>"
+       -F body=@"$ARTIFACTS/<filename>"
      ```
 
   Do NOT create new notes — always edit in place.
@@ -225,7 +225,7 @@ states:
 
       From the `glab issue create` output, extract and remember:
       - The **issue IID** (from the URL in the output, e.g., `https://gitlab.com/group/project/-/issues/42` -> issue IID is `42`)
-      - The **issue creator** username (run `glab api user --jq .username` to get the authenticated user's username, since the bot is creating the issue on behalf of the user)
+      - The **issue creator** username (run `glab api user | jq -r .username` to get the authenticated user's username, since the bot is creating the issue on behalf of the user)
 
       Report the issue URL to the user.
 

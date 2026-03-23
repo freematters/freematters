@@ -78,7 +78,7 @@ states:
 
       1. Validate the issue exists and has the `spec-ready` label:
          ```bash
-         glab api "projects/$(echo {project_path} | python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read().strip(),safe=\"\"))')/issues/{iid}" --jq '[.labels[]]'
+         glab api "projects/$(echo {project_path} | python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read().strip(),safe=\"\"))')/issues/{iid}" | jq '[.labels[]]'
          ```
          If no `spec-ready` label, warn the user and ask if they want to proceed anyway.
 

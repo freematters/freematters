@@ -186,9 +186,9 @@ states:
          Or use the API to get detailed job logs:
          ```bash
          # Get pipeline jobs
-         glab api "projects/<encoded_project>/merge_requests/<mr_iid>" --jq '.head_pipeline.id'
+         glab api "projects/<encoded_project>/merge_requests/<mr_iid>" | jq '.head_pipeline.id'
          # Then get failed jobs
-         glab api "projects/<encoded_project>/pipelines/<pipeline_id>/jobs" --jq '.[] | select(.status=="failed")'
+         glab api "projects/<encoded_project>/pipelines/<pipeline_id>/jobs" | jq '.[] | select(.status=="failed")'
          # Get job log
          glab api "projects/<encoded_project>/jobs/<job_id>/trace"
          ```
@@ -217,7 +217,7 @@ states:
       Before rebasing, wait 2 seconds and then check if the MR was already merged:
       ```bash
       sleep 2
-      glab api "projects/<encoded_project>/merge_requests/<mr_iid>" --jq '.state'
+      glab api "projects/<encoded_project>/merge_requests/<mr_iid>" | jq '.state'
       ```
       If the state is `merged` or `closed`, skip the rebase and transition to `MR merged`.
 
@@ -229,7 +229,7 @@ states:
          ```
          Wait a few seconds and check if rebase succeeded:
          ```bash
-         glab api "projects/<encoded_project>/merge_requests/<mr_iid>" --jq '.rebase_in_progress,.merge_error'
+         glab api "projects/<encoded_project>/merge_requests/<mr_iid>" | jq '.rebase_in_progress,.merge_error'
          ```
          If `rebase_in_progress` is false and no `merge_error`, the rebase succeeded.
 
