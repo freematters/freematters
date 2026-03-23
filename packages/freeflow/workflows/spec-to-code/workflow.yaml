@@ -43,14 +43,16 @@ states:
 
       Check the argument format to determine the source mode and platform:
 
-      - **GitLab issue mode**: The argument is a GitLab issue URL (contains `gitlab` in hostname)
-        or a `project/path#N` format where the project path contains more than one `/` segment
-        (e.g., `group/subgroup/project#42`), or the parent workflow has set `platform = "gitlab"`.
+      - **GitLab issue mode**: The argument is a GitLab issue URL (contains `gitlab` in hostname),
+        or the parent workflow has set `platform = "gitlab"`.
         Remember `source_mode = "issue"`, `platform = "gitlab"`, parse `project_path` and `iid`.
         Derive a concise `slug` from the issue title.
       - **GitHub issue mode**: The argument matches `owner/repo#N` (regex: `[\w.-]+/[\w.-]+#\d+`).
         Remember `source_mode = "issue"`, `platform = "github"`, parse `owner`, `repo`, `issue_number`.
         Derive a concise `slug` from the issue title — a short, meaningful identifier (lowercase letters, digits, and hyphens only).
+      - **Ambiguous `path#N` format**: If the argument matches `path#N` but is not a full URL,
+        check the git remote to disambiguate: `git remote get-url origin`. If it contains `gitlab`,
+        treat as GitLab issue mode. Otherwise treat as GitHub issue mode.
       - **Local mode**: Neither of the above. Remember `source_mode = "local"`. The argument is the spec directory path.
 
       ### 2. Load spec

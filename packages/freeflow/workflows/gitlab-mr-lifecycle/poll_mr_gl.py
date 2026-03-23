@@ -29,6 +29,10 @@ import urllib.parse
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+# Cache of note IDs that already have rocket emoji (handled).
+# Persists across poll cycles to avoid redundant API calls.
+_handled_note_cache: set[int] = set()
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -269,7 +273,9 @@ def find_unhandled_bot_mentions(
             if "@bot" not in body.lower():
                 continue
 
-            # Check for rocket emoji as dedup signal
+            # Check for rocket emoji as dedup signal (cached)
+            if note_id in _handled_note_cache:
+                continue
             emoji_data, _ = glab_api(
                 f"projects/{encoded}/merge_requests/{mr_iid}/notes/{note_id}/award_emoji",
                 hostname=hostname,
@@ -278,6 +284,7 @@ def find_unhandled_bot_mentions(
             if isinstance(emoji_data, list):
                 has_rocket = any(e.get("name") == "rocket" for e in emoji_data)
             if has_rocket:
+                _handled_note_cache.add(note_id)
                 continue
 
             mentions.append(BotMention(
