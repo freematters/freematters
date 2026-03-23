@@ -22,6 +22,7 @@ export type GatewayToClient =
   | { type: "run_created"; run_id: string }
   | { type: "run_started"; run_id: string; state: string }
   | { type: "agent_output"; run_id: string; content: string; stream?: boolean }
+  | { type: "user_input"; run_id: string; input: string }
   | { type: "state_changed"; run_id: string; from: string; to: string }
   | { type: "run_completed"; run_id: string; status: "completed" | "aborted" }
   | { type: "error"; run_id?: string; message: string };
@@ -89,6 +90,7 @@ const GATEWAY_TO_CLIENT_TYPES = new Set([
   "run_created",
   "run_started",
   "agent_output",
+  "user_input",
   "state_changed",
   "run_completed",
   "error",

@@ -13,6 +13,7 @@ type GatewayEventMap = {
   run_created: [Extract<GatewayToClient, { type: "run_created" }>];
   run_started: [Extract<GatewayToClient, { type: "run_started" }>];
   agent_output: [Extract<GatewayToClient, { type: "agent_output" }>];
+  user_input: [Extract<GatewayToClient, { type: "user_input" }>];
   state_changed: [Extract<GatewayToClient, { type: "state_changed" }>];
   run_completed: [Extract<GatewayToClient, { type: "run_completed" }>];
   error: [Extract<GatewayToClient, { type: "error" }>];
