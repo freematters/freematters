@@ -1,0 +1,252 @@
+# Issue-to-PR Lite — end-to-end pipeline from GitHub issue to merged pull request.
+#
+# Lite variant that uses github-spec-gen-lite for simplified design and plan
+# artifacts while keeping all other phases identical to issue-to-pr.
+#
+# Flow:
+#
+#   start --> spec (github-spec-gen-lite)
+#                  |
+#               decide
+#              /   |   \
+#        auto  ff   stop
+#          |    |      |
+#          |  confirm  done
+#          |  -implement
+#          |    |
+#          implement (spec-to-code)
+#               |
+#           confirm-pr
+#          (auto skips)
+#             /    \
+#        submit-pr  done
+#      (pr-lifecycle)
+#             |
+#           done
+
+version: 1.2
+extends_guide: ../github-spec-gen-lite/workflow.yaml
+guide: |
+  {{base}}
+
+  ### Issue-to-PR — Composition Guide
+
+  This workflow composes `github-spec-gen-lite`, `spec-to-code`, and `pr-lifecycle` into a
+  single end-to-end pipeline driven entirely through a GitHub issue.
+
+  #### Input Modes
+
+  The workflow accepts two input modes:
+  - **New idea**: The user provides a repo name and a rough idea description.
+    The `spec` sub-workflow will create a new issue and run the full spec-gen process.
+  - **Existing issue**: The user provides `owner/repo#N`. The `start` state fetches
+    the issue context and attaches to it, then hands off to `spec`.
+
+  #### Execution Modes
+
+  After the spec is complete, the user chooses an execution mode:
+  - **Full auto**: All gates are skipped. `spec-to-code` runs in fast-forward mode
+    (no intermediate approvals at setup). `confirm-pr` transitions directly to `submit-pr`.
+  - **Fast forward**: Gates pause for confirmation. The agent polls the issue for the
+    user's go-ahead before implementation and before PR submission.
+  - **Stop here**: The workflow ends after the spec is generated.
+
+  #### Agent Memory
+
+  You MUST remember these values across states (keep them in your conversation memory):
+  - `repo` — the `owner/repo` string (e.g., `freematters/testbed`)
+  - `issue_number` — the GitHub issue number
+  - `issue_creator` — the username of the issue creator
+  - `mode` — `full-auto` or `fast-forward` (set in `decide` state)
+  - `slug` — spec directory slug (derived from issue title)
+
+  #### Fast-Forward Propagation
+
+  When the user chose **fast-forward** mode:
+  - `github-spec-gen-lite` runs in fast-forward mode (user chose "fast forward" at requirements)
+  - Gate states (`confirm-implement`, `confirm-pr`) poll the issue for confirmation at 20s intervals
+
+  #### Full-Auto Propagation
+
+  When the user chose **full auto** mode:
+  - `github-spec-gen-lite` runs in fast-forward mode
+  - Gate states are skipped entirely (no polling)
+  - In `spec-to-code`'s setup state, select "fast forward" when prompted
+  - `confirm-pr` transitions directly to `submit-pr` without asking
+
+initial: start
+
+states:
+  start:
+    prompt: |
+      ## Detect Input Mode
+
+      Parse the user's prompt to determine the input mode:
+
+      ### Existing Issue (`owner/repo#N`)
+
+      If the input matches `owner/repo#N` (regex: `[\w.-]+/[\w.-]+#\d+`):
+
+      1. Parse `owner`, `repo`, and `issue_number` from the reference.
+      2. Verify the issue exists:
+         ```bash
+         gh api "repos/{owner}/{repo}/issues/{issue_number}" --jq '.title'
+         ```
+         If this fails (404), report the error and stop.
+      3. Fetch issue context:
+         ```bash
+         gh api "repos/{owner}/{repo}/issues/{issue_number}" \
+           --jq '{title: .title, body: .body, creator: .user.login, labels: [.labels[].name]}'
+         ```
+      4. Extract and remember: `repo` = `{owner}/{repo}`, `issue_number`, `issue_creator` = `.creator`.
+      5. Derive `slug` from the issue title (lowercase, hyphens, no special chars).
+      6. Transition to `proceed`.
+
+      ### New Idea
+
+      If the input is a rough idea with a repo name (not matching the issue pattern):
+
+      1. Extract the repo name from the user's prompt.
+      2. Remember `repo`.
+      3. Transition to `proceed` — the spec sub-workflow will create the issue.
+    transitions:
+      proceed: spec
+
+  spec:
+    workflow: ../github-spec-gen-lite/workflow.yaml
+    transitions:
+      completed: decide
+
+  decide:
+    prompt: |
+      ## Choose Execution Mode
+
+      The spec is complete. Read the spec artifacts from the local cache to get an overview:
+      ```bash
+      ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
+      ```
+      Read `$ARTIFACTS/requirements.md` and `$ARTIFACTS/design.md` for a brief summary.
+
+      Post a comment on the issue asking the user to choose an execution mode:
+
+      ```
+      [bot reply] ## Spec Complete!
+
+      The spec is ready. How would you like to proceed?
+
+      1. **Full auto** -- implement the spec and submit a PR without any human approvals.
+         Spec-to-code runs in fast-forward mode and PR submission starts automatically.
+      2. **Fast forward** -- proceed to implementation, but pause before starting and before
+         creating the PR for your confirmation.
+      3. **Stop here** -- keep the spec artifacts and end the workflow.
+
+      Reply with your choice (1, 2, or 3).
+      ```
+
+      Poll for the user's reply using the polling pattern from the guide.
+
+      When you receive a reply from the issue creator:
+      - If they choose 1 (full auto): remember `mode = "full-auto"`, transition to `full auto`
+      - If they choose 2 (fast forward): remember `mode = "fast-forward"`, transition to `fast forward`
+      - If they choose 3 (stop here): transition to `stop here`
+
+      You MUST NOT proceed without the user's explicit choice via an issue comment.
+    transitions:
+      full auto: implement
+      fast forward: confirm-implement
+      stop here: done
+
+  confirm-implement:
+    prompt: |
+      ## Confirm Implementation
+
+      This gate is reached in fast-forward mode. Post a confirmation request on the issue:
+
+      ```
+      [bot reply] ## Ready to Implement
+
+      The spec is complete and ready for implementation. I'll:
+      - Download the spec artifacts
+      - Create a feature branch
+      - Implement each plan step with TDD
+      - Run e2e tests and code review
+
+      Reply **go** to start implementation, or **stop** to end the workflow here.
+      ```
+
+      Poll for the user's reply using the polling pattern from the guide (20s interval).
+
+      When you receive a reply from the issue creator:
+      - If they approve (e.g., "go", "yes", "proceed"): transition to `approved`
+      - If they want to stop (e.g., "stop", "no"): transition to `stop here`
+    transitions:
+      approved: implement
+      stop here: done
+
+  implement:
+    workflow: ../spec-to-code/workflow.yaml
+    transitions:
+      completed: confirm-pr
+
+  confirm-pr:
+    prompt: |
+      ## Confirm PR Submission
+
+      Implementation is complete. Read `./specs/{slug}/implementation-summary.md` and present
+      the key results.
+
+      Post the implementation summary on the issue:
+
+      ```
+      [bot reply] ## Implementation Complete
+
+      {brief summary of what was implemented}
+
+      **Steps completed**: {N}/{N}
+      **Tests**: {total tests added}, all passing
+      **Branch**: `{branch_name}`
+      ```
+
+      **Full auto mode** (`mode == "full-auto"`): Transition directly to `submit pr` without
+      asking the user. Do NOT poll.
+
+      **Fast forward mode** (`mode == "fast-forward"`): Add to the comment:
+
+      ```
+      Ready to create a pull request. Reply **submit** to proceed, or **stop** to end here.
+      ```
+
+      Poll for the user's reply using the polling pattern from the guide.
+
+      When you receive a reply from the issue creator:
+      - If they approve (e.g., "submit", "yes", "go"): transition to `submit pr`
+      - If they want to stop (e.g., "stop", "no"): transition to `stop here`
+    transitions:
+      submit pr: submit-pr
+      stop here: done
+
+  submit-pr:
+    workflow: ../pr-lifecycle/workflow.yaml
+    transitions:
+      completed: done
+
+  done:
+    prompt: |
+      ## Workflow Complete
+
+      Post a final summary comment on the issue:
+
+      ```
+      [bot reply] ## Issue-to-PR Complete
+
+      **Phases completed**: {list phases: spec / spec + implementation / spec + implementation + PR}
+      **Artifacts**: {list key artifacts produced}
+      **PR**: {PR URL if applicable, otherwise "N/A"}
+      **Mode**: {full-auto / fast-forward}
+      ```
+
+      If the workflow stopped early (e.g., after spec only), suggest the next manual step
+      the user can take (e.g., "run `/spec-to-code` with `owner/repo#N` to implement").
+
+      Present the final summary to the user.
+    transitions: {}
