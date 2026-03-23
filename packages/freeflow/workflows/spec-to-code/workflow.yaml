@@ -155,7 +155,6 @@ states:
          >
          > 1. Read this step's **Related Files** from plan.md — these are files
          >    to modify or useful for your understanding of the codebase.
-         >    Files marked as "reference" ALREADY EXIST — import from them, do NOT recreate.
          > 2. Read this step's **Test Requirements** from plan.md — these are the
          >    specific test cases assigned to this step. Write failing tests for them (RED).
          >    You MAY add extra tests beyond the listed requirements if you discover
