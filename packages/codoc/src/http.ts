@@ -120,8 +120,10 @@ const GIT_FILE_NAME = "doc.md";
 const GIT_HASH_REGEX = /^[a-f0-9]+$/;
 
 function getApiBase(req: http.IncomingMessage): string {
-  const protocol = req.headers["x-forwarded-proto"] ?? "http";
-  const host = req.headers.host ?? "localhost";
+  const rawProto = String(req.headers["x-forwarded-proto"] ?? "http");
+  const protocol = rawProto === "https" ? "https" : "http";
+  const rawHost = String(req.headers.host ?? "localhost");
+  const host = /^[a-zA-Z0-9._:\[\]-]+$/.test(rawHost) ? rawHost : "localhost";
   return `${protocol}://${host}`;
 }
 

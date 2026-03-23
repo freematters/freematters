@@ -27,7 +27,7 @@ npm install -g @freematters/codoc
 codoc install claude
 ```
 
-See [packages/codoc/AGENTS.md](packages/codoc/AGENTS.md) for full documentation.
+See [packages/codoc/README.md](packages/codoc/README.md) for full documentation.
 
 ## Development
 

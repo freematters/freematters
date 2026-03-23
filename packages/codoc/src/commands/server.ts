@@ -5,6 +5,7 @@ import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { ScriptCallback } from "../callback.js";
 import {
@@ -345,7 +346,7 @@ async function runServer(): Promise<void> {
 
   if (!alreadyRunning && process.env.CODOC_DAEMON !== "1") {
     const cliPath = path.resolve(
-      path.dirname(import.meta.url.replace("file://", "")),
+      path.dirname(fileURLToPath(import.meta.url)),
       "..",
       "cli.js",
     );

@@ -28,7 +28,7 @@ Create `~/.codoc/config.json` before first use. `tunnel` is required — no defa
 }
 ```
 
-Set `tunnel` to `"cloudflare"` (expose via Cloudflare Tunnel, auto-downloads `cloudflared`) or `null` (local only). Add `"callbackScript": "command"` to run a shell command on every save.
+Set `tunnel` to `"cloudflare"` (expose via Cloudflare Tunnel, auto-downloads `cloudflared`) or `null` (local only). Add `"callbackScript": "command"` to run a shell command on every save. **Security note:** `callbackScript` is executed as a raw shell command via `/bin/sh -c`. Protect `~/.codoc/config.json` with appropriate file permissions (`chmod 600`).
 
 ### From source
 

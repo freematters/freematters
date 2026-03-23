@@ -19,13 +19,9 @@ export class TokenStore {
   private tokens: Map<string, TokenEntry>;
   private fileToToken: Map<string, string>;
   private primaryPath: string;
-  private fallbackPath: string;
-  private activePath: string;
 
   constructor(primaryPath: string) {
     this.primaryPath = primaryPath;
-    this.fallbackPath = path.join(process.cwd(), ".codoc", "tokens.json");
-    this.activePath = primaryPath;
     this.tokens = new Map();
     this.fileToToken = new Map();
     this.load();
@@ -116,35 +112,14 @@ export class TokenStore {
 
   private load(): void {
     this.loadFrom(this.primaryPath);
-    if (this.fallbackPath !== this.primaryPath) {
-      this.loadFrom(this.fallbackPath);
-    }
-  }
-
-  private tryWrite(filePath: string, data: string): boolean {
-    try {
-      const dir = path.dirname(filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      fs.writeFileSync(filePath, data);
-      return true;
-    } catch {
-      return false;
-    }
   }
 
   private save(): void {
+    const dir = path.dirname(this.primaryPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
     const data = JSON.stringify(Array.from(this.tokens.values()), null, 2);
-    if (this.tryWrite(this.activePath, data)) {
-      return;
-    }
-    if (
-      this.activePath !== this.fallbackPath &&
-      this.tryWrite(this.fallbackPath, data)
-    ) {
-      this.activePath = this.fallbackPath;
-      return;
-    }
+    fs.writeFileSync(this.primaryPath, data);
   }
 }

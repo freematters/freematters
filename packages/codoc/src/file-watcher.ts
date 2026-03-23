@@ -48,17 +48,11 @@ export class FileWatcher {
   }
 
   addOneTimeListener(filePath: string, callback: FileChangeCallback): void {
-    const existing = this.watchers.get(filePath);
-    if (!existing) {
-      this.watch(filePath, callback);
-      return;
-    }
-
     const wrappedCallback: FileChangeCallback = (fp: string, content: string) => {
       this.removeCallback(filePath, wrappedCallback);
       callback(fp, content);
     };
-    existing.callbacks.push(wrappedCallback);
+    this.watch(filePath, wrappedCallback);
   }
 
   removeCallback(filePath: string, callback: FileChangeCallback): void {

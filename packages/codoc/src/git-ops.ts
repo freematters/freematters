@@ -209,11 +209,12 @@ function parseBlameOutput(output: string): BlameEntry[] {
     }
 
     if (line.startsWith("\t")) {
-      const author = authorMap.get(currentHash) ?? currentAuthor;
-      pushOrMerge(entries, currentHash, author, currentLineStart, currentLineStart);
-      currentHash = "";
-      currentAuthor = "";
+      continue;
     }
+  }
+
+  if (currentHash && currentLineStart > 0) {
+    pushOrMerge(entries, currentHash, currentAuthor, currentLineStart, currentLineEnd);
   }
 
   return entries;
