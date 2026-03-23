@@ -15,7 +15,7 @@ function fixture(name: string): string {
 // --- Mixed workflow YAML: plan (normal) -> execute (subagent) -> done ---
 
 const MIXED_SUBAGENT_FSM = `
-version: 1
+version: 1.3
 guide: "Mixed subagent workflow"
 initial: plan
 states:

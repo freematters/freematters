@@ -101,6 +101,10 @@ function resolveRefs(
       fail(`state "${name}": "from" must be a non-empty string`);
     }
 
+    if (doc.version !== 1.1 && doc.version !== 1.2 && doc.version !== 1.3) {
+      fail(`state "${name}": "from" requires version 1.1 or higher`);
+    }
+
     const { workflowRef, stateRef } = parseFromRef(name, state.from);
 
     // Resolve the workflow path, handling relative paths from the current file's directory
@@ -186,6 +190,10 @@ function resolveExtendsGuide(
 
   if (typeof doc.extends_guide !== "string" || doc.extends_guide.length === 0) {
     fail(`"extends_guide" must be a non-empty string`);
+  }
+
+  if (doc.version !== 1.1 && doc.version !== 1.2 && doc.version !== 1.3) {
+    fail(`"extends_guide" requires version 1.1 or higher`);
   }
 
   const workflowRef = doc.extends_guide as string;
@@ -283,7 +291,7 @@ function resolveWorkflowStates(
     if (state.transitions === undefined || state.transitions === null) {
       fail(`state "${stateName}": "workflow" states must have "transitions"`);
     }
-    if (doc.version !== 1.2) {
+    if (doc.version !== 1.2 && doc.version !== 1.3) {
       fail(`state "${stateName}": "workflow" requires version 1.2 or higher`);
     }
 
@@ -421,8 +429,13 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
   resolveExtendsGuide(obj, absPath, visited);
 
   // Top-level required fields
-  if (obj.version !== 1 && obj.version !== 1.1 && obj.version !== 1.2) {
-    fail(`"version" must be 1, 1.1, or 1.2, got ${JSON.stringify(obj.version)}`);
+  if (
+    obj.version !== 1 &&
+    obj.version !== 1.1 &&
+    obj.version !== 1.2 &&
+    obj.version !== 1.3
+  ) {
+    fail(`"version" must be 1, 1.1, 1.2, or 1.3, got ${JSON.stringify(obj.version)}`);
   }
 
   if (
@@ -562,6 +575,9 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
     if (s.subagent !== undefined && s.subagent !== null) {
       if (typeof s.subagent !== "boolean") {
         fail(`state "${name}": "subagent" must be a boolean`);
+      }
+      if (obj.version !== 1.3) {
+        fail(`state "${name}": "subagent" requires version 1.3 or higher`);
       }
       states[name].subagent = s.subagent;
     }

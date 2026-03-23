@@ -1,6 +1,6 @@
 ---
-name: fflow-create
-description: Create FreeFlow workflow file.
+name: fflow-author
+description: Create or edit FreeFlow workflow files.
 ---
 
 # Create Workflow
@@ -125,51 +125,13 @@ This ensures the markdown renders correctly when the workflow is converted to `.
 
 ## Workflow Reuse
 
-Workflows can reuse states and guides from other workflow YAMLs. When the user wants to
-build on an existing workflow or share structure across workflows, use these features.
-
-### State-level reuse (`from:`)
-
-A state can inherit from another workflow's state using `from: <workflow-path>#<state-name>`:
-
-```yaml
-states:
-  start:
-    from: "./base.workflow.yaml#start"
-```
-
-This copies the base state's `prompt`, `todos`, and `transitions` into the child state.
-The child can override any field alongside `from:`:
-
-- **prompt**: if child prompt contains `{{base}}`, it's replaced with the base prompt; otherwise the child prompt fully replaces it
-- **transitions**: child transitions are merged on top of base transitions (child wins on conflict)
-- **todos**: child todos fully replace base todos; omit to inherit base todos as-is
-- **append_todos**: appends items after inherited (or overridden) todos — use when you want to keep base todos and add more
-
-### Guide reuse (`extends_guide:`)
-
-A workflow can extend another workflow's `guide` field:
-
-```yaml
-extends_guide: ./base.workflow.yaml
-guide: |
-  {{base}}
-  Extra child rules.
-```
-
-If the child guide contains `{{base}}`, it's replaced with the base guide; otherwise the
-child guide fully replaces it. Omitting the local `guide` field inherits the base guide as-is.
-
-### Resolution rules
-
-- Paths are resolved relative to the referencing file
-- Circular references are detected at load time and raise `SCHEMA_INVALID`
-- Chained reuse (A → B → C) is supported
-- Reuse is resolved transparently — downstream commands see a fully flattened FSM
+When the user wants to build on an existing workflow or share structure across workflows,
+read `composability.md` (in this skill directory) for full syntax
+and merge rules for `from:`, `extends_guide`, `workflow:`, and `subagent:`.
 
 ## Internal Validation Checklist (do not expose unless asked)
 
-- `version: 1` or `version: 1.1` (use 1.1 when using `append_todos`)
+- `version: 1.3` (always use latest version)
 - `guide` is present and contains cross-cutting rules
 - one valid `initial` state exists
 - terminal `done` state exists with `transitions: {}`

@@ -48,7 +48,7 @@ fflow install claude
 
 FreeFlow is typically used through these skills:
 
-- `/fflow-create` — guided Q&A to create a workflow YAML
+- `/fflow-author` — guided Q&A to create or edit a workflow YAML
 - `/fflow <path>` — start a workflow run (also searches `./workflows/` by name)
 - `/fflow:e2e-run` — run e2e agent tests
 

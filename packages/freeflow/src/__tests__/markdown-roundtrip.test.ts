@@ -217,7 +217,7 @@ describe("markdown round-trip integration", () => {
 
       // Create a YAML child that references the MD base
       const childYaml = [
-        "version: 1",
+        "version: 1.1",
         "initial: start",
         "states:",
         "  start:",
