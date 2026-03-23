@@ -68,7 +68,7 @@ describe("gateway CLI subcommand", () => {
       });
 
       expect(createGatewayServer).toHaveBeenCalledWith(
-        expect.objectContaining({ apiKey: "my-secret-key" }),
+        expect.objectContaining({ api_keys: ["my-secret-key"] }),
       );
     });
 
@@ -76,7 +76,7 @@ describe("gateway CLI subcommand", () => {
       await gateway({ storeRoot: "/custom/root" });
 
       expect(createGatewayServer).toHaveBeenCalledWith(
-        expect.objectContaining({ storeRoot: "/custom/root" }),
+        expect.objectContaining({ store_root: "/custom/root" }),
       );
     });
   });
@@ -86,8 +86,8 @@ describe("gateway CLI subcommand", () => {
       await gateway({ storeRoot: "/tmp/test-store" });
 
       const call = vi.mocked(createGatewayServer).mock.calls[0][0];
-      expect(call.apiKey).toBeDefined();
-      expect(call.apiKey.length).toBeGreaterThan(0);
+      expect(call.api_keys).toBeDefined();
+      expect(call.api_keys.length).toBeGreaterThan(0);
     });
 
     test("prints generated API key to stderr", async () => {

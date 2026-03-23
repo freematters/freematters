@@ -19,7 +19,14 @@ export async function gateway(opts: GatewayCliOptions): Promise<() => Promise<vo
   const apiKey = opts.apiKey ?? randomUUID();
   const storeRoot = opts.storeRoot;
 
-  const config: GatewayConfig = { port, host, apiKey, storeRoot };
+  const config: GatewayConfig = {
+    port,
+    host,
+    api_keys: [apiKey],
+    store_root: storeRoot,
+    max_concurrent_runs: 20,
+    idle_timeout_ms: 3600000,
+  };
   const server = createGatewayServer(config);
 
   await server.start();

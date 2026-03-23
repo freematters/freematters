@@ -29,7 +29,8 @@ function buildProgram(mockDaemon?: Daemon): {
 // ── Tests ────────────────────────────────────────────────────────
 
 describe("fflow daemon CLI", () => {
-  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  // biome-ignore lint: test mock typing
+  let stderrSpy: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -120,16 +121,19 @@ describe("fflow daemon CLI", () => {
       "ws://localhost:8080",
     ]);
 
-    const output = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    const output = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("");
     expect(output).toContain("ws://localhost:8080");
   });
 });
 
 describe("graceful shutdown", () => {
   let listeners: Map<string, (...args: unknown[]) => void>;
-  let processOnSpy: ReturnType<typeof vi.spyOn>;
-  let processExitSpy: ReturnType<typeof vi.spyOn>;
-  let stderrSpy: ReturnType<typeof vi.spyOn>;
+  // biome-ignore lint: test mock typing
+  let processOnSpy: any;
+  // biome-ignore lint: test mock typing
+  let processExitSpy: any;
+  // biome-ignore lint: test mock typing
+  let stderrSpy: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
