@@ -12,7 +12,6 @@ interface ClientInfo {
   subscribedRun?: string;
 }
 
-
 export class Router {
   private daemons = new Map<string, DaemonInfo>();
   private clients = new Map<string, ClientInfo>();
