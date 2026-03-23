@@ -23,3 +23,9 @@
 - **What was built**: Daemon process with GatewayClient (WebSocket connection, registration, message passing), AgentPool (lifecycle management, capacity enforcement, input queuing), and createDaemon factory
 - **Tests**: 14 tests added (gateway client, agent pool, daemon factory, integration), all passing
 - **Notes**: None — no spec deviations
+
+## Step 5: Extend CLI with --gateway Support
+- **Files changed**: `packages/freeflow/src/gateway/cli-client.ts` (created), `packages/freeflow/src/commands/run.ts` (modified), `packages/freeflow/src/cli.ts` (modified), `packages/freeflow/src/gateway/__tests__/cli-client.test.ts` (created)
+- **What was built**: GatewayCliClient with EventEmitter-based typed events, WebSocket connection, create/input/abort methods, reconnection logic. CLI run command extended with --gateway and --api-key options
+- **Tests**: 13 tests added (CLI options, connection/auth, input forwarding, message handling, user input routing integration, reconnection), all passing
+- **Notes**: None — no spec deviations
