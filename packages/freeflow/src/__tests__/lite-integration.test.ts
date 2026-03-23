@@ -17,12 +17,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { RunMeta, Snapshot } from "../store.js";
 import { Store } from "../store.js";
 import { runCli, runCliJson } from "./e2e/helpers.js";
-import {
-  MINIMAL_FSM,
-  MULTI_FSM,
-  cleanupTempDir,
-  createTempDir,
-} from "./fixtures.js";
+import { MINIMAL_FSM, MULTI_FSM, cleanupTempDir, createTempDir } from "./fixtures.js";
 
 let tmp: string;
 let fsmMulti: string;
@@ -177,4 +172,3 @@ describe("Non-lite round-trip: all full cards", () => {
     expect(gotoBack.stdout).not.toContain("Re-entering");
   });
 });
-

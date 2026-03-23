@@ -102,8 +102,7 @@ describe("markdown round-trip integration", () => {
 
       assertFsmEqual(roundTripped, original);
     });
-
-});
+  });
 
   describe("MD -> YAML -> MD", () => {
     test("simple markdown workflow", () => {
@@ -118,8 +117,7 @@ describe("markdown round-trip integration", () => {
 
       assertFsmEqualStrict(roundTripped, original);
     });
-
-});
+  });
 
   describe("cross-format from: references", () => {
     test("markdown workflow inheriting from YAML base", () => {

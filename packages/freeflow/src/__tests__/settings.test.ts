@@ -29,7 +29,6 @@ describe("loadSettings", () => {
     const result = loadSettings(root);
     expect(result).toEqual({});
   });
-
 });
 
 describe("isHookEnabled", () => {
@@ -38,5 +37,4 @@ describe("isHookEnabled", () => {
     mkdirSync(root, { recursive: true });
     expect(isHookEnabled(root, "postToolUse")).toBe(false);
   });
-
 });

@@ -76,7 +76,6 @@ describe("Store — commit", () => {
     );
     expect(event.metadata).toEqual({ key: "value" });
   });
-
 });
 
 describe("Store — readEvents", () => {

@@ -30,7 +30,6 @@ describe("Store — gateway fields on RunMeta", () => {
     expect(readBack.client_id).toBe("cli-456");
     expect(readBack.daemon_id).toBe("dmn-789");
   });
-
 });
 
 describe("Store — updateGatewayInfo", () => {
@@ -49,5 +48,4 @@ describe("Store — updateGatewayInfo", () => {
     expect(meta.client_id).toBe("cli-new");
     expect(meta.daemon_id).toBe("dmn-new");
   });
-
 });

@@ -1,10 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { FsmState } from "../fsm.js";
-import {
-  type StateCard,
-  formatSubagentDispatch,
-  stateCardFromFsm,
-} from "../output.js";
+import { type StateCard, formatSubagentDispatch, stateCardFromFsm } from "../output.js";
 
 function makeCard(overrides: Partial<StateCard> = {}): StateCard {
   return {

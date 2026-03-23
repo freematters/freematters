@@ -166,5 +166,4 @@ describe("validate all bundled workflows", () => {
       expect(fsm.states.done).toBeDefined();
     }
   });
-
 });

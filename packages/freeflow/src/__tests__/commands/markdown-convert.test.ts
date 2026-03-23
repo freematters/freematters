@@ -146,5 +146,4 @@ describe("markdown convert command", () => {
     expect(envelope.ok).toBe(true);
     expect(envelope.data).toHaveProperty("output_path");
   });
-
 });

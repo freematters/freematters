@@ -2,13 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  test,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import WebSocket from "ws";
 import { Router } from "../router.js";
 import { createGatewayServer } from "../server.js";

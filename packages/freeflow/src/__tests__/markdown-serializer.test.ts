@@ -117,5 +117,4 @@ describe("serializeMarkdown", () => {
     );
     expect(between).toContain("---");
   });
-
 });

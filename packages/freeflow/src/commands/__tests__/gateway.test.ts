@@ -74,5 +74,4 @@ describe("gateway command", () => {
 
     await shutdown();
   });
-
 });

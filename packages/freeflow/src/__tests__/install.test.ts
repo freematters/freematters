@@ -81,7 +81,6 @@ describeCodex("install codex", () => {
     expect(lstatSync(target).isSymbolicLink()).toBe(true);
     expect(readlinkSync(target)).toBe(join(PACKAGE_ROOT, "skills"));
   });
-
 });
 
 // ─── Claude install ─────────────────────────────────────────────
@@ -126,7 +125,6 @@ describeClaude("install claude", () => {
     expect(installed.plugins["freeflow@freeflow-local"]).toBeDefined();
     expect(installed.plugins["freeflow@freeflow-local"].length).toBeGreaterThan(0);
   });
-
 });
 
 // ─── End-to-end workflow ────────────────────────────────────────
