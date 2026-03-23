@@ -110,6 +110,18 @@ states:
       to cover, what setup the executor needs, and whether e2e is worth it for this feature
       (it's slow — two agent sessions per run). Record decisions in requirements.md.
 
+      **CRITICAL: If the user requires e2e tests, this is a hard constraint on the entire spec.**
+      E2E tests are the primary way humans review the feature — they will NOT read all the code.
+      When e2e is required, you MUST ensure the subsequent design and plan produce an implementation
+      where the e2e test plan is actually runnable after spec-to-code completes. This means:
+      - The design MUST include any CLI commands, server processes, or setup steps needed to
+        exercise the feature end-to-end.
+      - The plan MUST include implementation steps for ALL components referenced in the e2e
+        scenarios — if the e2e plan says "run `fflow foo`", then `fflow foo` must be a plan step.
+      - E2E tests are NOT skippable. If e2e is required in requirements, it is a blocking
+        acceptance criterion. A feature that passes unit tests but has no runnable e2e test
+        is incomplete.
+
       When you believe you have enough clarity on goals, constraints, and verification criteria,
       present a brief summary of what you've captured and ask the user:
       - "Revise requirements" — revisit and refine what we have → requirements
@@ -209,6 +221,12 @@ states:
          3. User does Z
          4. **Verify:** expected side effect
          ```
+         **CRITICAL**: If e2e testing was required in requirements, every command, process,
+         or API referenced in the e2e scenarios MUST be covered by a component in the design.
+         If the e2e scenario says "start server X" or "run command Y", then X and Y must
+         appear as designed components with clear interfaces. Do NOT reference commands or
+         features that are not part of the design — this guarantees the plan will include
+         implementation steps for everything the e2e test needs to run.
       8. **Error Handling** — failure modes, recovery strategies, and degradation behavior
 
       Constraints:
@@ -303,6 +321,13 @@ states:
 
       E2E testing is handled by the e2e-gen state after plan approval — do NOT add
       an e2e step to plan.md.
+
+      **CRITICAL: E2E completeness check.** If design.md has an E2E Testing section,
+      verify that EVERY command, server process, or setup step referenced in the e2e
+      scenarios has a corresponding implementation step in the plan. If the e2e scenario
+      says "run `fflow foo`", there must be a plan step that implements `fflow foo`.
+      Missing steps mean the e2e test will be unrunnable after implementation — add
+      the missing steps before presenting the plan to the user.
 
       Constraints:
       - Each step should be a complete module or logical unit, not a thin slice.

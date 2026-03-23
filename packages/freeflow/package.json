@@ -29,6 +29,7 @@
     "remark-frontmatter": "^5.0.0",
     "remark-parse": "^11.0.0",
     "unified": "^11.0.5",
+    "ws": "^8.20.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
@@ -37,6 +38,7 @@
     "@types/marked-terminal": "^6.1.1",
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
     "esbuild": "^0.27.3",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0",
