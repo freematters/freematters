@@ -1,0 +1,298 @@
+# GitLab Issue-to-MR — end-to-end pipeline from GitLab issue to merged merge request.
+#
+# Flow:
+#
+#   start ──> spec (gitlab-spec-gen)
+#                  |
+#               decide
+#              /   |   \
+#        auto  ff   stop
+#          |    |      |
+#          |  confirm  done
+#          |  -implement
+#          |    |
+#          implement (spec-to-code)
+#               |
+#           confirm-mr
+#          (auto skips)
+#             /    \
+#        submit-mr  done
+#      (gitlab-mr-lifecycle)
+#             |
+#           done
+
+version: 1.2
+extends_guide: ../gitlab-spec-gen/workflow.yaml
+guide: |
+  {{base}}
+
+  ### Issue-to-MR — Composition Guide
+
+  This workflow composes `gitlab-spec-gen`, `spec-to-code`, and `gitlab-mr-lifecycle` into a
+  single end-to-end pipeline driven entirely through a GitLab issue.
+
+  #### Input Modes
+
+  The workflow accepts two input modes:
+  - **New idea**: The user provides a project path and a rough idea description.
+    The `spec` sub-workflow will create a new issue and run the full spec-gen process.
+  - **Existing issue**: The user provides a GitLab issue URL or `project/path#N`. The `start`
+    state fetches the issue context and attaches to it, then hands off to `spec`.
+
+  #### Execution Modes
+
+  After the spec is complete, the user chooses an execution mode:
+  - **Full auto**: All gates are skipped. `spec-to-code` runs in fast-forward mode
+    (no intermediate approvals at setup). `confirm-mr` transitions directly to `submit-mr`.
+  - **Fast forward**: Gates pause for confirmation. The agent polls the issue for the
+    user's go-ahead before implementation and before MR submission.
+  - **Stop here**: The workflow ends after the spec is generated.
+
+  #### Agent Memory
+
+  You MUST remember these values across states (keep them in your conversation memory):
+  - `project_path` — the full GitLab project path (e.g., `group/project` or `group/subgroup/project`)
+  - `gitlab_url` — the GitLab instance URL (e.g., `https://gitlab.corp.metabit-trading.com`)
+  - `issue_iid` — the GitLab issue IID (project-scoped)
+  - `issue_creator` — the username of the issue creator
+  - `mode` — `full-auto` or `fast-forward` (set in `decide` state)
+  - `slug` — spec directory slug (derived from issue title)
+
+  #### Fast-Forward Propagation
+
+  When the user chose **fast-forward** mode:
+  - `gitlab-spec-gen` runs in fast-forward mode (user chose "fast forward" at requirements)
+  - Gate states (`confirm-implement`, `confirm-mr`) poll the issue for confirmation at 20s intervals
+
+  #### Full-Auto Propagation
+
+  When the user chose **full auto** mode:
+  - `gitlab-spec-gen` runs in fast-forward mode
+  - Gate states are skipped entirely (no polling)
+  - In `spec-to-code`'s setup state, select "fast forward" when prompted
+  - `confirm-mr` transitions directly to `submit-mr` without asking
+
+initial: start
+
+states:
+  start:
+    prompt: |
+      ## Detect Input Mode
+
+      Parse the user's prompt to determine the input mode.
+
+      ### Detect GitLab Hostname
+
+      Auto-detect the GitLab hostname from the current git remote:
+      ```bash
+      GITLAB_HOST=$(git remote get-url origin | sed -n 's|.*://\([^/]*\)/.*|\1|p; s|.*@\([^:]*\):.*|\1|p')
+      ```
+      Remember `gitlab_url = "https://$GITLAB_HOST"`.
+
+      ### Existing Issue (GitLab URL or `project/path#N`)
+
+      If the input is a GitLab issue URL (e.g., `https://gitlab.example.com/group/project/-/issues/42`):
+
+      1. Parse `project_path` and `issue_iid` from the URL.
+      2. Extract hostname from the URL for `gitlab_url`.
+
+      If the input matches `project/path#N` (a path with at least one `/` followed by `#` and a number):
+
+      1. Parse `project_path` and `issue_iid` from the reference.
+
+      For either pattern:
+
+      1. URL-encode the project path:
+         ```bash
+         ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
+         ```
+      2. Verify the issue exists:
+         ```bash
+         glab api "projects/$ENCODED_PATH/issues/$ISSUE_IID" --jq '.title' --hostname "$GITLAB_HOST"
+         ```
+         If this fails, report the error and stop.
+      3. Fetch issue context:
+         ```bash
+         glab api "projects/$ENCODED_PATH/issues/$ISSUE_IID" \
+           --jq '{title: .title, description: .description, creator: .author.username, labels: .labels}' \
+           --hostname "$GITLAB_HOST"
+         ```
+      4. Extract and remember: `project_path`, `issue_iid`, `issue_creator` = `.creator`.
+      5. Derive `slug` from the issue title (lowercase, hyphens, no special chars).
+      6. Transition to `proceed`.
+
+      ### New Idea
+
+      If the input is a rough idea with a project path (not matching the issue pattern):
+
+      1. Auto-detect the project path from git remote:
+         ```bash
+         PROJECT_PATH=$(git remote get-url origin | sed 's|.*://[^/]*/||;s|\.git$||' | sed 's|.*:||')
+         ```
+      2. Remember `project_path`.
+      3. Transition to `proceed` — the spec sub-workflow will create the issue.
+    transitions:
+      proceed: spec
+
+  spec:
+    workflow: ../gitlab-spec-gen/workflow.yaml
+    transitions:
+      completed: decide
+
+  decide:
+    prompt: |
+      ## Choose Execution Mode
+
+      The spec is complete. Read the spec artifacts from the local cache to get an overview:
+      ```bash
+      ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
+      ```
+      Read `$ARTIFACTS/requirements.md` and `$ARTIFACTS/design.md` for a brief summary.
+
+      URL-encode the project path:
+      ```bash
+      ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
+      ```
+
+      Post a note on the issue asking the user to choose an execution mode:
+
+      ```bash
+      glab api -X POST "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes" \
+        --hostname "$GITLAB_HOST" \
+        -f body='[bot reply] ## Spec Complete!
+
+      The spec is ready. How would you like to proceed?
+
+      1. **Full auto** -- implement the spec and submit an MR without any human approvals.
+         Spec-to-code runs in fast-forward mode and MR submission starts automatically.
+      2. **Fast forward** -- proceed to implementation, but pause before starting and before
+         creating the MR for your confirmation.
+      3. **Stop here** -- keep the spec artifacts and end the workflow.
+
+      Reply with your choice (1, 2, or 3).'
+      ```
+
+      Poll for the user's reply using the polling pattern from the guide.
+
+      When you receive a reply from the issue creator:
+      - If they choose 1 (full auto): remember `mode = "full-auto"`, transition to `full auto`
+      - If they choose 2 (fast forward): remember `mode = "fast-forward"`, transition to `fast forward`
+      - If they choose 3 (stop here): transition to `stop here`
+
+      You MUST NOT proceed without the user's explicit choice via an issue note.
+    transitions:
+      full auto: implement
+      fast forward: confirm-implement
+      stop here: done
+
+  confirm-implement:
+    prompt: |
+      ## Confirm Implementation
+
+      This gate is reached in fast-forward mode. Post a confirmation request on the issue:
+
+      ```bash
+      ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
+      glab api -X POST "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes" \
+        --hostname "$GITLAB_HOST" \
+        -f body='[bot reply] ## Ready to Implement
+
+      The spec is complete and ready for implementation. I'\''ll:
+      - Download the spec artifacts
+      - Create a feature branch
+      - Implement each plan step with TDD
+      - Run e2e tests and code review
+
+      Reply **go** to start implementation, or **stop** to end the workflow here.'
+      ```
+
+      Poll for the user's reply using the polling pattern from the guide (20s interval).
+
+      When you receive a reply from the issue creator:
+      - If they approve (e.g., "go", "yes", "proceed"): transition to `approved`
+      - If they want to stop (e.g., "stop", "no"): transition to `stop here`
+    transitions:
+      approved: implement
+      stop here: done
+
+  implement:
+    workflow: ../spec-to-code/workflow.yaml
+    transitions:
+      completed: confirm-mr
+
+  confirm-mr:
+    prompt: |
+      ## Confirm MR Submission
+
+      Implementation is complete. Read `./specs/{slug}/implementation-summary.md` and present
+      the key results.
+
+      URL-encode the project path:
+      ```bash
+      ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
+      ```
+
+      Post the implementation summary on the issue:
+
+      ```bash
+      glab api -X POST "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes" \
+        --hostname "$GITLAB_HOST" \
+        -f body='[bot reply] ## Implementation Complete
+
+      {brief summary of what was implemented}
+
+      **Steps completed**: {N}/{N}
+      **Tests**: {total tests added}, all passing
+      **Branch**: `{branch_name}`'
+      ```
+
+      **Full auto mode** (`mode == "full-auto"`): Transition directly to `submit mr` without
+      asking the user. Do NOT poll.
+
+      **Fast forward mode** (`mode == "fast-forward"`): Add to the note:
+
+      ```
+      Ready to create a merge request. Reply **submit** to proceed, or **stop** to end here.
+      ```
+
+      Poll for the user's reply using the polling pattern from the guide.
+
+      When you receive a reply from the issue creator:
+      - If they approve (e.g., "submit", "yes", "go"): transition to `submit mr`
+      - If they want to stop (e.g., "stop", "no"): transition to `stop here`
+    transitions:
+      submit mr: submit-mr
+      stop here: done
+
+  submit-mr:
+    workflow: ../gitlab-mr-lifecycle/workflow.yaml
+    transitions:
+      completed: done
+
+  done:
+    prompt: |
+      ## Workflow Complete
+
+      URL-encode the project path:
+      ```bash
+      ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
+      ```
+
+      Post a final summary note on the issue:
+
+      ```bash
+      glab api -X POST "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes" \
+        --hostname "$GITLAB_HOST" \
+        -f body='[bot reply] ## Issue-to-MR Complete
+
+      **Phases completed**: {list phases: spec / spec + implementation / spec + implementation + MR}
+      **Artifacts**: {list key artifacts produced}
+      **MR**: {MR URL if applicable, otherwise "N/A"}
+      **Mode**: {full-auto / fast-forward}'
+      ```
+
+      If the workflow stopped early (e.g., after spec only), suggest the next manual step
+      the user can take (e.g., "run spec-to-code with the GitLab issue reference to implement").
+
+      Present the final summary to the user.
+    transitions: {}
