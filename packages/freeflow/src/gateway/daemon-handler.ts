@@ -1,6 +1,6 @@
 import type WebSocket from "ws";
 import type { Router } from "./router.js";
-import type { DaemonToGateway } from "./types.js";
+import type { DaemonToGateway, GatewayToClient } from "./types.js";
 import { isDaemonMessage } from "./types.js";
 
 export class DaemonHandler {
@@ -75,7 +75,10 @@ export class DaemonHandler {
     this.send(ws, { type: "registered", daemon_id: msg.daemon_id });
   }
 
-  private forwardToClients(runId: string, msg: unknown): void {
+  private forwardToClients(runId: string, msg: GatewayToClient): void {
+    // Buffer the message for replay on reconnect
+    this.router.bufferMessage(runId, msg);
+
     const clients = this.router.getClientsForRun(runId);
     for (const clientWs of clients) {
       this.send(clientWs, msg);
