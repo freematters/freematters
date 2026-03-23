@@ -5,5 +5,4 @@ dist/
 .fc-worktrees/
 .worktrees/
 docs/plans/
-specs/fflow-gateway/
-specs/issue-to-gl-mr/
+specs/
