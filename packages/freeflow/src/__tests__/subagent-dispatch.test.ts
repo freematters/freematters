@@ -6,7 +6,7 @@ import { cleanupTempDir, createTempDir } from "./fixtures.js";
 
 /** Workflow where the initial state is a subagent state */
 const SUBAGENT_INITIAL_FSM = `
-version: 1
+version: 1.3
 guide: "Subagent workflow"
 initial: work
 states:
@@ -22,7 +22,7 @@ states:
 
 /** Mixed workflow: greet (normal) → work (subagent) → done */
 const MIXED_FSM = `
-version: 1
+version: 1.3
 guide: "Mixed workflow"
 initial: greet
 states:

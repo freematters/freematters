@@ -690,7 +690,7 @@ describe("loadFsm — subagent flag", () => {
     const p = writeYaml(
       "valid-subagent-true.yaml",
       `
-version: 1
+version: 1.3
 guide: "Subagent workflow"
 initial: start
 states:
@@ -712,7 +712,7 @@ states:
     const p = writeYaml(
       "valid-subagent-false.yaml",
       `
-version: 1
+version: 1.3
 guide: "Subagent workflow"
 initial: start
 states:
@@ -733,7 +733,7 @@ states:
   test("schema rejects non-boolean subagent", () => {
     expectSchemaInvalid(
       `
-version: 1
+version: 1.3
 guide: "x"
 initial: start
 states:
@@ -748,6 +748,27 @@ states:
 `,
       "invalid-subagent-string.yaml",
       /subagent.*boolean/,
+    );
+  });
+
+  test("schema rejects subagent on version < 1.3", () => {
+    expectSchemaInvalid(
+      `
+version: 1
+guide: "x"
+initial: start
+states:
+  start:
+    prompt: "x"
+    subagent: true
+    transitions:
+      go: done
+  done:
+    prompt: "x"
+    transitions: {}
+`,
+      "invalid-subagent-version.yaml",
+      /subagent.*requires version 1\.3/,
     );
   });
 
@@ -790,7 +811,7 @@ describe("loadFsm — markdown workflows", () => {
     const mdPath = join(fixturesDir, "child-from-yaml.workflow.md");
     const fsm = loadFsm(mdPath);
 
-    expect(fsm.version).toBe(1);
+    expect(fsm.version).toBe(1.1);
     expect(fsm.initial).toBe("start");
     // The start state should have its prompt merged with base via {{base}}
     expect(fsm.states.start.prompt).toContain("Custom start with base.");
@@ -812,7 +833,7 @@ describe("loadFsm — markdown workflows", () => {
     const yamlPath = join(fixturesDir, "child-from-md.workflow.yaml");
     const fsm = loadFsm(yamlPath);
 
-    expect(fsm.version).toBe(1);
+    expect(fsm.version).toBe(1.1);
     expect(fsm.initial).toBe("start");
     // The start state should have its prompt inherited from the .workflow.md file
     expect(fsm.states.start.prompt).toBe("Begin here.");
