@@ -5,7 +5,8 @@
 #
 # Key differences from github-spec-gen:
 #   - design.md: 4 sections (Overview, Goal & Constraints, Architecture & Components, E2E Testing)
-#   - plan.md: exactly 2 steps (Implement the feature + E2E test)
+#   - plan.md: exactly 1 step (all implementation in a single step)
+#   - e2e.md: generated in separate e2e-gen state (same as github-spec-gen)
 #
 # Flow:
 #
@@ -124,14 +125,14 @@ states:
       gaps found: requirements
 
   plan:
-    from: "../spec-gen/workflow.yaml#plan"
+    from: "../github-spec-gen/workflow.yaml#plan"
     prompt: |
       ## Implementation Plan (Lite)
 
-      Produce a plan.md artifact — a simplified 2-step implementation plan.
+      Produce a plan.md artifact — a single-step implementation plan.
 
       **This is the lite variant.** Instead of N steps (one per component), produce
-      exactly 2 steps: "Implement the feature" and "E2E test".
+      exactly 1 step that covers ALL implementation.
 
       Required format:
       ```markdown
@@ -139,7 +140,6 @@ states:
 
       ## Checklist
       - [ ] Step 1: Implement the feature
-      - [ ] Step 2: E2E test
 
       ---
 
@@ -157,29 +157,19 @@ states:
       **Related Files**: <all files from design>
 
       **Test Requirements**: <integration tests from design>
-
-      ---
-
-      ## Step 2: E2E test
-
-      **Depends on**: Step 1
-
-      **Objective**: Run e2e tests to validate the implementation.
       ```
 
       Step 1 sub-items MUST reference the specific components from design.md's
       Architecture & Components section. Each bullet should describe what to implement
       for that component.
 
-      E2E testing is handled by the e2e-gen state after plan approval — but Step 2
-      in the plan ensures spec-to-code will run e2e tests during implementation.
-
       **CRITICAL: E2E completeness check.** If design.md has an E2E Testing section,
       verify that EVERY command, server process, or setup step referenced in the e2e
       scenarios has a corresponding sub-item in Step 1.
 
       Constraints:
-      - Exactly 2 steps. Do NOT add more steps.
+      - Exactly 1 step. Do NOT add more steps. No separate e2e step in the plan —
+        spec-to-code handles e2e testing automatically when e2e.md exists.
       - You MUST NOT duplicate design details — reference design.md sections instead.
       - You MUST present the plan to the user and iterate on feedback until approved.
 
