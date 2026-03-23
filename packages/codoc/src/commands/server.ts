@@ -381,7 +381,7 @@ async function runServer(): Promise<void> {
     } catch {
       // non-fatal
     }
-    console.log("Server started (daemon)");
+    process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "Server started (daemon)" } })}\n`);
     return;
   }
 
