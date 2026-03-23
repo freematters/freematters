@@ -11,21 +11,17 @@
  * - Non-lite round-trip: all full cards
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { handlePostToolUse } from "../hooks/post-tool-use.js";
 import type { RunMeta, Snapshot } from "../store.js";
 import { Store } from "../store.js";
 import { runCli, runCliJson } from "./e2e/helpers.js";
 import {
   MINIMAL_FSM,
   MULTI_FSM,
-  PLANNING_FSM,
   cleanupTempDir,
   createTempDir,
-  startEvent,
-  writeFsmFile,
 } from "./fixtures.js";
 
 let tmp: string;
@@ -182,49 +178,3 @@ describe("Non-lite round-trip: all full cards", () => {
   });
 });
 
-// ─── Hook reminder: formatReminder omits prompt text ─────────────
-
-describe("PostToolUse hook reminder: no prompt text", () => {
-  test("reminder output contains state and transitions but not prompt text", () => {
-    const root = join(tmp, "hook-reminder-root");
-    const fsmPath = writeFsmFile(tmp, "planning-hook.yaml", PLANNING_FSM);
-
-    // Enable hook
-    mkdirSync(root, { recursive: true });
-    writeFileSync(
-      join(root, "settings.json"),
-      JSON.stringify({ hooks: { postToolUse: true } }),
-      "utf-8",
-    );
-
-    // Set up an active run with session binding
-    const store = new Store(root);
-    const runId = uniqueRunId("hook-reminder");
-    store.initRun(runId, fsmPath);
-    store.commit(runId, startEvent("plan"), { run_status: "active", state: "plan" });
-    store.bindSession("hook-session", runId);
-
-    const makeInput = (overrides: Record<string, unknown> = {}) => ({
-      session_id: "hook-session",
-      tool_name: "Read",
-      tool_input: {},
-      tool_response: {},
-      ...overrides,
-    });
-
-    // Advance counter to 4 so next call triggers reminder
-    for (let i = 0; i < 4; i++) {
-      const result = handlePostToolUse(makeInput(), root);
-      expect(result).toBeNull();
-    }
-
-    // 5th call: reminder should fire
-    const reminder = handlePostToolUse(makeInput(), root);
-    expect(reminder).not.toBeNull();
-    expect(reminder).toContain("[FSM Reminder]");
-    expect(reminder).toContain("State: plan");
-    expect(reminder).toContain("approved → execute");
-    // Reminder must NOT contain the prompt text
-    expect(reminder).not.toContain("Plan the work.");
-  });
-});

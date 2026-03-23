@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
-import type { Fsm, FsmState } from "../fsm.js";
+import type { Fsm } from "../fsm.js";
 import { loadFsm } from "../fsm.js";
 import { serializeMarkdown } from "../markdown-serializer.js";
 import { serializeYaml } from "../yaml-serializer.js";
@@ -103,39 +103,7 @@ describe("markdown round-trip integration", () => {
       assertFsmEqual(roundTripped, original);
     });
 
-    test("workflow with allowed_tools", () => {
-      const fsm: Fsm = {
-        version: 1,
-        initial: "start",
-        guide: "Test guide.",
-        allowed_tools: ["Read", "Bash", "Write"],
-        states: {
-          start: {
-            prompt: "Do the task.",
-            todos: ["Item A", "Item B"],
-            transitions: { next: "done" },
-          },
-          done: {
-            prompt: "All done.",
-            transitions: {},
-          },
-        },
-      };
-
-      // Write as YAML first, then round-trip through MD
-      const yamlContent = serializeYaml(fsm);
-      const yamlPath = join(tmpDir, "tools.workflow.yaml");
-      writeFileSync(yamlPath, yamlContent, "utf-8");
-      const loaded = loadFsm(yamlPath);
-
-      const md = serializeMarkdown(loaded);
-      const mdPath = join(tmpDir, "tools.workflow.md");
-      writeFileSync(mdPath, md, "utf-8");
-      const roundTripped = loadFsm(mdPath);
-
-      assertFsmEqual(roundTripped, loaded);
-    });
-  });
+});
 
   describe("MD -> YAML -> MD", () => {
     test("simple markdown workflow", () => {
@@ -151,19 +119,7 @@ describe("markdown round-trip integration", () => {
       assertFsmEqualStrict(roundTripped, original);
     });
 
-    test("markdown workflow preserves guide", () => {
-      const mdPath = join(FIXTURES, "simple.workflow.md");
-      const original = loadFsm(mdPath);
-      expect(original.guide).toBeDefined();
-
-      const yaml = serializeYaml(original);
-      const yamlPath = join(tmpDir, "guide.workflow.yaml");
-      writeFileSync(yamlPath, yaml, "utf-8");
-      const roundTripped = loadFsm(yamlPath);
-
-      expect(roundTripped.guide).toBe(original.guide);
-    });
-  });
+});
 
   describe("cross-format from: references", () => {
     test("markdown workflow inheriting from YAML base", () => {

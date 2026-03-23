@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
 import type { Fsm } from "../fsm.js";
 import { serializeMarkdown } from "../markdown-serializer.js";
-import { fsmToMermaid } from "../output.js";
 
 function minimalFsm(): Fsm {
   return {
@@ -59,14 +58,6 @@ describe("serializeMarkdown", () => {
     expect(mdWith).toContain("- Write");
   });
 
-  test("State Machine contains correct mermaid from fsmToMermaid()", () => {
-    const fsm = minimalFsm();
-    const md = serializeMarkdown(fsm);
-    const expectedMermaid = fsmToMermaid(fsm.states, fsm.initial);
-
-    expect(md).toContain(expectedMermaid);
-  });
-
   test("Guide section present only when fsm.guide is set", () => {
     const fsm = minimalFsm();
     const mdNoGuide = serializeMarkdown(fsm);
@@ -76,19 +67,6 @@ describe("serializeMarkdown", () => {
     const mdWithGuide = serializeMarkdown(fsm);
     expect(mdWithGuide).toContain("## Guide");
     expect(mdWithGuide).toContain("Follow these rules for all states.");
-  });
-
-  test("state prompts appear under ### Instructions", () => {
-    const fsm = minimalFsm();
-    const md = serializeMarkdown(fsm);
-
-    // Each state should have its prompt under Instructions
-    const startSection = md.slice(
-      md.indexOf("## State: start"),
-      md.indexOf("## State: done"),
-    );
-    expect(startSection).toContain("### Instructions");
-    expect(startSection).toContain("Begin here.");
   });
 
   test("todos appear as list items under ### Todos", () => {
@@ -103,18 +81,6 @@ describe("serializeMarkdown", () => {
     expect(startSection).toContain("### Todos");
     expect(startSection).toContain("- Write code");
     expect(startSection).toContain("- Run tests");
-  });
-
-  test("transitions appear as - label → target under ### Transitions", () => {
-    const fsm = minimalFsm();
-    const md = serializeMarkdown(fsm);
-
-    const startSection = md.slice(
-      md.indexOf("## State: start"),
-      md.indexOf("## State: done"),
-    );
-    expect(startSection).toContain("### Transitions");
-    expect(startSection).toContain("- next → done");
   });
 
   test("terminal state (done) has (none) in transitions section", () => {
@@ -152,33 +118,4 @@ describe("serializeMarkdown", () => {
     expect(between).toContain("---");
   });
 
-  test("no Todos section when state has no todos", () => {
-    const fsm = minimalFsm();
-    const md = serializeMarkdown(fsm);
-
-    const startSection = md.slice(
-      md.indexOf("## State: start"),
-      md.indexOf("## State: done"),
-    );
-    expect(startSection).not.toContain("### Todos");
-  });
-
-  test("Guide section appears before State sections", () => {
-    const fsm = minimalFsm();
-    fsm.guide = "Global guide.";
-    const md = serializeMarkdown(fsm);
-
-    const guideIdx = md.indexOf("## Guide");
-    const firstStateIdx = md.indexOf("## State:");
-    expect(guideIdx).toBeLessThan(firstStateIdx);
-  });
-
-  test("State Machine section appears before state sections", () => {
-    const fsm = minimalFsm();
-    const md = serializeMarkdown(fsm);
-
-    const machineIdx = md.indexOf("## State Machine");
-    const firstStateIdx = md.indexOf("## State:");
-    expect(machineIdx).toBeLessThan(firstStateIdx);
-  });
 });

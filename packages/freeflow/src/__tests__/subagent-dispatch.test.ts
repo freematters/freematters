@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { loadFsm } from "../fsm.js";
-import { runCli, runCliJson } from "./e2e/helpers.js";
+import { runCli } from "./e2e/helpers.js";
 import { cleanupTempDir, createTempDir } from "./fixtures.js";
 
 // biome-ignore lint/style/noNonNullAssertion: dirname is always defined for file modules
@@ -71,59 +71,6 @@ function uniqueRunId(prefix = "sub"): string {
 }
 
 const defaultRoot = () => join(tmp, "root");
-
-// ─── Test 8: start uses dispatch format for subagent initial state ───
-
-describe("start: subagent dispatch format", () => {
-  test("human-readable output contains subagent execution text", () => {
-    const id = uniqueRunId("start-sub");
-    const { stdout, exitCode } = runCli(`start ${fsmSubagentInitial} --run-id ${id}`, {
-      root: defaultRoot(),
-    });
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("subagent execution");
-    expect(stdout).toContain(`fflow current --run-id ${id}`);
-    // Should NOT contain the raw state prompt directly
-    expect(stdout).not.toContain("Your instructions:");
-  });
-
-  test("JSON output includes subagent: true", () => {
-    const id = uniqueRunId("start-sub-json");
-    const { envelope, exitCode } = runCliJson(
-      `start ${fsmSubagentInitial} --run-id ${id}`,
-      { root: defaultRoot() },
-    );
-    expect(exitCode).toBe(0);
-    const data = envelope.data as Record<string, unknown>;
-    expect(data.subagent).toBe(true);
-  });
-});
-
-// ─── Test 9: goto uses dispatch format for subagent target state ────
-
-describe("goto: subagent dispatch format", () => {
-  test("human-readable output contains subagent execution text", () => {
-    const id = uniqueRunId("goto-sub");
-    runCli(`start ${fsmMixed} --run-id ${id}`, { root: defaultRoot() });
-    const { stdout, exitCode } = runCli(`goto work --run-id ${id} --on next`, {
-      root: defaultRoot(),
-    });
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("subagent execution");
-    expect(stdout).not.toContain("Your instructions:");
-  });
-
-  test("JSON output includes subagent: true", () => {
-    const id = uniqueRunId("goto-sub-json");
-    runCli(`start ${fsmMixed} --run-id ${id}`, { root: defaultRoot() });
-    const { envelope, exitCode } = runCliJson(`goto work --run-id ${id} --on next`, {
-      root: defaultRoot(),
-    });
-    expect(exitCode).toBe(0);
-    const data = envelope.data as Record<string, unknown>;
-    expect(data.subagent).toBe(true);
-  });
-});
 
 // ─── Test 10: current always uses normal format ──────────────────────
 

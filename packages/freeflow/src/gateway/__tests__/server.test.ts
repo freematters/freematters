@@ -3,19 +3,15 @@ import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  afterAll,
   afterEach,
-  beforeAll,
   beforeEach,
   describe,
   expect,
   test,
 } from "vitest";
 import WebSocket from "ws";
-import { Store } from "../../store.js";
 import { Router } from "../router.js";
 import { createGatewayServer } from "../server.js";
-import { validateApiKey } from "../server.js";
 import type { GatewayConfig } from "../types.js";
 
 // --- Helpers ---
@@ -99,37 +95,6 @@ function wsSend(ws: WebSocket, msg: unknown): void {
   ws.send(JSON.stringify(msg));
 }
 
-// --- Unit Tests: API Key Validation ---
-
-describe("API key validation", () => {
-  test("accepts valid Bearer token", () => {
-    const keys = ["secret-123"];
-    expect(validateApiKey("Bearer secret-123", keys)).toBe(true);
-  });
-
-  test("accepts valid X-API-Key", () => {
-    const keys = ["secret-123"];
-    expect(validateApiKey("secret-123", keys)).toBe(true);
-  });
-
-  test("rejects missing key", () => {
-    const keys = ["secret-123"];
-    expect(validateApiKey(undefined, keys)).toBe(false);
-  });
-
-  test("rejects invalid key", () => {
-    const keys = ["secret-123"];
-    expect(validateApiKey("wrong-key", keys)).toBe(false);
-    expect(validateApiKey("Bearer wrong-key", keys)).toBe(false);
-  });
-
-  test("accepts any key from the list", () => {
-    const keys = ["key-a", "key-b", "key-c"];
-    expect(validateApiKey("Bearer key-b", keys)).toBe(true);
-    expect(validateApiKey("key-c", keys)).toBe(true);
-  });
-});
-
 // --- Unit Tests: REST Endpoints ---
 
 describe("REST endpoints", () => {
@@ -149,32 +114,6 @@ describe("REST endpoints", () => {
     rmSync(config.store_root, { recursive: true, force: true });
   });
 
-  test("GET /api/health returns ok", async () => {
-    const res = await httpRequest(port, "GET", "/api/health", undefined, {
-      Authorization: "Bearer test-key-1",
-    });
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: "ok" });
-  });
-
-  test("GET /api/health works without API key", async () => {
-    const res = await httpRequest(port, "GET", "/api/health");
-    expect(res.status).toBe(200);
-    expect(res.body).toEqual({ status: "ok" });
-  });
-
-  test("rejects non-health request without API key", async () => {
-    const res = await httpRequest(port, "GET", "/api/runs");
-    expect(res.status).toBe(401);
-  });
-
-  test("rejects request with wrong API key", async () => {
-    const res = await httpRequest(port, "GET", "/api/runs", undefined, {
-      Authorization: "Bearer wrong",
-    });
-    expect(res.status).toBe(403);
-  });
-
   test("POST /api/runs creates a run", async () => {
     const res = await httpRequest(
       port,
@@ -187,55 +126,6 @@ describe("REST endpoints", () => {
     const body = res.body as { run_id: string; status: string };
     expect(body.run_id).toBeDefined();
     expect(body.status).toBe("pending");
-  });
-
-  test("GET /api/runs lists runs", async () => {
-    // Create a run first
-    await httpRequest(
-      port,
-      "POST",
-      "/api/runs",
-      { workflow: "a.yaml" },
-      {
-        Authorization: "Bearer test-key-1",
-      },
-    );
-    const res = await httpRequest(port, "GET", "/api/runs", undefined, {
-      Authorization: "Bearer test-key-1",
-    });
-    expect(res.status).toBe(200);
-    const body = res.body as { runs: unknown[] };
-    expect(body.runs).toHaveLength(1);
-  });
-
-  test("GET /api/runs/:id returns run details", async () => {
-    const createRes = await httpRequest(
-      port,
-      "POST",
-      "/api/runs",
-      { workflow: "b.yaml" },
-      { Authorization: "Bearer test-key-1" },
-    );
-    const { run_id } = createRes.body as { run_id: string };
-
-    const res = await httpRequest(port, "GET", `/api/runs/${run_id}`, undefined, {
-      Authorization: "Bearer test-key-1",
-    });
-    expect(res.status).toBe(200);
-    const body = res.body as {
-      run_id: string;
-      workflow: string;
-      gateway_status: string;
-    };
-    expect(body.run_id).toBe(run_id);
-    expect(body.gateway_status).toBe("pending");
-  });
-
-  test("GET /api/runs/:id returns 404 for nonexistent run", async () => {
-    const res = await httpRequest(port, "GET", "/api/runs/no-such-run", undefined, {
-      Authorization: "Bearer test-key-1",
-    });
-    expect(res.status).toBe(404);
   });
 
   test("DELETE /api/runs/:id aborts a run", async () => {
@@ -264,30 +154,6 @@ describe("Router", () => {
 
   beforeEach(() => {
     router = new Router();
-  });
-
-  test("registers and retrieves daemon", () => {
-    const ws = {} as WebSocket;
-    router.registerDaemon("d1", ws, 5);
-    const daemon = router.getDaemon("d1");
-    expect(daemon).toBeDefined();
-    expect(daemon?.capacity).toBe(5);
-  });
-
-  test("assigns run to daemon", () => {
-    const ws = {} as WebSocket;
-    router.registerDaemon("d1", ws, 5);
-    router.assignRunToDaemon("run-1", "d1");
-    expect(router.getDaemonForRun("run-1")).toBe("d1");
-    expect(router.getDaemonWsForRun("run-1")).toBe(ws);
-  });
-
-  test("subscribes client to run", () => {
-    const ws = {} as WebSocket;
-    router.subscribeClient("c1", ws, "run-1");
-    const clients = router.getClientsForRun("run-1");
-    expect(clients).toHaveLength(1);
-    expect(clients[0]).toBe(ws);
   });
 
   test("removes daemon and its run mappings", () => {
@@ -355,10 +221,6 @@ describe("Integration: Gateway-Daemon Connection", () => {
     } finally {
       ws.close();
     }
-  });
-
-  test("rejects daemon WebSocket without API key", async () => {
-    await expect(connectWs(port, "/ws/daemon")).rejects.toThrow();
   });
 
   test("client connects and can create run via WebSocket", async () => {

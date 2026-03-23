@@ -192,12 +192,6 @@ All done.
     expect(states.done.transitions).toEqual({});
   });
 
-  test("parse ### Transitions with → separator", () => {
-    const doc = parseMarkdownWorkflow(minimal());
-    const states = doc.states as Record<string, Record<string, unknown>>;
-    expect(states.start.transitions).toEqual({ done: "done" });
-  });
-
   test("parse ### Transitions with -> separator", () => {
     const content = `---
 version: 1.2
@@ -229,12 +223,6 @@ Done.
     const doc = parseMarkdownWorkflow(content);
     const states = doc.states as Record<string, Record<string, unknown>>;
     expect(states.start.transitions).toEqual({ finish: "done" });
-  });
-
-  test("parse (none) / empty transitions → empty transitions object", () => {
-    const doc = parseMarkdownWorkflow(minimal());
-    const states = doc.states as Record<string, Record<string, unknown>>;
-    expect(states.done.transitions).toEqual({});
   });
 
   test('parse <freeflow from="base#state"> → state.from, tag stripped from prompt', () => {

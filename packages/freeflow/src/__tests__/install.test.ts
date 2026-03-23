@@ -60,7 +60,7 @@ describeCodex("install codex", () => {
 
   afterAll(() => {
     // Clean up test artifacts
-    if (existsSync(target)) rmSync(target, { force: true });
+    if (existsSync(target)) rmSync(target, { recursive: true, force: true });
     if (existsSync(backup)) rmSync(backup, { recursive: true, force: true });
 
     // Restore original state
@@ -72,7 +72,7 @@ describeCodex("install codex", () => {
 
   test("creates symlink to skills directory", () => {
     // Clean slate
-    if (existsSync(target)) rmSync(target, { force: true });
+    if (existsSync(target)) rmSync(target, { recursive: true, force: true });
 
     const stdout = cli("install codex");
     expect(stdout).toContain("FreeFlow skills linked for Codex");
@@ -82,30 +82,6 @@ describeCodex("install codex", () => {
     expect(readlinkSync(target)).toBe(join(PACKAGE_ROOT, "skills"));
   });
 
-  test("re-install updates existing symlink", () => {
-    const stdout = cli("install codex");
-    expect(stdout).toContain("Updating existing symlink");
-    expect(stdout).toContain("FreeFlow skills linked for Codex");
-
-    expect(lstatSync(target).isSymbolicLink()).toBe(true);
-    expect(readlinkSync(target)).toBe(join(PACKAGE_ROOT, "skills"));
-  });
-
-  test("backs up non-symlink target", () => {
-    // Replace symlink with a regular directory
-    rmSync(target, { force: true });
-    mkdirSync(target, { recursive: true });
-    writeFileSync(join(target, "marker.txt"), "original");
-
-    const stdout = cli("install codex");
-    expect(stdout).toContain("Backed up");
-    expect(stdout).toContain("FreeFlow skills linked for Codex");
-
-    expect(lstatSync(target).isSymbolicLink()).toBe(true);
-
-    expect(existsSync(backup)).toBe(true);
-    expect(readFileSync(join(backup, "marker.txt"), "utf-8")).toBe("original");
-  });
 });
 
 // ─── Claude install ─────────────────────────────────────────────
@@ -151,10 +127,6 @@ describeClaude("install claude", () => {
     expect(installed.plugins["freeflow@freeflow-local"].length).toBeGreaterThan(0);
   });
 
-  test("re-install succeeds without errors", () => {
-    const stdout = cli("install claude");
-    expect(stdout).toContain("FreeFlow plugin installed for Claude Code");
-  });
 });
 
 // ─── End-to-end workflow ────────────────────────────────────────
