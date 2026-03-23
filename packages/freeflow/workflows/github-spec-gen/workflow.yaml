@@ -7,8 +7,8 @@
 # Flow:
 #
 #   create-issue
-#       |           \
-#   requirements ← → research
+#       |           \          \
+#   requirements ← → research   both (requirements + background research)
 #       |
 #     design ← → requirements (gaps)
 #       |
@@ -224,19 +224,22 @@ states:
 
       1. **Requirements clarification** (recommended) — refine the idea through Q&A
       2. **Research first** — investigate specific technical topics before refining requirements
+      3. **Requirements + auto-research** — start Q&A immediately while research runs in the background
 
-      Reply with your choice (1 or 2)."
+      Reply with your choice (1, 2, or 3)."
       ```
 
       Now poll for the user's reply using the polling pattern from the guide.
       When you receive a reply from the issue creator:
       - If they choose requirements (1), transition to `start with requirements`
       - If they choose research (2), transition to `start with research`
+      - If they choose both (3), transition to `start with both`
 
       You MUST NOT proceed without the user's explicit choice via an issue comment.
     transitions:
       start with requirements: requirements
       start with research: research
+      start with both: requirements
 
   requirements:
     from: "../spec-gen/workflow.yaml#requirements"
@@ -252,6 +255,22 @@ states:
       You MUST ask ONE question at a time. Post a single question as an issue comment,
       poll for the reply, record the Q&A pair, then ask the next question.
       Do NOT batch multiple questions into one comment.
+
+      ### Auto-Research Mode (GitHub)
+
+      If you arrived via "start with both", the base workflow dispatches a background
+      research agent. In addition to the base auto-research behavior:
+
+      When the background research agent completes:
+      1. Write each research topic to the local artifact cache
+         (`$ARTIFACTS/research/<topic>.md`)
+      2. Post each as a `## research/<topic>.md` artifact comment on the issue,
+         following the artifact creation guide
+      3. Save comment IDs to the tracking file
+      4. Update the issue body status checklist: check off "research"
+
+      The brief summaries surfaced during Q&A are posted as part of the next
+      Q&A comment — not as separate comments.
 
       When compiling requirements:
       1. Post the structured requirements as a `## requirements.md` artifact comment.
