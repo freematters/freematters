@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type WebSocket from "ws";
 import type { Router } from "./router.js";
 import type { DaemonToGateway, GatewayToClient } from "./types.js";
@@ -5,6 +6,9 @@ import { isDaemonMessage } from "./types.js";
 
 export class DaemonHandler {
   private router: Router;
+
+  /** Callback invoked when a run completes, allowing ClientHandler to update state. */
+  onRunCompleted?: (runId: string, status: string) => void;
 
   constructor(router: Router) {
     this.router = router;
@@ -56,6 +60,8 @@ export class DaemonHandler {
         break;
       case "run_completed":
         this.forwardToClients(runId, msg);
+        this.router.clearBuffer(runId);
+        this.onRunCompleted?.(runId, msg.status);
         break;
       case "error":
         this.forwardToClients(runId, {
@@ -71,8 +77,9 @@ export class DaemonHandler {
     ws: WebSocket,
     msg: Extract<DaemonToGateway, { type: "register" }>,
   ): void {
-    this.router.registerDaemon(msg.daemon_id, ws, msg.capacity);
-    this.send(ws, { type: "registered", daemon_id: msg.daemon_id });
+    const daemonId = `daemon-${randomUUID().slice(0, 8)}`;
+    this.router.registerDaemon(daemonId, ws, msg.capacity);
+    this.send(ws, { type: "registered", daemon_id: daemonId });
   }
 
   private forwardToClients(runId: string, msg: GatewayToClient): void {

@@ -157,13 +157,19 @@ describe("REST endpoints", () => {
     expect(res.body).toEqual({ status: "ok" });
   });
 
-  test("rejects request without API key", async () => {
+  test("GET /api/health works without API key", async () => {
     const res = await httpRequest(port, "GET", "/api/health");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: "ok" });
+  });
+
+  test("rejects non-health request without API key", async () => {
+    const res = await httpRequest(port, "GET", "/api/runs");
     expect(res.status).toBe(401);
   });
 
   test("rejects request with wrong API key", async () => {
-    const res = await httpRequest(port, "GET", "/api/health", undefined, {
+    const res = await httpRequest(port, "GET", "/api/runs", undefined, {
       Authorization: "Bearer wrong",
     });
     expect(res.status).toBe(403);
@@ -342,10 +348,10 @@ describe("Integration: Gateway-Daemon Connection", () => {
       // Send register message
       wsSend(ws, { type: "register", daemon_id: "daemon-1", capacity: 5 });
 
-      // Expect registered acknowledgment
+      // Expect registered acknowledgment with server-generated ID
       const ack = (await wsRecv(ws)) as { type: string; daemon_id: string };
       expect(ack.type).toBe("registered");
-      expect(ack.daemon_id).toBe("daemon-1");
+      expect(ack.daemon_id).toMatch(/^daemon-[a-f0-9]{8}$/);
     } finally {
       ws.close();
     }

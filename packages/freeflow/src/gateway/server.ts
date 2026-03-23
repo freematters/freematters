@@ -18,10 +18,19 @@ export function validateApiKey(
   return validKeys.includes(key);
 }
 
+const MAX_BODY_SIZE = 1024 * 1024; // 1 MB
+
 function parseBody(req: http.IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     let data = "";
-    req.on("data", (chunk) => {
+    let size = 0;
+    req.on("data", (chunk: Buffer | string) => {
+      size += typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.length;
+      if (size > MAX_BODY_SIZE) {
+        req.destroy();
+        reject(new Error("Request body too large"));
+        return;
+      }
       data += chunk;
     });
     req.on("end", () => {
@@ -50,13 +59,20 @@ export function createGatewayServer(config: GatewayConfig) {
   const clientHandler = new ClientHandler(store, router);
   const daemonHandler = new DaemonHandler(router);
 
+  daemonHandler.onRunCompleted = (runId, status) => {
+    clientHandler.updateRunStatus(
+      runId,
+      status === "completed" ? "completed" : "aborted",
+    );
+  };
+
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
     const path = url.pathname;
     const method = req.method ?? "GET";
 
-    // Auth check for all /api/* routes
-    if (path.startsWith("/api/")) {
+    // Auth check for all /api/* routes (except health)
+    if (path.startsWith("/api/") && !(path === "/api/health" && method === "GET")) {
       const authHeader = req.headers.authorization;
       const apiKeyHeader = req.headers["x-api-key"] as string | undefined;
       const keyValue = authHeader ?? apiKeyHeader;
@@ -85,6 +101,10 @@ export function createGatewayServer(config: GatewayConfig) {
           return;
         }
         const result = clientHandler.createRun(body.workflow, body.prompt);
+        if ("error" in result) {
+          sendJson(res, 400, result);
+          return;
+        }
         sendJson(res, 201, result);
       } catch {
         sendJson(res, 400, { error: "Invalid request body" });
@@ -148,8 +168,13 @@ export function createGatewayServer(config: GatewayConfig) {
     const apiKeyHeader = req.headers["x-api-key"] as string | undefined;
     const keyValue = authHeader ?? apiKeyHeader;
 
-    if (!validateApiKey(keyValue, config.api_keys)) {
+    if (!keyValue) {
       socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+    if (!validateApiKey(keyValue, config.api_keys)) {
+      socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
       socket.destroy();
       return;
     }

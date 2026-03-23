@@ -166,7 +166,9 @@ states:
            ```
          - Commit the plan.md and progress.md updates.
          - Check the dependency graph: if this completion unblocks new steps,
-           dispatch them immediately.
+           dispatch them immediately — do NOT wait for other in-flight agents
+           to finish first. Maximize parallelism by dispatching as soon as
+           dependencies are satisfied.
 
       3. Repeat until all steps are complete or no more steps can be dispatched.
 
