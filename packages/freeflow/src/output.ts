@@ -71,6 +71,12 @@ export function formatStateCard(card: StateCard, fsmGuide?: string): string {
     );
   }
 
+  lines.push("");
+  lines.push(
+    "IMPORTANT: You MUST NOT truncate fflow command output. " +
+      "Always read the complete output of fflow start, goto, and current commands.",
+  );
+
   return lines.join("\n");
 }
 
