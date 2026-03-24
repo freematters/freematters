@@ -125,13 +125,11 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
     presenceTracker,
     lastSavedContentHash,
     (filePath: string, cb: (newContent: string) => void) => {
-      const wrapped = (_path: string, content: string) => {
-        cb(content);
-      };
-      fileWatcher.watch(filePath, wrapped);
-      return () => {
-        fileWatcher.removeCallback(filePath, wrapped);
-      };
+      if (fileWatcher) {
+        fileWatcher.addOneTimeListener(filePath, (_path: string, content: string) => {
+          cb(content);
+        });
+      }
     },
   );
   const httpServer = http.createServer(handler);

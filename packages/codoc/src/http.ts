@@ -195,18 +195,17 @@ case "$CMD" in
       -H "Content-Type: application/json" \\
       -d "{\\"sessionId\\": \\"$SESSION_ID\\"}" > /dev/null 2>&1; }
     trap poll_cleanup EXIT
-    echo "Listening for changes (SSE)..." >&2
-    curl -sfN "$CODOC_SERVER/api/events/$TOKEN" | while IFS= read -r line; do
-      case "$line" in
-        "event: change") EVENT="change" ;;
-        data:*)
-          if [ "$EVENT" = "change" ]; then
-            DATA="\${line#data: }"
-            echo "$DATA" | jq -r '.diff'
-            EVENT=""
-          fi
-          ;;
-      esac
+    echo "Polling for changes..." >&2
+    while true; do
+      curl -sf -X POST "$CODOC_SERVER/api/presence/$TOKEN/heartbeat" \\
+        -H "Content-Type: application/json" \\
+        -d "{\\"sessionId\\": \\"$SESSION_ID\\"}" > /dev/null 2>&1
+      RESULT=$(curl -sf "$CODOC_SERVER/api/poll/$TOKEN?timeout=30")
+      CHANGED=$(echo "$RESULT" | jq -r '.changed')
+      if [ "$CHANGED" = "true" ]; then
+        echo "$RESULT" | jq -r '.diff'
+        break
+      fi
     done
     ;;
   who)
@@ -366,33 +365,37 @@ curl -sf ${apiBase}/api/presence/${token} | jq '.users'
 
 ---
 
-## 3. SSE stream for changes
+## 3. Long-poll for changes
 
-Subscribe to real-time file changes via Server-Sent Events. The connection stays
-open and pushes every change as it happens — no polling gaps.
+Use the long-poll endpoint to wait for file changes efficiently. It blocks until
+the file changes or the timeout expires, then returns the diff:
 
 \`\`\`
-GET /api/events/:token
+GET /api/poll/:token?timeout=30
 \`\`\`
 
-Each change event contains:
+**Response** (changed):
+\`\`\`json
+{"changed": true, "diff": "+ added line\\n- removed line", "comments": [...], "content": "full content"}
 \`\`\`
-event: change
-data: {"diff": "+ added\\n- removed", "comments": [...], "content": "full content"}
+
+**Response** (timeout, no change):
+\`\`\`json
+{"changed": false}
 \`\`\`
 
 \`\`\`bash
-curl -sfN ${apiBase}/api/events/${token} | while IFS= read -r line; do
-  case "$line" in
-    "event: change") EVENT="change" ;;
-    data:*)
-      if [ "$EVENT" = "change" ]; then
-        DATA="\${line#data: }"
-        echo "$DATA" | jq -r '.diff'
-        EVENT=""
-      fi
-      ;;
-  esac
+while true; do
+  RESULT=$(curl -sf "${apiBase}/api/poll/${token}?timeout=30")
+  CHANGED=$(echo "$RESULT" | jq -r '.changed')
+  if [ "$CHANGED" = "true" ]; then
+    echo "$RESULT" | jq -r '.diff'
+    break
+  fi
+  # Send heartbeat between polls
+  curl -sf -X POST ${apiBase}/api/presence/${token}/heartbeat \\
+    -H "Content-Type: application/json" \\
+    -d "{\\\"sessionId\\\": \\\"$SESSION_ID\\\"}" > /dev/null 2>&1
 done
 \`\`\`
 
@@ -532,10 +535,7 @@ curl -sf -X POST $SERVER/api/presence/$TOKEN/leave \\
 `;
 }
 
-export type WatchCallback = (
-  filePath: string,
-  cb: (newContent: string) => void,
-) => () => void;
+export type PollCallback = (filePath: string, cb: (newContent: string) => void) => void;
 
 export function createHttpHandler(
   tokenStore: TokenStore,
@@ -545,7 +545,7 @@ export function createHttpHandler(
   defaultName: string | undefined,
   presenceTracker: PresenceTracker | undefined,
   savedContentHashMap?: Map<string, string>,
-  onWatch?: WatchCallback,
+  onPollRegister?: PollCallback,
 ): http.RequestListener {
   return (req: http.IncomingMessage, res: http.ServerResponse) => {
     const method = req.method ?? "GET";
@@ -613,11 +613,11 @@ export function createHttpHandler(
       return;
     }
 
-    // GET /api/events/:token — SSE stream of file changes
+    // GET /api/poll/:token — long-poll, blocks until file changes, returns diff
     if (
       method === "GET" &&
       segments[0] === "api" &&
-      segments[1] === "events" &&
+      segments[1] === "poll" &&
       segments.length === 3
     ) {
       const token = segments[2];
@@ -626,43 +626,47 @@ export function createHttpHandler(
         send404(res);
         return;
       }
-      if (!onWatch) {
-        sendJson(res, 501, { error: "Watch not available" });
+      if (!onPollRegister) {
+        sendJson(res, 501, { error: "Poll not available" });
         return;
       }
 
-      res.writeHead(200, {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-        "Access-Control-Allow-Origin": "*",
-      });
-      res.write(":\n\n");
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const timeoutMs = Math.min(
+        Number.parseInt(url.searchParams.get("timeout") ?? "30", 10) * 1000,
+        120000,
+      );
 
-      let lastContent: string;
+      let originalContent: string;
       try {
-        lastContent = fs.readFileSync(entry.filePath, "utf-8");
+        originalContent = fs.readFileSync(entry.filePath, "utf-8");
       } catch {
-        res.write("event: error\ndata: cannot read file\n\n");
-        res.end();
+        sendJson(res, 500, { error: "Cannot read file" });
         return;
       }
 
-      const unwatch = onWatch(entry.filePath, (newContent: string) => {
-        const diff = computeDiff(lastContent, newContent);
-        const comments = parseComments(newContent);
-        const data = JSON.stringify({ diff, comments, content: newContent });
-        res.write(`event: change\ndata: ${data}\n\n`);
-        lastContent = newContent;
-      });
+      let responded = false;
+      const timer = setTimeout(() => {
+        if (!responded) {
+          responded = true;
+          sendJson(res, 200, { changed: false });
+        }
+      }, timeoutMs);
 
-      const heartbeat = setInterval(() => {
-        res.write(":\n\n");
-      }, 15000);
+      onPollRegister(entry.filePath, (newContent: string) => {
+        if (responded) return;
+        responded = true;
+        clearTimeout(timer);
+        const diff = computeDiff(originalContent, newContent);
+        const comments = parseComments(newContent);
+        sendJson(res, 200, { changed: true, diff, comments, content: newContent });
+      });
 
       req.on("close", () => {
-        clearInterval(heartbeat);
-        unwatch();
+        if (!responded) {
+          responded = true;
+          clearTimeout(timer);
+        }
       });
       return;
     }
