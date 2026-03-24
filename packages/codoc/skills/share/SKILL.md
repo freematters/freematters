@@ -7,8 +7,10 @@ description: Share a file for collaborative editing with a human via browser. Us
 
 ## Flow
 
+0. `codoc` cli should already be installed on the machine. Just call `codoc xxx` without any prefixes!
+
 1. Run `codoc server` **in background** (set `run_in_background: true`, timeout 600000ms). This starts the HTTP server and tunnel. It blocks until killed — that's expected.
-2. `codoc share /absolute/path/to/file.md` → prints Edit URL + Readonly URL + token
+2. `codoc share /absolute/path/to/file.md` → prints Edit URL + Readonly URL + token. No need to wait - this command will wait for the server to be ready.
 3. Tell user the Edit URL (or Readonly URL if they should only view)
 4. Run `codoc poll <token> agent` **in background** (set `run_in_background: true`, timeout 600000ms). You will be notified when the human edits. Continue with other work while waiting.
 5. When poll completes, read the file. Find `[REPLY_TEMPLATE]` lines inside `<!-- ... -->` blocks, replace each with your reply (keep the line format, remove `[REPLY_TEMPLATE] ` prefix).

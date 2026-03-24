@@ -6,6 +6,14 @@ Humans edit in the browser (Monaco Editor), agents edit via CLI. Collaboration h
 
 ## Install
 
+Tell this to your coding agent:
+
+```
+Read https://github.com/freematters/freematters/blob/main/packages/codoc/README.md to install codoc
+```
+
+Or install manually:
+
 ```bash
 npm install -g @freematters/codoc
 ```

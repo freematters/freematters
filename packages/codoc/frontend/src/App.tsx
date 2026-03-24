@@ -104,9 +104,11 @@ export function App() {
   const prevPresenceUsersRef = useRef<PresenceUser[]>([]);
   const pollTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pollTypingVisible, setPollTypingVisible] = useState<boolean>(false);
+  const [waitingForUpdate, setWaitingForUpdate] = useState<boolean>(false);
+  const waitingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const glyphDecorationIds = useRef<string[]>([]);
   const previewPaneRef = useRef<HTMLDivElement | null>(null);
-  const scrollSyncSource = useRef<"editor" | "preview" | null>(null);
+  const scrollSyncLockUntil = useRef<number>(0);
   const glyphDragStartLine = useRef<number | null>(null);
   const glyphDragDecorationIds = useRef<string[]>([]);
   const savePendingRef = useRef<boolean>(false);
@@ -314,6 +316,11 @@ export function App() {
     (msg: WsMessage) => {
       switch (msg.type) {
         case "file:content": {
+          setWaitingForUpdate(false);
+          if (waitingTimerRef.current !== null) {
+            clearTimeout(waitingTimerRef.current);
+            waitingTimerRef.current = null;
+          }
           const payload = msg.payload as { content: string; version: number };
           const hadLocalEdits = contentRef.current !== mergeBaseRef.current;
           if (!hadLocalEdits) {
@@ -340,6 +347,11 @@ export function App() {
             by: string;
             version: number;
           };
+          setWaitingForUpdate(false);
+          if (waitingTimerRef.current !== null) {
+            clearTimeout(waitingTimerRef.current);
+            waitingTimerRef.current = null;
+          }
           if (!savePendingRef.current) {
             if (token) {
               fetchFile(token)
@@ -372,6 +384,11 @@ export function App() {
           break;
         }
         case "file:changed": {
+          setWaitingForUpdate(false);
+          if (waitingTimerRef.current !== null) {
+            clearTimeout(waitingTimerRef.current);
+            waitingTimerRef.current = null;
+          }
           const changedPayload = msg.payload as { by?: string };
           const changedBy = changedPayload.by ?? "external";
           if (token) {
@@ -456,6 +473,15 @@ export function App() {
         mergeBaseRef.current = currentContent;
         setDirty(false);
         setStatus("saved");
+
+        setWaitingForUpdate(true);
+        if (waitingTimerRef.current !== null) {
+          clearTimeout(waitingTimerRef.current);
+        }
+        waitingTimerRef.current = setTimeout(() => {
+          setWaitingForUpdate(false);
+          waitingTimerRef.current = null;
+        }, 60000);
 
         setTypingTrigger((prev) => prev + 1);
         setTimeout(foldCommentRegions, 200);
@@ -745,8 +771,8 @@ export function App() {
       });
 
       editorInstance.onDidScrollChange(() => {
-        if (scrollSyncSource.current === "preview") return;
-        scrollSyncSource.current = "editor";
+        if (Date.now() < scrollSyncLockUntil.current) return;
+        scrollSyncLockUntil.current = Date.now() + 100;
         const preview = previewPaneRef.current;
         if (!preview) return;
         const scrollTop = editorInstance.getScrollTop();
@@ -756,9 +782,6 @@ export function App() {
         const ratio = maxScroll > 0 ? scrollTop / maxScroll : 0;
         const previewMax = preview.scrollHeight - preview.clientHeight;
         preview.scrollTop = ratio * previewMax;
-        requestAnimationFrame(() => {
-          scrollSyncSource.current = null;
-        });
       });
 
       setTimeout(() => {
@@ -1085,9 +1108,18 @@ export function App() {
             </span>
           )}
           {!readonly && (
-            <button className={dirty ? "btn btn-primary" : "btn"} onClick={handleSave}>
-              Save<span className="btn-shortcut">⌘S</span>
-            </button>
+            <>
+              <button className={dirty ? "btn btn-primary" : "btn"} onClick={handleSave}>
+                Save<span className="btn-shortcut">⌘S</span>
+              </button>
+              {waitingForUpdate && (
+                <span className="typing-indicator">
+                  <span className="codoc-typing-dot" />
+                  <span className="codoc-typing-dot" />
+                  <span className="codoc-typing-dot" />
+                </span>
+              )}
+            </>
           )}
           <button
             className={dirty ? "btn btn-accent" : "btn btn-disabled"}
@@ -1136,6 +1168,7 @@ export function App() {
               glyphMargin: true,
               folding: true,
               foldingStrategy: "auto",
+              scrollBeyondLastLine: false,
             }}
           />
           <DiffGutter
@@ -1168,8 +1201,8 @@ export function App() {
           className="preview-pane"
           ref={previewPaneRef}
           onScroll={() => {
-            if (scrollSyncSource.current === "editor") return;
-            scrollSyncSource.current = "preview";
+            if (Date.now() < scrollSyncLockUntil.current) return;
+            scrollSyncLockUntil.current = Date.now() + 100;
             const ed = editorRef.current;
             const preview = previewPaneRef.current;
             if (!ed || !preview) return;
@@ -1177,9 +1210,6 @@ export function App() {
             const ratio = previewMax > 0 ? preview.scrollTop / previewMax : 0;
             const editorMax = ed.getScrollHeight() - ed.getLayoutInfo().height;
             ed.setScrollTop(ratio * editorMax);
-            requestAnimationFrame(() => {
-              scrollSyncSource.current = null;
-            });
           }}
         >
           <MarkdownPreview
