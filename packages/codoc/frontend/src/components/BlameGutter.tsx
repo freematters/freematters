@@ -67,8 +67,9 @@ export function BlameGutter(props: BlameGutterProps) {
             options: {
               isWholeLine: true,
               marginClassName: cssClass,
-              glyphMarginHoverMessage: {
-                value: `**${entry.author}** · \`${entry.hash.substring(0, 7)}\`${isLatest ? " (latest)" : ""}`,
+              minimap: {
+                color: entry.isAgent ? AGENT_COLOR : HUMAN_COLOR,
+                position: 1,
               },
               overviewRuler: isLatest
                 ? {
