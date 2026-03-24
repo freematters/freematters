@@ -180,54 +180,26 @@ export function App() {
       });
   }, []);
 
-  const flashChangedLines = useCallback((oldContent: string, newContent: string) => {
+  const flashChangedLines = useCallback((diff: string, newContent: string) => {
     const editorInstance = editorRef.current;
     const monacoNs = monacoRef.current;
 
-    if (!editorInstance || !monacoNs) return;
+    if (!editorInstance || !monacoNs || !diff) return;
 
-    const oldLines = oldContent.split("\n");
+    // Map diff "+" lines to their line numbers in newContent
     const newLines = newContent.split("\n");
-    const m = oldLines.length;
-    const n = newLines.length;
+    const addedLines = diff
+      .split("\n")
+      .filter((l) => l.startsWith("+ "))
+      .map((l) => l.slice(2));
 
-    // LCS via two-row DP + full direction table for backtracking
-    let prev = new Array<number>(n + 1).fill(0);
-    let curr = new Array<number>(n + 1).fill(0);
-    const dirs: Uint8Array[] = [];
-    for (let i = 0; i <= m; i++) dirs[i] = new Uint8Array(n + 1);
-
-    for (let i = 1; i <= m; i++) {
-      curr[0] = 0;
-      for (let j = 1; j <= n; j++) {
-        if (oldLines[i - 1] === newLines[j - 1]) {
-          curr[j] = prev[j - 1] + 1;
-          dirs[i][j] = 1;
-        } else if (prev[j] >= curr[j - 1]) {
-          curr[j] = prev[j];
-          dirs[i][j] = 2;
-        } else {
-          curr[j] = curr[j - 1];
-          dirs[i][j] = 3;
-        }
-      }
-      [prev, curr] = [curr, prev];
-      curr.fill(0);
-    }
-
-    // Backtrack: collect new-side line numbers that are additions (not in LCS)
     const changedLineNumbers: number[] = [];
-    let i = m;
-    let j = n;
-    while (i > 0 || j > 0) {
-      if (i > 0 && j > 0 && dirs[i][j] === 1) {
-        i--;
-        j--;
-      } else if (j > 0 && (i === 0 || dirs[i][j] === 3)) {
-        changedLineNumbers.push(j);
-        j--;
-      } else {
-        i--;
+    let searchFrom = 0;
+    for (const added of addedLines) {
+      const idx = newLines.indexOf(added, searchFrom);
+      if (idx !== -1) {
+        changedLineNumbers.push(idx + 1);
+        searchFrom = idx + 1;
       }
     }
 
@@ -414,19 +386,22 @@ export function App() {
           break;
         }
         case "file:changed": {
-          const changedPayload = msg.payload as { by?: string };
+          const changedPayload = msg.payload as {
+            by?: string;
+            diff?: string;
+          };
           const changedBy = changedPayload.by ?? "external";
+          const diff = changedPayload.diff ?? "";
           if (token) {
             fetchFile(token)
               .then((data) => {
                 const hadLocalEdits = contentRef.current !== mergeBaseRef.current;
                 savedContentRef.current = data.content;
                 if (!hadLocalEdits) {
-                  const oldContent = contentRef.current;
                   setContent(data.content);
                   contentRef.current = data.content;
                   mergeBaseRef.current = data.content;
-                  flashChangedLines(oldContent, data.content);
+                  flashChangedLines(diff, data.content);
                   setDirty(false);
                   setStatus(`changed by ${changedBy}`);
                 } else {
