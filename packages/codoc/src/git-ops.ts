@@ -185,19 +185,22 @@ function parseBlameOutput(output: string): BlameEntry[] {
 
     const headerMatch = line.match(/^([0-9a-f]{40})\s+(\d+)\s+(\d+)(?:\s+(\d+))?$/);
     if (headerMatch) {
-      if (currentHash && currentLineStart > 0) {
-        pushOrMerge(
-          entries,
-          currentHash,
-          currentAuthor,
-          currentLineStart,
-          currentLineEnd,
-        );
+      const isGroupStart = headerMatch[4] !== undefined;
+      if (isGroupStart) {
+        if (currentHash && currentLineStart > 0) {
+          pushOrMerge(
+            entries,
+            currentHash,
+            currentAuthor,
+            currentLineStart,
+            currentLineEnd,
+          );
+        }
+        currentHash = headerMatch[1];
+        currentLineStart = Number.parseInt(headerMatch[3], 10);
+        const numLines = Number.parseInt(headerMatch[4], 10);
+        currentLineEnd = currentLineStart + numLines - 1;
       }
-      currentHash = headerMatch[1];
-      currentLineStart = Number.parseInt(headerMatch[3], 10);
-      const numLines = headerMatch[4] ? Number.parseInt(headerMatch[4], 10) : 1;
-      currentLineEnd = currentLineStart + numLines - 1;
       continue;
     }
 

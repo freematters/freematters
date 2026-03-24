@@ -38,15 +38,30 @@ export function HistoryOverlay(props: HistoryOverlayProps) {
         setLoading(false);
         if (showLatestDiff && !autoShownDiff && data.length > 0) {
           setAutoShownDiff(true);
-          fetchHistoryContent(token, data[0].hash)
-            .then((lastSaved) => {
-              setDiffData({
-                original: lastSaved,
-                modified: currentContent,
-                title: "Current vs Last Saved",
-              });
-            })
-            .catch(() => {});
+          if (data.length >= 2) {
+            Promise.all([
+              fetchHistoryContent(token, data[1].hash),
+              fetchHistoryContent(token, data[0].hash),
+            ])
+              .then(([prev, latest]) => {
+                setDiffData({
+                  original: prev,
+                  modified: latest,
+                  title: `${data[0].author} — ${new Date(data[0].date).toLocaleString()}`,
+                });
+              })
+              .catch(() => {});
+          } else {
+            fetchHistoryContent(token, data[0].hash)
+              .then((content) => {
+                setDiffData({
+                  original: "",
+                  modified: content,
+                  title: `${data[0].author} — ${new Date(data[0].date).toLocaleString()}`,
+                });
+              })
+              .catch(() => {});
+          }
         }
       })
       .catch((err: Error) => {
