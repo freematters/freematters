@@ -190,7 +190,7 @@ case "$CMD" in
       curl -sf -X POST "$CODOC_SERVER/api/presence/$TOKEN/heartbeat" \\
         -H "Content-Type: application/json" \\
         -d "{\\"sessionId\\": \\"$SESSION_ID\\"}" > /dev/null 2>&1
-      RESULT=$(curl -sf "$CODOC_SERVER/api/file/$TOKEN?since=$LAST_HASH")
+      RESULT=$(curl -sf "$CODOC_SERVER/api/file/$TOKEN?hash=$LAST_HASH")
       CHANGED=$(echo "$RESULT" | jq -r '.changed // empty')
       if [ "$CHANGED" = "false" ]; then
         continue
@@ -360,7 +360,7 @@ curl -sf ${apiBase}/api/presence/${token} | jq '.users'
 ## 3. Polling for changes
 
 The \`/api/file/:token\` endpoint returns a server-computed \`hash\` field.
-Use the \`?since=<hash>\` query parameter to efficiently check for changes:
+Use the \`?hash=<known_hash>\` query parameter to efficiently check for changes:
 - If content unchanged: \`{"changed": false, "hash": "..."}\`
 - If content changed: full response with \`content\`, \`hash\`, and \`changed: true\`
 
@@ -371,7 +371,7 @@ LAST_HASH=$(curl -sf ${apiBase}/api/file/${token} | jq -r '.hash')
 # Poll loop
 while true; do
   sleep 2
-  RESULT=$(curl -sf "${apiBase}/api/file/${token}?since=$LAST_HASH")
+  RESULT=$(curl -sf "${apiBase}/api/file/${token}?hash=$LAST_HASH")
   CHANGED=$(echo "$RESULT" | jq -r '.changed // empty')
   if [ "$CHANGED" = "false" ]; then continue; fi
   # Content changed — new hash and content available
@@ -576,8 +576,8 @@ export function createHttpHandler(
         const contentHash = crypto.createHash("sha256").update(content).digest("hex");
 
         const url = new URL(req.url ?? "/", "http://localhost");
-        const sinceHash = url.searchParams.get("since");
-        if (sinceHash && sinceHash === contentHash) {
+        const knownHash = url.searchParams.get("hash");
+        if (knownHash && knownHash === contentHash) {
           sendJson(res, 200, { changed: false, hash: contentHash });
           return;
         }
@@ -588,7 +588,7 @@ export function createHttpHandler(
           fileName: path.basename(entry.filePath),
           readonly: entry.readonly,
         };
-        if (sinceHash) {
+        if (knownHash) {
           responseData.changed = true;
         }
         if (defaultName) {
