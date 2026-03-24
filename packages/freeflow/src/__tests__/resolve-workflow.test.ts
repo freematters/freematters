@@ -39,6 +39,37 @@ describe("hasWorkflowExtension recognises .workflow.md", () => {
   });
 });
 
+describe("hasWorkflowExtension recognises .md", () => {
+  let tmp: string;
+
+  beforeAll(() => {
+    tmp = createTempDir("resolve-wf-plain-md");
+  });
+
+  afterAll(() => {
+    cleanupTempDir(tmp);
+  });
+
+  test("explicit .md path resolves directly when file exists", () => {
+    const mdPath = join(tmp, "workflow.md");
+    writeFileSync(mdPath, "# placeholder", "utf-8");
+    const resolved = resolveWorkflow(mdPath);
+    expect(resolved).toBe(mdPath);
+  });
+
+  test("bare name with .md extension throws helpful message", () => {
+    expect(() => resolveWorkflow("some-wf.md")).toThrow(CliError);
+    try {
+      resolveWorkflow("some-wf.md");
+    } catch (e) {
+      const err = e as CliError;
+      expect(err.code).toBe("WORKFLOW_NOT_FOUND");
+      expect(err.message).toContain("Flat filename format is no longer supported");
+      expect(err.message).toContain("some-wf");
+    }
+  });
+});
+
 // ─── probeDir: markdown-only and ambiguity ──────────────────────
 
 describe("probeDir markdown resolution", () => {

@@ -23,12 +23,12 @@ function detectDirection(filePath: string): Direction {
   ) {
     return "yaml-to-md";
   }
-  if (filePath.endsWith(".workflow.md")) {
+  if (filePath.endsWith(".md")) {
     return "md-to-yaml";
   }
   throw new CliError(
     "ARGS_INVALID",
-    `unsupported file extension: expected .yaml, .yml, or .workflow.md, got "${basename(filePath)}"`,
+    `unsupported file extension: expected .yaml, .yml, or .md, got "${basename(filePath)}"`,
   );
 }
 
@@ -36,15 +36,25 @@ function defaultOutputPath(filePath: string, direction: Direction): string {
   const dir = dirname(filePath);
   const base = basename(filePath);
   if (direction === "yaml-to-md") {
-    const stem = base.replace(/\.(workflow\.)?ya?ml$/, "");
-    return join(dir, `${stem}.workflow.md`);
+    // Preserve .workflow. infix when present, otherwise simple extension swap
+    if (/\.workflow\.ya?ml$/.test(base)) {
+      const stem = base.replace(/\.workflow\.ya?ml$/, "");
+      return join(dir, `${stem}.workflow.md`);
+    }
+    const stem = base.replace(/\.ya?ml$/, "");
+    return join(dir, `${stem}.md`);
   }
-  const stem = base.replace(/\.workflow\.md$/, "");
-  return join(dir, `${stem}.workflow.yaml`);
+  // MD→YAML: preserve .workflow. infix when present
+  if (base.endsWith(".workflow.md")) {
+    const stem = base.replace(/\.workflow\.md$/, "");
+    return join(dir, `${stem}.workflow.yaml`);
+  }
+  const stem = base.replace(/\.md$/, "");
+  return join(dir, `${stem}.yaml`);
 }
 
 function deriveTitle(absPath: string): string {
-  let stem = basename(absPath).replace(/\.(workflow\.)?ya?ml$/, "");
+  let stem = basename(absPath).replace(/\.(workflow\.)?(ya?ml|md)$/, "");
   if (stem === "workflow") {
     stem = basename(dirname(absPath));
   }

@@ -408,9 +408,7 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
   visited.add(absPath);
 
   const raw = readFileSync(absPath, "utf-8");
-  const doc = absPath.endsWith(".workflow.md")
-    ? parseMarkdownWorkflow(raw)
-    : yamlLoad(raw);
+  const doc = absPath.endsWith(".md") ? parseMarkdownWorkflow(raw) : yamlLoad(raw);
 
   if (
     doc === null ||

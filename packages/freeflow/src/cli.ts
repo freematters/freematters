@@ -289,7 +289,7 @@ const markdownCmd = program
 markdownCmd
   .command("convert")
   .description("convert between YAML and Markdown workflow formats")
-  .argument("<file>", "path to .workflow.yaml or .workflow.md file")
+  .argument("<file>", "path to .yaml, .yml, or .md workflow file")
   .option(
     "-o, --output <path>",
     "output file path (default: same basename, swapped extension)",
