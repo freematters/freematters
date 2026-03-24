@@ -312,9 +312,6 @@ export class IpcServer {
       if (this.sessionTracker) {
         this.sessionTracker.removePoll(poll.token);
       }
-      if (poll.presenceSessionId && this.presenceLeaveCallback) {
-        this.presenceLeaveCallback(poll.presenceSessionId);
-      }
     }
   }
 
