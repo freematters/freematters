@@ -43,6 +43,7 @@ export interface ServerHandle {
   port: number;
   socketPath: string;
   tunnelUrl: string | null;
+  setTunnelUrl: (url: string) => void;
   shutdown: () => Promise<void>;
 }
 
@@ -96,7 +97,8 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
   presenceTracker.startCleanup();
   let wsServer: WebSocketServer | null = null;
   const scriptCallback = callbackScript ? new ScriptCallback(callbackScript) : null;
-  const baseUrl = tunnelUrl ?? `http://127.0.0.1:${port}`;
+  let resolvedTunnelUrl = tunnelUrl;
+  const getBaseUrl = () => resolvedTunnelUrl ?? `http://127.0.0.1:${actualPort}`;
   const lastSavedContentHash = new Map<string, string>();
 
   const handler = createHttpHandler(
@@ -114,7 +116,7 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
       }
       if (scriptCallback) {
         if (entry) {
-          const editUrl = `${baseUrl}/edit/${token}`;
+          const editUrl = `${getBaseUrl()}/edit/${token}`;
           scriptCallback.execute(entry.filePath, "save", token, editUrl);
         }
       }
@@ -193,7 +195,7 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
         if (matchedEntry) {
           wsServer.notifyFileChanged(matchedEntry.token, newContent, [], "external");
           if (scriptCallback) {
-            const editUrl = `${baseUrl}/edit/${matchedEntry.token}`;
+            const editUrl = `${getBaseUrl()}/edit/${matchedEntry.token}`;
             scriptCallback.execute(
               matchedEntry.filePath,
               "external_change",
@@ -231,7 +233,7 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
           if (entry) {
             wsServer.notifyFileChanged(entry.token, newContent, [], "external");
             if (scriptCallback) {
-              const editUrl = `${baseUrl}/edit/${entry.token}`;
+              const editUrl = `${getBaseUrl()}/edit/${entry.token}`;
               scriptCallback.execute(
                 entry.filePath,
                 "external_change",
@@ -275,7 +277,7 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
     });
   };
 
-  ipcServer.setTunnelUrl(tunnelUrl ?? null);
+  ipcServer.setTunnelUrl(resolvedTunnelUrl ?? null);
 
   ipcServer.onStop(() => {
     shutdown().catch(() => {});
@@ -286,7 +288,11 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
   return {
     port: actualPort,
     socketPath,
-    tunnelUrl: tunnelUrl ?? null,
+    tunnelUrl: resolvedTunnelUrl ?? null,
+    setTunnelUrl: (url: string) => {
+      resolvedTunnelUrl = url;
+      ipcServer.setTunnelUrl(url);
+    },
     shutdown,
   };
 }
@@ -407,23 +413,7 @@ async function runServer(): Promise<void> {
     return;
   }
 
-  let tunnelUrl: string | undefined;
   let tunnelProcess: childProcess.ChildProcess | null = null;
-
-  if (config.tunnel === "cloudflare") {
-    const cloudflaredPath = ensureCloudflared();
-    if (!cloudflaredPath) {
-      console.error("cloudflared not available, starting without tunnel");
-    }
-    if (cloudflaredPath)
-      try {
-        const result = await startTunnel(config.port, cloudflaredPath);
-        tunnelUrl = result.tunnelUrl;
-        tunnelProcess = result.tunnelProcess;
-      } catch {
-        // tunnel failure is non-fatal, server starts without it
-      }
-  }
 
   try {
     const handle = await startServer({
@@ -431,9 +421,24 @@ async function runServer(): Promise<void> {
       socketPath,
       tokensPath,
       callbackScript: config.callbackScript,
-      tunnelUrl,
       defaultName: config.defaultName,
     });
+
+    if (config.tunnel === "cloudflare") {
+      const cloudflaredPath = ensureCloudflared();
+      if (!cloudflaredPath) {
+        console.error("cloudflared not available, running without tunnel");
+      }
+      if (cloudflaredPath) {
+        try {
+          const result = await startTunnel(handle.port, cloudflaredPath);
+          tunnelProcess = result.tunnelProcess;
+          handle.setTunnelUrl(result.tunnelUrl);
+        } catch {
+          // tunnel failure is non-fatal, server runs without it
+        }
+      }
+    }
 
     const onSignal = () => {
       if (tunnelProcess) {
