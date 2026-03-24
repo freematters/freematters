@@ -1,4 +1,4 @@
-version: 1
+version: 1.1
 extends_guide: ./base-no-guide.workflow.yaml
 initial: start
 states:

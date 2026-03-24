@@ -46,7 +46,7 @@ Design principles:
 | `src/commands/finish.ts` | Abort run, commit finish event |
 | `src/hooks/post-tool-use.ts` | PostToolUse hook: auto-detect, counter, reminder |
 | `hooks/hooks.json` | Claude Code hook declarations |
-| `skills/fflow-create/SKILL.md` | /fflow-create — guided workflow YAML creation |
+| `skills/fflow-author/SKILL.md` | /fflow-author — guided workflow YAML creation |
 | `skills/fflow/SKILL.md` | /fflow — initialize a workflow run |
 | `skills/e2e-run/SKILL.md` | /fflow:e2e-run — run e2e agent tests |
 | `src/e2e/multi-turn-session.ts` | V1 query() wrapper for multi-turn agent sessions |

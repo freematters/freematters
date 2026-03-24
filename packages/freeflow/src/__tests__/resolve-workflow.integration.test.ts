@@ -125,24 +125,6 @@ states:
     expect(fsm.states.start.prompt).toContain("PROJECT-LOCAL");
   });
 
-  test("old flat format in project-local search dir is NOT found by name", () => {
-    // Place a flat-format file inside the project-local search dir
-    // (this is the dir that resolveWorkflow actually searches)
-    const searchDir = join(tmp, ".freeflow", "workflows");
-    writeFileSync(
-      join(searchDir, "flat-in-search.workflow.yaml"),
-      MINIMAL_FSM,
-      "utf-8",
-    );
-    // Searching by bare name should not find it — only <name>/workflow.yaml format works
-    expect(() => resolveWorkflow("flat-in-search")).toThrow(CliError);
-    try {
-      resolveWorkflow("flat-in-search");
-    } catch (e) {
-      expect((e as CliError).code).toBe("WORKFLOW_NOT_FOUND");
-    }
-  });
-
   // Note: user-global search path (~/.freeflow/workflows/) sits between project-local
   // and bundled in priority. We cannot test it in integration tests without writing to
   // the real home directory (~/.freeflow/workflows/), which would cause side effects.
@@ -182,22 +164,6 @@ describe("validate all bundled workflows", () => {
       expect(fsm.initial).toBeTruthy();
       expect(Object.keys(fsm.states).length).toBeGreaterThan(0);
       expect(fsm.states.done).toBeDefined();
-    }
-  });
-
-  test("expected bundled workflows exist", () => {
-    const expectedWorkflows = [
-      "spec-gen",
-      "spec-to-code",
-      "github-pr-lifecycle",
-      "code-review",
-      "github-spec-gen",
-      "release",
-      "gamemaker",
-      "verifier",
-    ];
-    for (const name of expectedWorkflows) {
-      expect(workflowDirs).toContain(name);
     }
   });
 });

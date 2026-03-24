@@ -36,7 +36,7 @@ Code is deterministic but rigid, hard to extend, and bug-prone.
 |              Claude Code Plugin              |
 |                                              |
 |  skills/              hooks/                 |
-|  +-- fflow-create/    +-- hooks.json         |
+|  +-- fflow-author/    +-- hooks.json         |
 |  +-- fflow/                                  |
 |  +-- current/          PostToolUse:           |
 |  +-- finish/            - every 5 tool calls |
@@ -333,7 +333,7 @@ Transitions:
 
 ## Skills
 
-### `/fflow-create [PATH]`
+### `/fflow-author [PATH]`
 
 Interactively create an FSM workflow YAML through conversation. User describes workflows in natural language, agent generates schema-compliant YAML.
 
@@ -354,7 +354,7 @@ Abort the current FSM run. Calls `fflow finish` and displays the terminal summar
 ### Skills design decisions
 
 - **Hooks are always mounted, activated on demand** — hooks check for an active session/run and no-op if none exists. No dynamic install/uninstall.
-- **`/fflow-create` does not depend on CLI** — pure conversation to generate YAML
+- **`/fflow-author` does not depend on CLI** — pure conversation to generate YAML
 - **`goto` is not a skill** — transitions are driven by agent via CLI, not exposed as slash commands
 
 ## Plugin Structure
@@ -362,7 +362,7 @@ Abort the current FSM run. Calls `fflow finish` and displays the terminal summar
 ```
 ./
 ├── skills/
-│   ├── fflow-create/
+│   ├── fflow-author/
 │   │   └── SKILL.md
 │   ├── fflow/
 │   │   └── SKILL.md

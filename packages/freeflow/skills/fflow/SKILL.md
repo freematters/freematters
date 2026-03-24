@@ -57,4 +57,4 @@ If the exit code of any CLI is not 0, the cli will output the error message, fol
 ## Error Handling
 
 - **`RUN_EXISTS`** — The generated run_id is already taken. Generate a different slug and retry.
-- **`SCHEMA_INVALID`** — The YAML file has validation errors. Show the error message and suggest using `/fflow-create` to build a valid workflow.
+- **`SCHEMA_INVALID`** — The YAML file has validation errors. Show the error message and suggest using `/fflow-author` to build a valid workflow.

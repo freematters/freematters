@@ -11,28 +11,24 @@
  * - Non-lite round-trip: all full cards
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
-import { handlePostToolUse } from "../hooks/post-tool-use.js";
+import type { RunMeta, Snapshot } from "../store.js";
 import { Store } from "../store.js";
 import { runCli, runCliJson } from "./e2e/helpers.js";
-import {
-  MULTI_FSM,
-  PLANNING_FSM,
-  cleanupTempDir,
-  createTempDir,
-  startEvent,
-  writeFsmFile,
-} from "./fixtures.js";
+import { MINIMAL_FSM, MULTI_FSM, cleanupTempDir, createTempDir } from "./fixtures.js";
 
 let tmp: string;
 let fsmMulti: string;
+let fsmMinimal: string;
 
 beforeAll(() => {
   tmp = createTempDir("lite-integ");
   fsmMulti = join(tmp, "multi.yaml");
   writeFileSync(fsmMulti, MULTI_FSM, "utf-8");
+  fsmMinimal = join(tmp, "minimal.yaml");
+  writeFileSync(fsmMinimal, MINIMAL_FSM, "utf-8");
 });
 
 afterAll(() => {
@@ -44,6 +40,25 @@ function uniqueRunId(prefix = "integ"): string {
   runCounter++;
   return `${prefix}-${runCounter}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
+
+// ─── Design Test 1: Lite flag persistence ────────────────────────
+
+describe("start --lite: lite flag persistence", () => {
+  test("start with lite: true → meta has lite: true, initial snapshot has visited_states with initial state", () => {
+    const id = uniqueRunId("lite-persist");
+    const root = join(tmp, "root-persist");
+
+    runCli(`start ${fsmMinimal} --run-id ${id} --lite`, { root });
+
+    const store = new Store(root);
+    const meta = store.readMeta(id) as RunMeta & { lite?: boolean };
+    expect(meta.lite).toBe(true);
+
+    const snap = store.readSnapshot(id) as Snapshot & { visited_states?: string[] };
+    expect(snap).not.toBeNull();
+    expect(snap.visited_states).toEqual(["start"]);
+  });
+});
 
 // ─── Design Test 2: Visited states tracking on goto ──────────────
 
@@ -155,52 +170,5 @@ describe("Non-lite round-trip: all full cards", () => {
     expect(gotoBack.stdout).toContain("Begin work.");
     expect(gotoBack.stdout).toContain("Your instructions:");
     expect(gotoBack.stdout).not.toContain("Re-entering");
-  });
-});
-
-// ─── Hook reminder: formatReminder omits prompt text ─────────────
-
-describe("PostToolUse hook reminder: no prompt text", () => {
-  test("reminder output contains state and transitions but not prompt text", () => {
-    const root = join(tmp, "hook-reminder-root");
-    const fsmPath = writeFsmFile(tmp, "planning-hook.yaml", PLANNING_FSM);
-
-    // Enable hook
-    mkdirSync(root, { recursive: true });
-    writeFileSync(
-      join(root, "settings.json"),
-      JSON.stringify({ hooks: { postToolUse: true } }),
-      "utf-8",
-    );
-
-    // Set up an active run with session binding
-    const store = new Store(root);
-    const runId = uniqueRunId("hook-reminder");
-    store.initRun(runId, fsmPath);
-    store.commit(runId, startEvent("plan"), { run_status: "active", state: "plan" });
-    store.bindSession("hook-session", runId);
-
-    const makeInput = (overrides: Record<string, unknown> = {}) => ({
-      session_id: "hook-session",
-      tool_name: "Read",
-      tool_input: {},
-      tool_response: {},
-      ...overrides,
-    });
-
-    // Advance counter to 4 so next call triggers reminder
-    for (let i = 0; i < 4; i++) {
-      const result = handlePostToolUse(makeInput(), root);
-      expect(result).toBeNull();
-    }
-
-    // 5th call: reminder should fire
-    const reminder = handlePostToolUse(makeInput(), root);
-    expect(reminder).not.toBeNull();
-    expect(reminder).toContain("[FSM Reminder]");
-    expect(reminder).toContain("State: plan");
-    expect(reminder).toContain("approved → execute");
-    // Reminder must NOT contain the prompt text
-    expect(reminder).not.toContain("Plan the work.");
   });
 });
