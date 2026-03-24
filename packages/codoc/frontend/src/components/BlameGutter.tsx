@@ -47,45 +47,35 @@ export function BlameGutter(props: BlameGutterProps) {
         return;
       }
 
-      const latestEntries = entries.filter((e) => e.hash === latestHash);
-      if (latestEntries.length === 0) {
-        decorationIds.current = editorInstance.deltaDecorations(
-          decorationIds.current,
-          [],
-        );
-        return;
-      }
-
-      const isAgent = latestEntries[0].isAgent;
-      const color = isAgent ? AGENT_COLOR : HUMAN_COLOR;
-      const cssClass = "codoc-blame-latest";
-
-      if (injectedStyleRef.current) {
-        injectedStyleRef.current.textContent = `.${cssClass} { background: ${color} !important; width: 4px !important; margin-left: 3px !important; }`;
-      } else {
+      if (!injectedStyleRef.current) {
         const style = document.createElement("style");
-        style.setAttribute("data-blame-latest", "true");
-        style.textContent = `.${cssClass} { background: ${color} !important; width: 4px !important; margin-left: 3px !important; }`;
+        style.setAttribute("data-blame-gutter", "true");
+        style.textContent = [
+          `.codoc-blame-agent { background: ${AGENT_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
+          `.codoc-blame-human { background: ${HUMAN_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
+        ].join("\n");
         document.head.appendChild(style);
         injectedStyleRef.current = style;
       }
 
-      for (const entry of latestEntries) {
+      for (const entry of entries) {
+        const isLatest = latestHash && entry.hash === latestHash;
+        const cssClass = entry.isAgent ? "codoc-blame-agent" : "codoc-blame-human";
         for (let line = entry.lineStart; line <= entry.lineEnd; line++) {
           decorations.push({
             range: new monacoNs.Range(line, 1, line, 1),
             options: {
               isWholeLine: true,
               marginClassName: cssClass,
-              stickiness:
-                monacoNs.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
               glyphMarginHoverMessage: {
-                value: `**${entry.author}** \u00b7 \`${entry.hash.substring(0, 7)}\``,
+                value: `**${entry.author}** · \`${entry.hash.substring(0, 7)}\`${isLatest ? " (latest)" : ""}`,
               },
-              overviewRuler: {
-                color,
-                position: 1,
-              },
+              overviewRuler: isLatest
+                ? {
+                    color: entry.isAgent ? AGENT_COLOR : HUMAN_COLOR,
+                    position: 1,
+                  }
+                : undefined,
             },
           });
         }
