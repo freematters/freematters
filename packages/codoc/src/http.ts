@@ -195,17 +195,18 @@ case "$CMD" in
       -H "Content-Type: application/json" \\
       -d "{\\"sessionId\\": \\"$SESSION_ID\\"}" > /dev/null 2>&1; }
     trap poll_cleanup EXIT
-    echo "Polling for changes..." >&2
-    while true; do
-      curl -sf -X POST "$CODOC_SERVER/api/presence/$TOKEN/heartbeat" \\
-        -H "Content-Type: application/json" \\
-        -d "{\\"sessionId\\": \\"$SESSION_ID\\"}" > /dev/null 2>&1
-      RESULT=$(curl -sf "$CODOC_SERVER/api/poll/$TOKEN?timeout=30")
-      CHANGED=$(echo "$RESULT" | jq -r '.changed')
-      if [ "$CHANGED" = "true" ]; then
-        echo "$RESULT" | jq -r '.diff'
-        break
-      fi
+    echo "Listening for changes (SSE)..." >&2
+    curl -sfN "$CODOC_SERVER/api/events/$TOKEN" | while IFS= read -r line; do
+      case "$line" in
+        "event: change") EVENT="change" ;;
+        data:*)
+          if [ "$EVENT" = "change" ]; then
+            DATA="\${line#data: }"
+            echo "$DATA" | jq -r '.diff'
+            EVENT=""
+          fi
+          ;;
+      esac
     done
     ;;
   who)
@@ -365,37 +366,33 @@ curl -sf ${apiBase}/api/presence/${token} | jq '.users'
 
 ---
 
-## 3. Long-poll for changes
+## 3. SSE stream for changes
 
-Use the long-poll endpoint to wait for file changes efficiently. It blocks until
-the file changes or the timeout expires, then returns the diff:
+Subscribe to real-time file changes via Server-Sent Events. The connection stays
+open and pushes every change as it happens — no polling gaps.
 
 \`\`\`
-GET /api/poll/:token?timeout=30
+GET /api/events/:token
 \`\`\`
 
-**Response** (changed):
-\`\`\`json
-{"changed": true, "diff": "+ added line\\n- removed line", "comments": [...], "content": "full content"}
+Each change event contains:
 \`\`\`
-
-**Response** (timeout, no change):
-\`\`\`json
-{"changed": false}
+event: change
+data: {"diff": "+ added\\n- removed", "comments": [...], "content": "full content"}
 \`\`\`
 
 \`\`\`bash
-while true; do
-  RESULT=$(curl -sf "${apiBase}/api/poll/${token}?timeout=30")
-  CHANGED=$(echo "$RESULT" | jq -r '.changed')
-  if [ "$CHANGED" = "true" ]; then
-    echo "$RESULT" | jq -r '.diff'
-    break
-  fi
-  # Send heartbeat between polls
-  curl -sf -X POST ${apiBase}/api/presence/${token}/heartbeat \\
-    -H "Content-Type: application/json" \\
-    -d "{\\\"sessionId\\\": \\\"$SESSION_ID\\\"}" > /dev/null 2>&1
+curl -sfN ${apiBase}/api/events/${token} | while IFS= read -r line; do
+  case "$line" in
+    "event: change") EVENT="change" ;;
+    data:*)
+      if [ "$EVENT" = "change" ]; then
+        DATA="\${line#data: }"
+        echo "$DATA" | jq -r '.diff'
+        EVENT=""
+      fi
+      ;;
+  esac
 done
 \`\`\`
 
@@ -535,7 +532,10 @@ curl -sf -X POST $SERVER/api/presence/$TOKEN/leave \\
 `;
 }
 
-export type PollCallback = (filePath: string, cb: (newContent: string) => void) => void;
+export type WatchCallback = (
+  filePath: string,
+  cb: (newContent: string) => void,
+) => () => void;
 
 export function createHttpHandler(
   tokenStore: TokenStore,
@@ -545,7 +545,7 @@ export function createHttpHandler(
   defaultName: string | undefined,
   presenceTracker: PresenceTracker | undefined,
   savedContentHashMap?: Map<string, string>,
-  onPollRegister?: PollCallback,
+  onWatch?: WatchCallback,
 ): http.RequestListener {
   return (req: http.IncomingMessage, res: http.ServerResponse) => {
     const method = req.method ?? "GET";
@@ -613,11 +613,11 @@ export function createHttpHandler(
       return;
     }
 
-    // GET /api/poll/:token — long-poll, blocks until file changes, returns diff
+    // GET /api/events/:token — SSE stream of file changes
     if (
       method === "GET" &&
       segments[0] === "api" &&
-      segments[1] === "poll" &&
+      segments[1] === "events" &&
       segments.length === 3
     ) {
       const token = segments[2];
@@ -626,47 +626,43 @@ export function createHttpHandler(
         send404(res);
         return;
       }
-      if (!onPollRegister) {
-        sendJson(res, 501, { error: "Poll not available" });
+      if (!onWatch) {
+        sendJson(res, 501, { error: "Watch not available" });
         return;
       }
 
-      const url = new URL(req.url ?? "/", "http://localhost");
-      const timeoutMs = Math.min(
-        Number.parseInt(url.searchParams.get("timeout") ?? "30", 10) * 1000,
-        120000,
-      );
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.write(":\n\n");
 
-      let originalContent: string;
+      let lastContent: string;
       try {
-        originalContent = fs.readFileSync(entry.filePath, "utf-8");
+        lastContent = fs.readFileSync(entry.filePath, "utf-8");
       } catch {
-        sendJson(res, 500, { error: "Cannot read file" });
+        res.write("event: error\ndata: cannot read file\n\n");
+        res.end();
         return;
       }
 
-      let responded = false;
-      const timer = setTimeout(() => {
-        if (!responded) {
-          responded = true;
-          sendJson(res, 200, { changed: false });
-        }
-      }, timeoutMs);
-
-      onPollRegister(entry.filePath, (newContent: string) => {
-        if (responded) return;
-        responded = true;
-        clearTimeout(timer);
-        const diff = computeDiff(originalContent, newContent);
+      const unwatch = onWatch(entry.filePath, (newContent: string) => {
+        const diff = computeDiff(lastContent, newContent);
         const comments = parseComments(newContent);
-        sendJson(res, 200, { changed: true, diff, comments, content: newContent });
+        const data = JSON.stringify({ diff, comments, content: newContent });
+        res.write(`event: change\ndata: ${data}\n\n`);
+        lastContent = newContent;
       });
 
+      const heartbeat = setInterval(() => {
+        res.write(":\n\n");
+      }, 15000);
+
       req.on("close", () => {
-        if (!responded) {
-          responded = true;
-          clearTimeout(timer);
-        }
+        clearInterval(heartbeat);
+        unwatch();
       });
       return;
     }
