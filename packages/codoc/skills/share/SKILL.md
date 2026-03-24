@@ -19,7 +19,7 @@ description: Share a file for collaborative editing with a human via browser. Us
 
 If the user says the link doesn't work, is broken, or returns 404:
 1. Try `codoc share` again on the same file to get a fresh URL.
-2. If re-share fails (server not running), stop the old server with `codoc stop`, then restart from step 1 of the Flow (run `codoc server` in background, then `codoc share`).
+2. If re-share fails (server not running), stop the old background `codoc server` task (via TaskStop or `codoc stop`), then restart from step 1 of the Flow (run `codoc server` in background, then `codoc share`).
 
 ## Comment Block Format
 
