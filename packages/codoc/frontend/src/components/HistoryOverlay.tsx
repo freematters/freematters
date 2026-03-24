@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type LogEntry,
   fetchDiff,
+  fetchFile,
   fetchHistory,
   fetchHistoryContent,
   revertToCommit,
@@ -19,6 +20,8 @@ interface HistoryOverlayProps {
 
 export function HistoryOverlay(props: HistoryOverlayProps) {
   const { token, dirty, showLatestDiff, currentContent, onClose, onRevert } = props;
+  const currentContentRef = useRef(currentContent);
+  currentContentRef.current = currentContent;
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -36,14 +39,14 @@ export function HistoryOverlay(props: HistoryOverlayProps) {
       .then((data) => {
         setEntries(data);
         setLoading(false);
-        if (showLatestDiff && !autoShownDiff && data.length > 0) {
+        if (showLatestDiff && !autoShownDiff) {
           setAutoShownDiff(true);
-          fetchHistoryContent(token, data[0].hash)
-            .then((lastSaved) => {
+          fetchFile(token)
+            .then((fileData) => {
               setDiffData({
-                original: lastSaved,
-                modified: currentContent,
-                title: "Current vs Last Saved",
+                original: fileData.content,
+                modified: currentContentRef.current,
+                title: "On Disk → Editor",
               });
             })
             .catch(() => {});
@@ -111,20 +114,18 @@ export function HistoryOverlay(props: HistoryOverlayProps) {
   );
 
   const handleViewUnsavedDiff = useCallback(() => {
-    if (entries.length > 0) {
-      fetchHistoryContent(token, entries[0].hash)
-        .then((lastSaved) => {
-          setDiffData({
-            original: lastSaved,
-            modified: currentContent,
-            title: "Unsaved changes",
-          });
-        })
-        .catch((err: Error) => {
-          setError(err.message);
+    fetchFile(token)
+      .then((fileData) => {
+        setDiffData({
+          original: fileData.content,
+          modified: currentContentRef.current,
+          title: "On Disk → Editor",
         });
-    }
-  }, [token, entries, currentContent]);
+      })
+      .catch((err: Error) => {
+        setError(err.message);
+      });
+  }, [token]);
 
   const closeDiff = useCallback(() => {
     setDiffData(null);

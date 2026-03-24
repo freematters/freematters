@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import type http from "node:http";
 import path from "node:path";
@@ -142,17 +143,6 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-sha256() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum | cut -d' ' -f1
-  elif command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 | cut -d' ' -f1
-  else
-    echo "Error: sha256sum or shasum required" >&2
-    exit 1
-  fi
-}
-
 case "$CMD" in
   edit)
     TOKEN="\$1"
@@ -194,19 +184,20 @@ case "$CMD" in
       -d "{\\"sessionId\\": \\"$SESSION_ID\\"}" > /dev/null 2>&1; }
     trap poll_cleanup EXIT
     echo "Polling for changes..." >&2
-    LAST_HASH=""
+    LAST_HASH=$(curl -sf "$CODOC_SERVER/api/file/$TOKEN" | jq -r '.hash')
     while true; do
+      sleep 2
       curl -sf -X POST "$CODOC_SERVER/api/presence/$TOKEN/heartbeat" \\
         -H "Content-Type: application/json" \\
         -d "{\\"sessionId\\": \\"$SESSION_ID\\"}" > /dev/null 2>&1
-      CONTENT=$(curl -sf "$CODOC_SERVER/api/file/$TOKEN" | jq -r '.content')
-      HASH=$(echo "$CONTENT" | sha256)
-      if [ -n "$LAST_HASH" ] && [ "$HASH" != "$LAST_HASH" ]; then
-        echo "Document changed."
-        break
+      RESULT=$(curl -sf "$CODOC_SERVER/api/file/$TOKEN?hash=$LAST_HASH")
+      CHANGED=$(echo "$RESULT" | jq -r '.changed // empty')
+      if [ "$CHANGED" = "false" ]; then
+        continue
       fi
-      LAST_HASH="$HASH"
-      sleep 2
+      LAST_HASH=$(echo "$RESULT" | jq -r '.hash')
+      echo "$RESULT" | jq -r '.content'
+      break
     done
     ;;
   who)
@@ -366,22 +357,33 @@ curl -sf ${apiBase}/api/presence/${token} | jq '.users'
 
 ---
 
-## 3. Shell-based polling
+## 3. Polling for changes
 
-Poll for changes using a simple bash loop:
+The \`/api/file/:token\` endpoint returns a server-computed \`hash\` field.
+Use the \`?hash=<known_hash>\` query parameter to efficiently check for changes:
+- If content unchanged: \`{"changed": false, "hash": "..."}\`
+- If content changed: full response with \`content\`, \`hash\`, and \`changed: true\`
 
 \`\`\`bash
-LAST_HASH=""
+# Get initial hash
+LAST_HASH=$(curl -sf ${apiBase}/api/file/${token} | jq -r '.hash')
+
+# Poll loop
 while true; do
-  CONTENT=$(curl -sf ${apiBase}/api/file/${token} | jq -r '.content')
-  HASH=$(echo "$CONTENT" | sha256sum | cut -d' ' -f1)
-  if [ -n "$LAST_HASH" ] && [ "$HASH" != "$LAST_HASH" ]; then
-    echo "Changed"; break
-  fi
-  LAST_HASH="$HASH"
   sleep 2
+  RESULT=$(curl -sf "${apiBase}/api/file/${token}?hash=$LAST_HASH")
+  CHANGED=$(echo "$RESULT" | jq -r '.changed // empty')
+  if [ "$CHANGED" = "false" ]; then continue; fi
+  # Content changed — new hash and content available
+  LAST_HASH=$(echo "$RESULT" | jq -r '.hash')
+  echo "$RESULT" | jq -r '.content'
+  break
 done
 \`\`\`
+
+**Important**: Always use the server-provided \`hash\` for comparison.
+Do NOT compute your own hash from the content — shell processing
+(echo, jq) can alter whitespace and cause false positives.
 
 ---
 
@@ -526,6 +528,7 @@ export function createHttpHandler(
   sessionTracker: SessionTracker | undefined,
   defaultName: string | undefined,
   presenceTracker: PresenceTracker | undefined,
+  savedContentHashMap?: Map<string, string>,
 ): http.RequestListener {
   return (req: http.IncomingMessage, res: http.ServerResponse) => {
     const method = req.method ?? "GET";
@@ -570,11 +573,24 @@ export function createHttpHandler(
       }
       try {
         const content = fs.readFileSync(entry.filePath, "utf-8");
+        const contentHash = crypto.createHash("sha256").update(content).digest("hex");
+
+        const url = new URL(req.url ?? "/", "http://localhost");
+        const knownHash = url.searchParams.get("hash");
+        if (knownHash && knownHash === contentHash) {
+          sendJson(res, 200, { changed: false, hash: contentHash });
+          return;
+        }
+
         const responseData: Record<string, unknown> = {
           content,
+          hash: contentHash,
           fileName: path.basename(entry.filePath),
           readonly: entry.readonly,
         };
+        if (knownHash) {
+          responseData.changed = true;
+        }
         if (defaultName) {
           responseData.defaultName = defaultName;
         }
@@ -636,6 +652,12 @@ export function createHttpHandler(
             if (typeof parsed.content !== "string") {
               sendJson(res, 400, { error: "content must be a string" });
               return;
+            }
+            if (savedContentHashMap) {
+              savedContentHashMap.set(
+                entry.filePath,
+                crypto.createHash("sha256").update(parsed.content).digest("hex"),
+              );
             }
             fs.writeFileSync(entry.filePath, parsed.content);
 

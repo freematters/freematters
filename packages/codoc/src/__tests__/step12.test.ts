@@ -119,6 +119,7 @@ describe("Server idempotency", () => {
     socketPath = getSocketPath();
     tokensPath = getTokensPath();
     handle1 = await startServer({ port: 0, socketPath, tokensPath });
+    await handle1.startIpc();
 
     await expect(startServer({ port: 0, socketPath, tokensPath })).rejects.toThrow(
       /already running/i,
@@ -131,6 +132,7 @@ describe("Server idempotency", () => {
     tokensPath = getTokensPath();
     fs.writeFileSync(socketPath, "stale");
     handle1 = await startServer({ port: 0, socketPath, tokensPath });
+    await handle1.startIpc();
     expect(handle1.port).toBeGreaterThan(0);
     expect(fs.existsSync(socketPath)).toBe(true);
   });
@@ -159,6 +161,7 @@ describe("Stop graceful handling", () => {
     const socketPath = getSocketPath();
     const tokensPath = getTokensPath();
     const handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
 
     const result = await runStop(socketPath, true, "test");
     expect(result.ok).toBe(true);
@@ -200,6 +203,7 @@ describe("Full integration: all CLI commands and API routes", () => {
 
     // 1. Start server
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
     expect(handle.port).toBeGreaterThan(0);
     expect(fs.existsSync(socketPath)).toBe(true);
 

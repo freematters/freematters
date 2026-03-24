@@ -5,9 +5,10 @@ import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { ScriptCallback } from "../callback.js";
+
+const GIT_FILE_NAME = "doc.md";
 import {
   ensureCloudflared,
   getTunnelSpawnArgs,
@@ -19,12 +20,7 @@ import { FileWatcher } from "../file-watcher.js";
 import { GitOps } from "../git-ops.js";
 import { createHttpHandler } from "../http.js";
 import { IpcServer } from "../ipc.js";
-import { IpcClient } from "../ipc.js";
-import {
-  getDefaultSocketPath,
-  getDefaultTokensPath,
-  readSessionIdFromStdin,
-} from "../paths.js";
+import { getDefaultSocketPath, getDefaultTokensPath } from "../paths.js";
 import { PresenceTracker } from "../presence.js";
 import { SessionTracker } from "../session-tracker.js";
 import { TokenStore } from "../token-store.js";
@@ -43,6 +39,8 @@ export interface ServerHandle {
   port: number;
   socketPath: string;
   tunnelUrl: string | null;
+  setTunnelUrl: (url: string) => void;
+  startIpc: () => Promise<void>;
   shutdown: () => Promise<void>;
 }
 
@@ -96,25 +94,20 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
   presenceTracker.startCleanup();
   let wsServer: WebSocketServer | null = null;
   const scriptCallback = callbackScript ? new ScriptCallback(callbackScript) : null;
-  const baseUrl = tunnelUrl ?? `http://127.0.0.1:${port}`;
+  let resolvedTunnelUrl = tunnelUrl;
+  const getBaseUrl = () => resolvedTunnelUrl ?? `http://127.0.0.1:${actualPort}`;
   const lastSavedContentHash = new Map<string, string>();
 
   const handler = createHttpHandler(
     tokenStore,
     (token: string, content: string, author: string) => {
-      const entry = tokenStore.resolve(token);
-      if (entry) {
-        lastSavedContentHash.set(
-          entry.filePath,
-          crypto.createHash("sha256").update(content).digest("hex"),
-        );
-      }
       if (wsServer) {
         wsServer.notifySaved(token, author);
       }
       if (scriptCallback) {
+        const entry = tokenStore.resolve(token);
         if (entry) {
-          const editUrl = `${baseUrl}/edit/${token}`;
+          const editUrl = `${getBaseUrl()}/edit/${token}`;
           scriptCallback.execute(entry.filePath, "save", token, editUrl);
         }
       }
@@ -123,6 +116,7 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
     sessionTracker,
     defaultName,
     presenceTracker,
+    lastSavedContentHash,
   );
   const httpServer = http.createServer(handler);
 
@@ -193,7 +187,7 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
         if (matchedEntry) {
           wsServer.notifyFileChanged(matchedEntry.token, newContent, [], "external");
           if (scriptCallback) {
-            const editUrl = `${baseUrl}/edit/${matchedEntry.token}`;
+            const editUrl = `${getBaseUrl()}/edit/${matchedEntry.token}`;
             scriptCallback.execute(
               matchedEntry.filePath,
               "external_change",
@@ -215,9 +209,19 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
         const data = result.data as { token: string; url: string };
         const filePath = params.filePath as string;
         const resolvedPath = path.resolve(filePath);
-        if (gitOpsMap.has(data.token)) {
+
+        const existingGitOps = gitOpsMap.get(data.token);
+        if (existingGitOps) {
+          try {
+            const gitFilePath = path.join(existingGitOps.getWorkTree(), GIT_FILE_NAME);
+            fs.copyFileSync(resolvedPath, gitFilePath);
+            await existingGitOps.commit(GIT_FILE_NAME, "share", "system");
+          } catch {
+            // commit failure is non-fatal (no changes to commit)
+          }
           return;
         }
+
         fileWatcher.watch(resolvedPath, (changedPath: string, newContent: string) => {
           const contentHash = crypto
             .createHash("sha256")
@@ -227,11 +231,18 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
           if (lastHash === contentHash) {
             return;
           }
+          lastSavedContentHash.set(changedPath, contentHash);
           const entry = tokenStore.list().find((e) => e.filePath === changedPath);
           if (entry) {
             wsServer.notifyFileChanged(entry.token, newContent, [], "external");
+            const gitOps = gitOpsMap.get(entry.token);
+            if (gitOps) {
+              const gitFilePath = path.join(gitOps.getWorkTree(), GIT_FILE_NAME);
+              fs.copyFileSync(changedPath, gitFilePath);
+              gitOps.commit(GIT_FILE_NAME, "external", "agent").catch(() => {});
+            }
             if (scriptCallback) {
-              const editUrl = `${baseUrl}/edit/${entry.token}`;
+              const editUrl = `${getBaseUrl()}/edit/${entry.token}`;
               scriptCallback.execute(
                 entry.filePath,
                 "external_change",
@@ -252,9 +263,9 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
         const gitOps = new GitOps(gitDir, gitBase);
         try {
           await gitOps.init();
-          const gitFilePath = path.join(gitBase, "doc.md");
+          const gitFilePath = path.join(gitBase, GIT_FILE_NAME);
           fs.copyFileSync(resolvedPath, gitFilePath);
-          await gitOps.commit("doc.md", "initial", "system");
+          await gitOps.commit(GIT_FILE_NAME, "initial", "system");
           gitOpsMap.set(data.token, gitOps);
         } catch {
           // git init failure is non-fatal
@@ -275,18 +286,21 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
     });
   };
 
-  ipcServer.setTunnelUrl(tunnelUrl ?? null);
+  ipcServer.setTunnelUrl(resolvedTunnelUrl ?? null);
 
   ipcServer.onStop(() => {
     shutdown().catch(() => {});
   });
 
-  await ipcServer.start();
-
   return {
     port: actualPort,
     socketPath,
-    tunnelUrl: tunnelUrl ?? null,
+    tunnelUrl: resolvedTunnelUrl ?? null,
+    setTunnelUrl: (url: string) => {
+      resolvedTunnelUrl = url;
+      ipcServer.setTunnelUrl(url);
+    },
+    startIpc: () => ipcServer.start(),
     shutdown,
   };
 }
@@ -335,54 +349,12 @@ function startTunnel(
 async function runServer(): Promise<void> {
   const socketPath = getDefaultSocketPath();
 
-  const stdinSessionId = await readSessionIdFromStdin();
-  const sessionId =
-    stdinSessionId ?? process.env.SESSION_ID ?? `session-${process.pid}-${Date.now()}`;
-  let alreadyRunning = false;
-
   if (fs.existsSync(socketPath)) {
     const active = await isSocketActive(socketPath);
     if (active) {
-      alreadyRunning = true;
-    }
-  }
-
-  if (!alreadyRunning && process.env.CODOC_DAEMON !== "1") {
-    const cliPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "..",
-      "cli.js",
-    );
-    const child = childProcess.spawn(process.execPath, [cliPath, "server"], {
-      env: { ...process.env, CODOC_DAEMON: "1" },
-      detached: true,
-      stdio: "ignore",
-    });
-    child.unref();
-
-    for (let i = 0; i < 50; i++) {
-      await new Promise((r) => setTimeout(r, 100));
-      if (fs.existsSync(socketPath) && (await isSocketActive(socketPath))) {
-        alreadyRunning = true;
-        break;
-      }
-    }
-    if (!alreadyRunning) {
-      console.error("Server failed to start within 5s");
-      process.exitCode = 1;
+      console.error("Server already running on this socket");
       return;
     }
-  }
-
-  if (alreadyRunning) {
-    try {
-      const client = new IpcClient(socketPath);
-      await client.send({ method: "session-start", params: { sessionId } });
-    } catch {
-      // non-fatal
-    }
-    process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "Server started (daemon)" } })}\n`);
-    return;
   }
 
   const tokensPath = getDefaultTokensPath();
@@ -398,23 +370,7 @@ async function runServer(): Promise<void> {
     return;
   }
 
-  let tunnelUrl: string | undefined;
   let tunnelProcess: childProcess.ChildProcess | null = null;
-
-  if (config.tunnel === "cloudflare") {
-    const cloudflaredPath = ensureCloudflared();
-    if (!cloudflaredPath) {
-      console.error("cloudflared not available, starting without tunnel");
-    }
-    if (cloudflaredPath)
-      try {
-        const result = await startTunnel(config.port, cloudflaredPath);
-        tunnelUrl = result.tunnelUrl;
-        tunnelProcess = result.tunnelProcess;
-      } catch {
-        // tunnel failure is non-fatal, server starts without it
-      }
-  }
 
   try {
     const handle = await startServer({
@@ -422,9 +378,26 @@ async function runServer(): Promise<void> {
       socketPath,
       tokensPath,
       callbackScript: config.callbackScript,
-      tunnelUrl,
       defaultName: config.defaultName,
     });
+
+    if (config.tunnel === "cloudflare") {
+      const cloudflaredPath = ensureCloudflared();
+      if (!cloudflaredPath) {
+        console.error("cloudflared not available, running without tunnel");
+      }
+      if (cloudflaredPath) {
+        try {
+          const result = await startTunnel(handle.port, cloudflaredPath);
+          tunnelProcess = result.tunnelProcess;
+          handle.setTunnelUrl(result.tunnelUrl);
+        } catch {
+          // tunnel failure is non-fatal, server runs without it
+        }
+      }
+    }
+
+    await handle.startIpc();
 
     const onSignal = () => {
       if (tunnelProcess) {

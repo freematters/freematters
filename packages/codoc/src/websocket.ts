@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import type http from "node:http";
 import { WebSocket, WebSocketServer as WsServer } from "ws";
-import { computeDiff } from "./diff.js";
+import { computeChangedLines, computeDiff } from "./diff.js";
 import type { ConnectedUser } from "./presence.js";
 import type { TokenStore } from "./token-store.js";
 
@@ -87,15 +87,15 @@ export class WebSocketServer {
 
   notifySaved(token: string, by: string): void {
     const version = this.incrementVersion(token);
-    const msg: WsMessage = {
-      type: "file:saved",
-      payload: { by, version },
-    };
-    const data = JSON.stringify(msg);
 
     for (const s of this.subscriptions) {
       if (s.token === token && s.ws.readyState === WebSocket.OPEN) {
-        s.ws.send(data);
+        const self = s.author === by;
+        const msg: WsMessage = {
+          type: "file:saved",
+          payload: { by, version, self },
+        };
+        s.ws.send(JSON.stringify(msg));
       }
     }
   }
@@ -137,10 +137,11 @@ export class WebSocketServer {
     const version = this.incrementVersion(token);
     const oldContent = this.lastContent.get(token) ?? "";
     const diff = computeDiff(oldContent, content);
+    const changedLines = computeChangedLines(oldContent, content);
     this.lastContent.set(token, content);
     const msg: WsMessage = {
       type: "file:changed",
-      payload: { diff, newComments, version, by },
+      payload: { diff, changedLines, newComments, version, by },
     };
     const data = JSON.stringify(msg);
 

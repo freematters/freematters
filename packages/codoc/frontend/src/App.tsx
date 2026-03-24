@@ -4,15 +4,12 @@ import { stripHtmlComments } from "@shared/copy-markdown";
 import type { editor } from "monaco-editor";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  type BlameEntry,
   DiffData,
   type PresenceUser,
   type WsMessage,
   createWebSocket,
-  fetchBlame,
   fetchDiff,
   fetchFile,
-  fetchHistory,
   fetchPresence,
   heartbeatPresence,
   joinPresence,
@@ -21,7 +18,7 @@ import {
   saveFile,
   sendWsMessage,
 } from "./api";
-import { BlameGutter } from "./components/BlameGutter";
+import { DiffGutter } from "./components/BlameGutter";
 import { CommentPopup } from "./components/CommentPopup";
 import { DiffView } from "./components/DiffView";
 import { HelpPanel } from "./components/HelpPanel";
@@ -78,7 +75,6 @@ export function App() {
     visible: boolean;
     showLatestDiff: boolean;
   }>({ visible: false, showLatestDiff: false });
-  const [blameRefresh, setBlameRefresh] = useState<number>(0);
   const [showShareDialog, setShowShareDialog] = useState<boolean>(false);
   const [readonlyToken, setReadonlyToken] = useState<string | null>(null);
   const [copiedMd, setCopiedMd] = useState<boolean>(false);
@@ -86,16 +82,13 @@ export function App() {
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [fileName, setFilePath] = useState<string>("");
   const [hoverLine, setHoverLine] = useState<number | null>(null);
-  const [blameEntries, setBlameEntries] = useState<BlameEntry[]>([]);
-  const [blameTooltip, setBlameTooltip] = useState<{
-    line: number;
-    top: number;
-    author: string;
-    timeAgo: string;
-  } | null>(null);
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
   const [dirty, setDirty] = useState<boolean>(false);
-  const [latestCommitHash, setLatestCommitHash] = useState<string | null>(null);
+  const [savedContent, setSavedContent] = useState<string>("");
+  const [quickDiffData, setQuickDiffData] = useState<{
+    original: string;
+    modified: string;
+  } | null>(null);
   const [conflictData, setConflictData] = useState<{
     conflictContent: string;
     myContent: string;
@@ -108,49 +101,68 @@ export function App() {
   const monacoRef = useRef<Monaco | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const contentRef = useRef<string>("");
-  const flashDecorationIds = useRef<string[]>([]);
   const prevPresenceUsersRef = useRef<PresenceUser[]>([]);
   const pollTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pollTypingVisible, setPollTypingVisible] = useState<boolean>(false);
+  const [waitingForUpdate, setWaitingForUpdate] = useState<boolean>(false);
+  const waitingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const glyphDecorationIds = useRef<string[]>([]);
+  const previewPaneRef = useRef<HTMLDivElement | null>(null);
+  const scrollSyncLockUntil = useRef<number>(0);
   const glyphDragStartLine = useRef<number | null>(null);
   const glyphDragDecorationIds = useRef<string[]>([]);
+  const savePendingRef = useRef<boolean>(false);
 
   const foldCommentRegions = useCallback(() => {
     const ed = editorRef.current;
-    if (!ed) return;
+    const monacoNs = monacoRef.current;
+    if (!ed || !monacoNs) return;
     const model = ed.getModel();
     if (!model) return;
     const lineCount = model.getLineCount();
-    const commentStartLines: number[] = [];
-    let inBlock = false;
+    const regions: { start: number; end: number }[] = [];
+    let blockStart = -1;
     for (let i = 1; i <= lineCount; i++) {
       const line = model.getLineContent(i).trimStart();
-      if (!inBlock && line === "<!--") {
-        commentStartLines.push(i);
-        inBlock = true;
-      } else if (inBlock && line === "-->") {
-        inBlock = false;
+      if (blockStart === -1 && line === "<!--") {
+        blockStart = i;
+      } else if (blockStart !== -1 && line === "-->") {
+        regions.push({ start: blockStart, end: i });
+        blockStart = -1;
       }
     }
+    if (regions.length === 0) return;
+    const selections = regions.map(
+      (r) => new monacoNs.Selection(r.start, 1, r.start, 1),
+    );
     const pos = ed.getPosition();
-    for (const startLine of commentStartLines) {
-      ed.setPosition({ lineNumber: startLine, column: 1 });
-      ed.trigger("fold", "editor.fold", {});
-    }
+    ed.setSelections(selections);
+    ed.trigger("fold", "editor.fold", {});
     if (pos) {
       ed.setPosition(pos);
     }
   }, []);
 
-  const handleUsernameChange = useCallback((newUsername: string) => {
-    setUsername(newUsername);
-    try {
-      localStorage.setItem("codoc_username", newUsername);
-    } catch {
-      // ignore storage errors
-    }
-  }, []);
+  const handleUsernameChange = useCallback(
+    (newUsername: string) => {
+      setUsername(newUsername);
+      try {
+        localStorage.setItem("codoc_username", newUsername);
+      } catch {
+        // ignore storage errors
+      }
+      if (token && presenceSessionIdRef.current) {
+        const mode = readonly ? ("read" as const) : ("write" as const);
+        leavePresence(token, presenceSessionIdRef.current).catch(() => {});
+        joinPresence(token, newUsername, mode)
+          .then((newId) => {
+            presenceSessionIdRef.current = newId;
+          })
+          .catch(() => {});
+      }
+    },
+    [token, readonly],
+  );
 
   useEffect(() => {
     const parsed = getTokenFromUrl();
@@ -165,6 +177,7 @@ export function App() {
         setContent(data.content);
         contentRef.current = data.content;
         savedContentRef.current = data.content;
+        setSavedContent(data.content);
         mergeBaseRef.current = data.content;
         setDirty(false);
         setReadonly(data.readonly);
@@ -178,46 +191,6 @@ export function App() {
       .catch((err: Error) => {
         setStatus(`Error: ${err.message}`);
       });
-  }, []);
-
-  const flashChangedLines = useCallback((oldContent: string, newContent: string) => {
-    const editorInstance = editorRef.current;
-    const monacoNs = monacoRef.current;
-
-    if (!editorInstance || !monacoNs) return;
-
-    const oldLines = oldContent.split("\n");
-    const newLines = newContent.split("\n");
-    const changedLineNumbers: number[] = [];
-
-    for (let i = 0; i < newLines.length; i++) {
-      if (i >= oldLines.length || newLines[i] !== oldLines[i]) {
-        changedLineNumbers.push(i + 1);
-      }
-    }
-
-    if (changedLineNumbers.length === 0) return;
-
-    const decorations = changedLineNumbers.map((lineNum) => ({
-      range: new monacoNs.Range(lineNum, 1, lineNum, 1),
-      options: {
-        isWholeLine: true,
-        className: "codoc-yellow-flash",
-        stickiness: monacoNs.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
-      },
-    }));
-
-    flashDecorationIds.current = editorInstance.deltaDecorations(
-      flashDecorationIds.current,
-      decorations,
-    );
-
-    setTimeout(() => {
-      flashDecorationIds.current = editorInstance.deltaDecorations(
-        flashDecorationIds.current,
-        [],
-      );
-    }, 3200);
   }, []);
 
   useEffect(() => {
@@ -300,7 +273,14 @@ export function App() {
         presenceSessionIdRef.current = sessionId;
         heartbeatInterval = setInterval(() => {
           if (presenceSessionIdRef.current) {
-            heartbeatPresence(token, presenceSessionIdRef.current).catch(() => {});
+            heartbeatPresence(token, presenceSessionIdRef.current).catch(() => {
+              const rejoinMode = readonly ? ("read" as const) : ("write" as const);
+              joinPresence(token, getStoredUsername(), rejoinMode)
+                .then((newId) => {
+                  presenceSessionIdRef.current = newId;
+                })
+                .catch(() => {});
+            });
           }
         }, 30000);
       })
@@ -336,23 +316,49 @@ export function App() {
     (msg: WsMessage) => {
       switch (msg.type) {
         case "file:content": {
+          setWaitingForUpdate(false);
+          if (waitingTimerRef.current !== null) {
+            clearTimeout(waitingTimerRef.current);
+            waitingTimerRef.current = null;
+          }
           const payload = msg.payload as { content: string; version: number };
-          setContent(payload.content);
-          contentRef.current = payload.content;
+          const hadLocalEdits = contentRef.current !== mergeBaseRef.current;
+          if (!hadLocalEdits) {
+            setContent(payload.content);
+            contentRef.current = payload.content;
+            savedContentRef.current = payload.content;
+            setSavedContent(payload.content);
+            mergeBaseRef.current = payload.content;
+            setDirty(false);
+          } else if (payload.content !== savedContentRef.current) {
+            savedContentRef.current = payload.content;
+            setSavedContent(payload.content);
+            setConflictData({
+              conflictContent: payload.content,
+              myContent: contentRef.current,
+              baseContent: mergeBaseRef.current,
+            });
+            setStatus("conflict with server content");
+          }
           break;
         }
         case "file:saved": {
           const payload = msg.payload as {
             by: string;
             version: number;
-            self?: boolean;
           };
-          if (!payload.self) {
+          setWaitingForUpdate(false);
+          if (waitingTimerRef.current !== null) {
+            clearTimeout(waitingTimerRef.current);
+            waitingTimerRef.current = null;
+          }
+          if (!savePendingRef.current) {
             if (token) {
               fetchFile(token)
                 .then((data) => {
                   const hadLocalEdits = contentRef.current !== mergeBaseRef.current;
                   savedContentRef.current = data.content;
+                  setSavedContent(data.content);
                   if (!hadLocalEdits) {
                     setContent(data.content);
                     contentRef.current = data.content;
@@ -367,18 +373,22 @@ export function App() {
                     });
                     setStatus(`conflict with ${payload.by}'s save`);
                   }
-                  setBlameRefresh((prev) => prev + 1);
+
                   setTimeout(foldCommentRegions, 200);
                 })
                 .catch(() => {});
             }
           } else {
             setStatus("saved");
-            setBlameRefresh((prev) => prev + 1);
           }
           break;
         }
         case "file:changed": {
+          setWaitingForUpdate(false);
+          if (waitingTimerRef.current !== null) {
+            clearTimeout(waitingTimerRef.current);
+            waitingTimerRef.current = null;
+          }
           const changedPayload = msg.payload as { by?: string };
           const changedBy = changedPayload.by ?? "external";
           if (token) {
@@ -386,12 +396,11 @@ export function App() {
               .then((data) => {
                 const hadLocalEdits = contentRef.current !== mergeBaseRef.current;
                 savedContentRef.current = data.content;
+                setSavedContent(data.content);
                 if (!hadLocalEdits) {
-                  const oldContent = contentRef.current;
                   setContent(data.content);
                   contentRef.current = data.content;
                   mergeBaseRef.current = data.content;
-                  flashChangedLines(oldContent, data.content);
                   setDirty(false);
                   setStatus(`changed by ${changedBy}`);
                 } else {
@@ -402,7 +411,7 @@ export function App() {
                   });
                   setStatus(`conflict with ${changedBy}'s change`);
                 }
-                setBlameRefresh((prev) => prev + 1);
+
                 setTimeout(foldCommentRegions, 200);
               })
               .catch(() => {});
@@ -433,7 +442,7 @@ export function App() {
         }
       }
     },
-    [token, flashChangedLines],
+    [token],
   );
 
   const focusEditor = useCallback(() => {
@@ -446,9 +455,24 @@ export function App() {
     const currentContent = contentRef.current;
     const baseContent = savedContentRef.current;
     setStatus("saving...");
+    savePendingRef.current = true;
+    setWaitingForUpdate(true);
+    if (waitingTimerRef.current !== null) {
+      clearTimeout(waitingTimerRef.current);
+    }
+    waitingTimerRef.current = setTimeout(() => {
+      setWaitingForUpdate(false);
+      waitingTimerRef.current = null;
+    }, 60000);
     saveFile(token, currentContent, baseContent)
       .then((result) => {
+        savePendingRef.current = false;
         if (result.conflict) {
+          setWaitingForUpdate(false);
+          if (waitingTimerRef.current !== null) {
+            clearTimeout(waitingTimerRef.current);
+            waitingTimerRef.current = null;
+          }
           setConflictData({
             conflictContent: result.conflictContent ?? "",
             myContent: currentContent,
@@ -458,14 +482,21 @@ export function App() {
           return;
         }
         savedContentRef.current = currentContent;
+        setSavedContent(currentContent);
         mergeBaseRef.current = currentContent;
         setDirty(false);
         setStatus("saved");
-        setBlameRefresh((prev) => prev + 1);
+
         setTypingTrigger((prev) => prev + 1);
         setTimeout(foldCommentRegions, 200);
       })
       .catch((err: Error) => {
+        savePendingRef.current = false;
+        setWaitingForUpdate(false);
+        if (waitingTimerRef.current !== null) {
+          clearTimeout(waitingTimerRef.current);
+          waitingTimerRef.current = null;
+        }
         setStatus(`Save error: ${err.message}`);
       });
   }, [token, readonly, focusEditor, foldCommentRegions]);
@@ -508,8 +539,16 @@ export function App() {
   }, []);
 
   const handleQuickDiff = useCallback(() => {
-    setShowHistory({ visible: true, showLatestDiff: true });
-  }, [token]);
+    if (!token || !dirty) return;
+    fetchFile(token)
+      .then((data) => {
+        setQuickDiffData({
+          original: data.content,
+          modified: contentRef.current,
+        });
+      })
+      .catch(() => {});
+  }, [token, dirty]);
 
   const openCommentPopupAtRange = useCallback((startLine: number, endLine: number) => {
     const editorInstance = editorRef.current;
@@ -740,6 +779,20 @@ export function App() {
         },
       });
 
+      editorInstance.onDidScrollChange(() => {
+        if (Date.now() < scrollSyncLockUntil.current) return;
+        scrollSyncLockUntil.current = Date.now() + 100;
+        const preview = previewPaneRef.current;
+        if (!preview) return;
+        const scrollTop = editorInstance.getScrollTop();
+        const scrollHeight = editorInstance.getScrollHeight();
+        const clientHeight = editorInstance.getLayoutInfo().height;
+        const maxScroll = scrollHeight - clientHeight;
+        const ratio = maxScroll > 0 ? scrollTop / maxScroll : 0;
+        const previewMax = preview.scrollHeight - preview.clientHeight;
+        preview.scrollTop = ratio * previewMax;
+      });
+
       setTimeout(() => {
         foldCommentRegions();
         editorInstance.setPosition({ lineNumber: 1, column: 1 });
@@ -774,6 +827,7 @@ export function App() {
       const newContent = lines.join("\n");
       contentRef.current = newContent;
       setContent(newContent);
+      setDirty(newContent !== savedContentRef.current);
       setCommentPopup(null);
 
       focusEditor();
@@ -789,7 +843,7 @@ export function App() {
   const handleRevert = useCallback((revertedContent: string) => {
     setContent(revertedContent);
     contentRef.current = revertedContent;
-    setBlameRefresh((prev) => prev + 1);
+
     setStatus("reverted");
   }, []);
 
@@ -804,10 +858,10 @@ export function App() {
           return;
         }
         savedContentRef.current = conflictData.myContent;
+        setSavedContent(conflictData.myContent);
         mergeBaseRef.current = conflictData.myContent;
         setDirty(false);
         setStatus("saved");
-        setBlameRefresh((prev) => prev + 1);
       })
       .catch((err: Error) => {
         setStatus(`Save error: ${err.message}`);
@@ -822,10 +876,10 @@ export function App() {
         setContent(data.content);
         contentRef.current = data.content;
         savedContentRef.current = data.content;
+        setSavedContent(data.content);
         mergeBaseRef.current = data.content;
         setDirty(false);
         setStatus("loaded server version");
-        setBlameRefresh((prev) => prev + 1);
       })
       .catch((err: Error) => {
         setStatus(`Fetch error: ${err.message}`);
@@ -843,6 +897,7 @@ export function App() {
         setContent(result.content);
         contentRef.current = result.content;
         savedContentRef.current = conflictData.conflictContent;
+        setSavedContent(conflictData.conflictContent);
         mergeBaseRef.current = conflictData.conflictContent;
         setConflictData(null);
         if (result.conflict) {
@@ -1014,44 +1069,6 @@ export function App() {
     setDirty(newContent !== savedContentRef.current);
   }, []);
 
-  // Fetch blame entries for tooltip
-  useEffect(() => {
-    if (!token) return;
-    fetchBlame(token)
-      .then((entries) => {
-        setBlameEntries(entries);
-      })
-      .catch(() => {});
-    fetchHistory(token)
-      .then((historyEntries) => {
-        if (historyEntries.length > 0) {
-          setLatestCommitHash(historyEntries[0].hash);
-        }
-      })
-      .catch(() => {});
-  }, [token, blameRefresh]);
-
-  // Handle blame tooltip on glyph hover
-  const handleEditorMouseMove = useCallback(
-    (lineNumber: number, topPixel: number) => {
-      if (blameEntries.length === 0) return;
-
-      for (const entry of blameEntries) {
-        if (lineNumber >= entry.lineStart && lineNumber <= entry.lineEnd) {
-          setBlameTooltip({
-            line: lineNumber,
-            top: topPixel,
-            author: entry.author,
-            timeAgo: timeAgo(entry.hash),
-          });
-          return;
-        }
-      }
-      setBlameTooltip(null);
-    },
-    [blameEntries],
-  );
-
   if (!token) {
     return (
       <div className="no-token-page">
@@ -1099,17 +1116,27 @@ export function App() {
               <span className="codoc-typing-dot" />
             </span>
           )}
+          {waitingForUpdate && (
+            <span className="typing-indicator">
+              <span className="codoc-typing-dot" />
+              <span className="codoc-typing-dot" />
+              <span className="codoc-typing-dot" />
+            </span>
+          )}
           {!readonly && (
             <button className={dirty ? "btn btn-primary" : "btn"} onClick={handleSave}>
-              {dirty ? "Save" : "Save"}
-              <span className="btn-shortcut">⌘S</span>
+              Save<span className="btn-shortcut">⌘S</span>
             </button>
           )}
+          <button
+            className={dirty ? "btn btn-accent" : "btn btn-disabled"}
+            onClick={handleQuickDiff}
+            disabled={!dirty}
+          >
+            Current Diff<span className="btn-shortcut">⇧⌘D</span>
+          </button>
           <button className="btn" onClick={handleShowHistory}>
             History<span className="btn-shortcut">⇧⌘H</span>
-          </button>
-          <button className="btn" onClick={handleQuickDiff}>
-            Diff<span className="btn-shortcut">⇧⌘D</span>
           </button>
           {!readonly && (
             <button className="btn" onClick={handleShowShare}>
@@ -1148,15 +1175,14 @@ export function App() {
               glyphMargin: true,
               folding: true,
               foldingStrategy: "auto",
+              scrollBeyondLastLine: false,
             }}
           />
-          <BlameGutter
-            token={token}
+          <DiffGutter
             editor={editorRef.current}
             monaco={monacoRef.current}
-            refreshTrigger={blameRefresh}
-            blameEntries={blameEntries}
-            latestCommitHash={latestCommitHash}
+            savedContent={savedContent}
+            currentContent={content}
           />
           {commentPopup && (
             <div
@@ -1178,7 +1204,21 @@ export function App() {
           )}
         </div>
         <div className="editor-divider" />
-        <div className="preview-pane">
+        <div
+          className="preview-pane"
+          ref={previewPaneRef}
+          onScroll={() => {
+            if (Date.now() < scrollSyncLockUntil.current) return;
+            scrollSyncLockUntil.current = Date.now() + 100;
+            const ed = editorRef.current;
+            const preview = previewPaneRef.current;
+            if (!ed || !preview) return;
+            const previewMax = preview.scrollHeight - preview.clientHeight;
+            const ratio = previewMax > 0 ? preview.scrollTop / previewMax : 0;
+            const editorMax = ed.getScrollHeight() - ed.getLayoutInfo().height;
+            ed.setScrollTop(ratio * editorMax);
+          }}
+        >
           <MarkdownPreview
             content={content}
             username={username}
@@ -1195,6 +1235,14 @@ export function App() {
           currentContent={contentRef.current}
           onClose={handleCloseHistory}
           onRevert={handleRevert}
+        />
+      )}
+      {quickDiffData !== null && (
+        <DiffView
+          original={quickDiffData.original}
+          modified={quickDiffData.modified}
+          title="On Disk → Editor"
+          onClose={() => setQuickDiffData(null)}
         />
       )}
       {showShareDialog && token && (

@@ -50,6 +50,10 @@ async function runPoll(token: string, author: string): Promise<void> {
       clearInterval(heartbeatInterval);
       heartbeatInterval = null;
     }
+  };
+
+  const cleanupWithLeave = async () => {
+    await cleanup();
     if (presenceSessionId && serverPort) {
       await httpPost(
         serverPort,
@@ -60,7 +64,7 @@ async function runPoll(token: string, author: string): Promise<void> {
   };
 
   const onSigint = () => {
-    cleanup().finally(() => process.exit(0));
+    cleanupWithLeave().finally(() => process.exit(0));
   };
   process.on("SIGINT", onSigint);
 

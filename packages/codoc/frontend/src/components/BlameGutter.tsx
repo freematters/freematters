@@ -1,138 +1,64 @@
-import { useCallback, useEffect, useRef } from "react";
-import { type BlameEntry, fetchBlame } from "../api";
+import { computeChangedLines } from "@shared/diff";
+import { useEffect, useRef } from "react";
 
-interface BlameGutterProps {
-  token: string;
+interface DiffGutterProps {
   editor: unknown;
   monaco: unknown;
-  refreshTrigger: number;
-  blameEntries: BlameEntry[];
-  latestCommitHash: string | null;
+  savedContent: string;
+  currentContent: string;
 }
 
-const HUMAN_COLOR = "#3b82f6";
-const AGENT_COLOR = "#22c55e";
+const ADDED_COLOR = "#2ea04370";
+const MODIFIED_COLOR = "#d29922";
 
-export function BlameGutter(props: BlameGutterProps) {
-  const { token, editor, monaco, refreshTrigger, blameEntries, latestCommitHash } =
-    props;
+export function DiffGutter(props: DiffGutterProps) {
+  const { editor, monaco, savedContent, currentContent } = props;
   const decorationIds = useRef<string[]>([]);
   const injectedStyleRef = useRef<HTMLStyleElement | null>(null);
 
-  const applyDecorations = useCallback(
-    (
-      entries: BlameEntry[],
-      monacoNs: {
-        editor: { TrackedRangeStickiness: { NeverGrowsWhenTypingAtEdges: number } };
-        Range: new (
-          startLine: number,
-          startCol: number,
-          endLine: number,
-          endCol: number,
-        ) => unknown;
-      },
-      editorInstance: {
-        deltaDecorations: (oldIds: string[], newDecorations: unknown[]) => string[];
-        getModel: () => { getLineCount: () => number } | null;
-      },
-      latestHash: string | null,
-    ) => {
-      const decorations: unknown[] = [];
-
-      if (!latestHash) {
-        decorationIds.current = editorInstance.deltaDecorations(
-          decorationIds.current,
-          [],
-        );
-        return;
-      }
-
-      const latestEntries = entries.filter((e) => e.hash === latestHash);
-      if (latestEntries.length === 0) {
-        decorationIds.current = editorInstance.deltaDecorations(
-          decorationIds.current,
-          [],
-        );
-        return;
-      }
-
-      const isAgent = latestEntries[0].isAgent;
-      const color = isAgent ? AGENT_COLOR : HUMAN_COLOR;
-      const cssClass = "codoc-blame-latest";
-
-      if (injectedStyleRef.current) {
-        injectedStyleRef.current.textContent = `.${cssClass} { background: ${color} !important; width: 4px !important; margin-left: 3px !important; }`;
-      } else {
-        const style = document.createElement("style");
-        style.setAttribute("data-blame-latest", "true");
-        style.textContent = `.${cssClass} { background: ${color} !important; width: 4px !important; margin-left: 3px !important; }`;
-        document.head.appendChild(style);
-        injectedStyleRef.current = style;
-      }
-
-      for (const entry of latestEntries) {
-        for (let line = entry.lineStart; line <= entry.lineEnd; line++) {
-          decorations.push({
-            range: new monacoNs.Range(line, 1, line, 1),
-            options: {
-              isWholeLine: true,
-              marginClassName: cssClass,
-              stickiness:
-                monacoNs.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
-              glyphMarginHoverMessage: {
-                value: `**${entry.author}** \u00b7 \`${entry.hash.substring(0, 7)}\``,
-              },
-              overviewRuler: {
-                color,
-                position: 1,
-              },
-            },
-          });
-        }
-      }
-
-      decorationIds.current = editorInstance.deltaDecorations(
-        decorationIds.current,
-        decorations,
-      );
-    },
-    [],
-  );
-
-  const updateBlame = useCallback(() => {
+  useEffect(() => {
     if (!editor || !monaco) return;
 
     const monacoNs = monaco as {
-      editor: {
-        TrackedRangeStickiness: { NeverGrowsWhenTypingAtEdges: number };
-      };
-      Range: new (
-        startLine: number,
-        startCol: number,
-        endLine: number,
-        endCol: number,
-      ) => unknown;
+      Range: new (s: number, sc: number, e: number, ec: number) => unknown;
     };
-
     const editorInstance = editor as {
-      deltaDecorations: (oldIds: string[], newDecorations: unknown[]) => string[];
-      getModel: () => { getLineCount: () => number } | null;
+      deltaDecorations: (old: string[], dec: unknown[]) => string[];
     };
 
-    if (blameEntries.length === 0) {
-      fetchBlame(token)
-        .then((entries: BlameEntry[]) => {
-          applyDecorations(entries, monacoNs, editorInstance, latestCommitHash);
-        })
-        .catch(() => {});
-    } else {
-      applyDecorations(blameEntries, monacoNs, editorInstance, latestCommitHash);
+    if (!injectedStyleRef.current) {
+      const style = document.createElement("style");
+      style.setAttribute("data-diff-gutter", "true");
+      style.textContent = [
+        `.codoc-diff-added { background: ${ADDED_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
+        `.codoc-diff-modified { background: ${MODIFIED_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
+      ].join("\n");
+      document.head.appendChild(style);
+      injectedStyleRef.current = style;
     }
-  }, [token, editor, monaco, blameEntries, latestCommitHash, applyDecorations]);
 
-  useEffect(() => {
-    updateBlame();
-  }, [updateBlame, refreshTrigger]);
+    if (savedContent === currentContent) {
+      decorationIds.current = editorInstance.deltaDecorations(
+        decorationIds.current,
+        [],
+      );
+      return;
+    }
+
+    const changedLineNumbers = computeChangedLines(savedContent, currentContent);
+    const decorations = changedLineNumbers.map((lineNum) => ({
+      range: new monacoNs.Range(lineNum, 1, lineNum, 1),
+      options: {
+        isWholeLine: true,
+        marginClassName: "codoc-diff-added",
+      },
+    }));
+
+    decorationIds.current = editorInstance.deltaDecorations(
+      decorationIds.current,
+      decorations,
+    );
+  }, [editor, monaco, savedContent, currentContent]);
 
   return null;
 }

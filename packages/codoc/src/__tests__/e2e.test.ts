@@ -153,6 +153,7 @@ describe("E2E Scenario 1: Server Lifecycle", () => {
   it("should start server, bind socket, detect already-running, stop and cleanup", async () => {
     // 1. Start server
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
     expect(handle.port).toBeGreaterThan(0);
 
     // 2. Socket exists
@@ -214,6 +215,7 @@ describe("E2E Scenario 2: Share + Poll flow", () => {
   it("should share file, poll blocks, file modification triggers poll with diff", async () => {
     fs.writeFileSync(testFilePath, "# Test\n");
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
 
     // Share file via IPC
     const client = new IpcClient(socketPath);
@@ -256,6 +258,7 @@ describe("E2E Scenario 3: HTTP API Routes", () => {
     testFilePath = uniquePath("s3-file", ".md");
     fs.writeFileSync(testFilePath, "# API Test\n\nOriginal content.\n");
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
 
     const client = new IpcClient(socketPath);
     const shareRes = await client.send({
@@ -388,6 +391,7 @@ describe("E2E Scenario 4: Comment Protocol", () => {
 
     fs.writeFileSync(testFilePath, commentContent);
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
 
     const client = new IpcClient(socketPath);
     const shareRes = await client.send({
@@ -465,6 +469,7 @@ describe("E2E Scenario 5: Readonly Token", () => {
     testFilePath = uniquePath("s5-file", ".md");
     fs.writeFileSync(testFilePath, "# Readonly Test\n");
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
   });
 
   afterEach(async () => {
@@ -546,6 +551,7 @@ describe("E2E Scenario 6: WebSocket Sync", () => {
     testFilePath = uniquePath("s6-file", ".md");
     fs.writeFileSync(testFilePath, "# WS Sync Test\n");
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
 
     const client = new IpcClient(socketPath);
     const shareRes = await client.send({
@@ -729,6 +735,7 @@ describe("E2E Scenario 10: Git History + Revert", () => {
     testFilePath = uniquePath("s10-file", ".md");
     fs.writeFileSync(testFilePath, "initial\n");
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
 
     const client = new IpcClient(socketPath);
     const shareRes = await client.send({

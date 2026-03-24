@@ -7,12 +7,21 @@ description: Share a file for collaborative editing with a human via browser. Us
 
 ## Flow
 
-1. `codoc share /absolute/path/to/file.md` → prints Edit URL + Readonly URL + token
-2. Tell user the Edit URL (or Readonly URL if they should only view)
-3. Run `codoc poll <token> agent` **in background** (set `run_in_background: true`, timeout 600000ms). You will be notified when the human edits. Continue with other work while waiting.
-4. When poll completes, read the file. Find `[REPLY_TEMPLATE]` lines inside `<!-- ... -->` blocks, replace each with your reply (keep the line format, remove `[REPLY_TEMPLATE] ` prefix).
-5. Run `codoc poll <token> agent` in background again. Repeat 3-4.
-6. When you have nothing else to do, keep polling. Only stop polling if the user gives you a different task.
+0. `codoc` cli should already be installed on the machine. Just call `codoc xxx` without any prefixes!
+
+1. Run `codoc server` **in background** (set `run_in_background: true`, timeout 600000ms). This starts the HTTP server and tunnel. It blocks until killed — that's expected.
+2. `codoc share /absolute/path/to/file.md` → prints Edit URL + Readonly URL + token. No need to wait - this command will wait for the server to be ready.
+3. Tell user the Edit URL (or Readonly URL if they should only view)
+4. Run `codoc poll <token> agent` **in background** (set `run_in_background: true`, timeout 600000ms). You will be notified when the human edits. Continue with other work while waiting.
+5. When poll completes, read the file. Find `[REPLY_TEMPLATE]` lines inside `<!-- ... -->` blocks, replace each with your reply (keep the line format, remove `[REPLY_TEMPLATE] ` prefix).
+6. Run `codoc poll <token> agent` in background again. Repeat 4-5.
+7. When you have nothing else to do, keep polling. Only stop polling if the user gives you a different task.
+
+## Troubleshooting
+
+If the user says the link doesn't work, is broken, or returns 404:
+1. Try `codoc share` again on the same file to get a fresh URL.
+2. If re-share fails (server not running), stop the old background `codoc server` task (via TaskStop or `codoc stop`), then restart from step 1 of the Flow (run `codoc server` in background, then `codoc share`).
 
 ## Comment Block Format
 

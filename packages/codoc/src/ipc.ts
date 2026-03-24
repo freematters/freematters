@@ -286,9 +286,6 @@ export class IpcServer {
     if (this.sessionTracker) {
       this.sessionTracker.removePoll(pendingPoll.token);
     }
-    if (pendingPoll.presenceSessionId && this.presenceLeaveCallback) {
-      this.presenceLeaveCallback(pendingPoll.presenceSessionId);
-    }
 
     const diff = computeDiff(pendingPoll.originalContent, newContent);
     const newComments = parseComments(newContent);
@@ -314,9 +311,6 @@ export class IpcServer {
       }
       if (this.sessionTracker) {
         this.sessionTracker.removePoll(poll.token);
-      }
-      if (poll.presenceSessionId && this.presenceLeaveCallback) {
-        this.presenceLeaveCallback(poll.presenceSessionId);
       }
     }
   }
@@ -344,7 +338,14 @@ export class IpcServer {
       return { ok: false, error: "Missing sessionId parameter" };
     }
     this.activeSessions.add(sessionId);
-    return { ok: true, data: { sessions: this.activeSessions.size } };
+    return {
+      ok: true,
+      data: {
+        sessions: this.activeSessions.size,
+        port: this.httpPort,
+        tunnelUrl: this.tunnelUrl,
+      },
+    };
   }
 
   private handleSessionEnd(params: Record<string, unknown>): IpcResponse {
