@@ -4,7 +4,7 @@ import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
 import { z } from "zod";
-import { agentLog, colors as c, logSdkMessage } from "../agent-log.js";
+import { agentLog, colors as c, logSdkMessage, truncate } from "../agent-log.js";
 import { MultiTurnSession } from "../e2e/multi-turn-session.js";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
@@ -18,6 +18,38 @@ import {
 import { symlinkSessionLog } from "../session-log.js";
 import { Spinner } from "../spinner.js";
 import { type RunStatus, Store } from "../store.js";
+
+/** Short spinner label for a tool call. Returns null to skip (e.g. request_input). */
+function spinnerLabel(name: string, input?: Record<string, unknown>): string | null {
+  const short = name.replace(/^mcp__freeflow__/, "");
+  if (short === "request_input") return null;
+  switch (short) {
+    case "Bash":
+      return `$ ${truncate(String(input?.command ?? ""), 40)}`;
+    case "Read":
+      return `Reading ${fileBase(input?.file_path)}`;
+    case "Write":
+      return `Writing ${fileBase(input?.file_path)}`;
+    case "Edit":
+      return `Editing ${fileBase(input?.file_path)}`;
+    case "Glob":
+      return `Searching ${input?.pattern ?? ""}`;
+    case "Grep":
+      return `Grep /${input?.pattern ?? ""}/`;
+    case "Agent":
+      return `Agent(${truncate(String(input?.description ?? ""), 30)})`;
+    case "fsm_goto":
+      return `${input?.on} → ${input?.target}`;
+    case "fsm_current":
+      return "Reading state...";
+    default:
+      return `${short}...`;
+  }
+}
+
+function fileBase(v: unknown): string {
+  return typeof v === "string" ? basename(v) : "";
+}
 
 export interface RunArgs {
   fsmPath: string;
@@ -313,7 +345,7 @@ function requestInputHandler(
       const answer = await promptUser(`${c.green}> ${c.reset}`);
       // Rewrite the input line with unified dark background
       process.stderr.write(
-        `\x1b[A\x1b[2K\r\x1b[48;5;236m ${c.green}>${c.reset}\x1b[48;5;236m ${answer} ${c.reset}\n`,
+        `\x1b[A\x1b[2K\r\x1b[48;5;236m ${c.green}>${c.reset}\x1b[48;5;236m ${answer} ${c.reset}\n\n`,
       );
       spinner?.start("Thinking...");
       return {
@@ -438,7 +470,20 @@ export async function runCore(
   logFn(`state=${fsm.initial} (initial)`, c.green);
 
   const spinner = new Spinner();
-  const fsmServer = createFsmMcpServer(fsm, store, runId, logFn, opts.lite, spinner);
+  // Wrap logFn to clear spinner before writing, then resume
+  const spinnerAwareLog = (msg: string, color?: string) => {
+    spinner.pause();
+    logFn(msg, color);
+    spinner.resume();
+  };
+  const fsmServer = createFsmMcpServer(
+    fsm,
+    store,
+    runId,
+    spinnerAwareLog,
+    opts.lite,
+    spinner,
+  );
 
   const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
   const stateCard = formatStateCard(card);
@@ -476,7 +521,27 @@ export async function runCore(
         // Capture and log session_id from the first message that has one
         if (!sessionId && "session_id" in message) {
           sessionId = (message as { session_id: string }).session_id;
-          logFn(`session=${sessionId}`, c.cyan);
+          spinnerAwareLog(`session=${sessionId}`, c.cyan);
+        }
+
+        // Update spinner with tool call info
+        if (message.type === "assistant") {
+          const msg = message as {
+            type: "assistant";
+            message: {
+              content: Array<{
+                type: string;
+                name?: string;
+                input?: Record<string, unknown>;
+              }>;
+            };
+          };
+          for (const block of msg.message.content) {
+            if (block.type === "tool_use" && block.name) {
+              const label = spinnerLabel(block.name, block.input);
+              if (label) spinner.update(label);
+            }
+          }
         }
 
         if (opts.verbose) {
@@ -513,10 +578,13 @@ export async function runCore(
           };
           if (sysMsg.subtype === "task_started" && sysMsg.task_id) {
             pendingTasks.add(sysMsg.task_id);
-            logFn(`task started: ${sysMsg.description ?? sysMsg.task_id}`, c.cyan);
+            spinnerAwareLog(
+              `task started: ${sysMsg.description ?? sysMsg.task_id}`,
+              c.cyan,
+            );
           } else if (sysMsg.subtype === "task_notification" && sysMsg.task_id) {
             pendingTasks.delete(sysMsg.task_id);
-            logFn(
+            spinnerAwareLog(
               `task ${sysMsg.status}: ${sysMsg.summary ?? sysMsg.task_id}`,
               sysMsg.status === "completed" ? c.green : c.red,
             );
@@ -558,17 +626,19 @@ export async function runCore(
         break;
       }
 
-      logFn(
-        `turn ended but workflow not complete, state=${snap.state} — retrying`,
-        c.magenta,
-      );
+      if (opts.verbose) {
+        logFn(
+          `turn ended but workflow not complete, state=${snap.state} — retrying`,
+          c.magenta,
+        );
+      }
       session.send(
         `The workflow is not complete yet. Continue from the current state.\n\n${formatStateCard(stateCardFromFsm(snap.state, fsm.states[snap.state] ?? { transitions: {} }))}`,
       );
       spinner.start("Thinking...");
     }
   } finally {
-    spinner.stop();
+    spinner.destroy();
     session.close();
   }
 
