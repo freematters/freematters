@@ -4,15 +4,12 @@ import { stripHtmlComments } from "@shared/copy-markdown";
 import type { editor } from "monaco-editor";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  type BlameEntry,
   DiffData,
   type PresenceUser,
   type WsMessage,
   createWebSocket,
-  fetchBlame,
   fetchDiff,
   fetchFile,
-  fetchHistory,
   fetchPresence,
   heartbeatPresence,
   joinPresence,
@@ -21,7 +18,7 @@ import {
   saveFile,
   sendWsMessage,
 } from "./api";
-import { BlameGutter } from "./components/BlameGutter";
+import { DiffGutter } from "./components/BlameGutter";
 import { CommentPopup } from "./components/CommentPopup";
 import { DiffView } from "./components/DiffView";
 import { HelpPanel } from "./components/HelpPanel";
@@ -78,7 +75,6 @@ export function App() {
     visible: boolean;
     showLatestDiff: boolean;
   }>({ visible: false, showLatestDiff: false });
-  const [blameRefresh, setBlameRefresh] = useState<number>(0);
   const [showShareDialog, setShowShareDialog] = useState<boolean>(false);
   const [readonlyToken, setReadonlyToken] = useState<string | null>(null);
   const [copiedMd, setCopiedMd] = useState<boolean>(false);
@@ -86,16 +82,9 @@ export function App() {
   const [showHelp, setShowHelp] = useState<boolean>(false);
   const [fileName, setFilePath] = useState<string>("");
   const [hoverLine, setHoverLine] = useState<number | null>(null);
-  const [blameEntries, setBlameEntries] = useState<BlameEntry[]>([]);
-  const [blameTooltip, setBlameTooltip] = useState<{
-    line: number;
-    top: number;
-    author: string;
-    timeAgo: string;
-  } | null>(null);
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([]);
   const [dirty, setDirty] = useState<boolean>(false);
-  const [latestCommitHash, setLatestCommitHash] = useState<string | null>(null);
+  const [savedContent, setSavedContent] = useState<string>("");
   const [conflictData, setConflictData] = useState<{
     conflictContent: string;
     myContent: string;
@@ -108,7 +97,6 @@ export function App() {
   const monacoRef = useRef<Monaco | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const contentRef = useRef<string>("");
-  const flashDecorationIds = useRef<string[]>([]);
   const prevPresenceUsersRef = useRef<PresenceUser[]>([]);
   const pollTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pollTypingVisible, setPollTypingVisible] = useState<boolean>(false);
@@ -181,6 +169,7 @@ export function App() {
         setContent(data.content);
         contentRef.current = data.content;
         savedContentRef.current = data.content;
+        setSavedContent(data.content);
         mergeBaseRef.current = data.content;
         setDirty(false);
         setReadonly(data.readonly);
@@ -194,34 +183,6 @@ export function App() {
       .catch((err: Error) => {
         setStatus(`Error: ${err.message}`);
       });
-  }, []);
-
-  const flashChangedLines = useCallback((changedLineNumbers: number[]) => {
-    const editorInstance = editorRef.current;
-    const monacoNs = monacoRef.current;
-
-    if (!editorInstance || !monacoNs || changedLineNumbers.length === 0) return;
-
-    const decorations = changedLineNumbers.map((lineNum) => ({
-      range: new monacoNs.Range(lineNum, 1, lineNum, 1),
-      options: {
-        isWholeLine: true,
-        className: "codoc-yellow-flash",
-        stickiness: monacoNs.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
-      },
-    }));
-
-    flashDecorationIds.current = editorInstance.deltaDecorations(
-      flashDecorationIds.current,
-      decorations,
-    );
-
-    setTimeout(() => {
-      flashDecorationIds.current = editorInstance.deltaDecorations(
-        flashDecorationIds.current,
-        [],
-      );
-    }, 3200);
   }, []);
 
   useEffect(() => {
@@ -353,10 +314,12 @@ export function App() {
             setContent(payload.content);
             contentRef.current = payload.content;
             savedContentRef.current = payload.content;
+            setSavedContent(payload.content);
             mergeBaseRef.current = payload.content;
             setDirty(false);
           } else if (payload.content !== savedContentRef.current) {
             savedContentRef.current = payload.content;
+            setSavedContent(payload.content);
             setConflictData({
               conflictContent: payload.content,
               myContent: contentRef.current,
@@ -377,6 +340,7 @@ export function App() {
                 .then((data) => {
                   const hadLocalEdits = contentRef.current !== mergeBaseRef.current;
                   savedContentRef.current = data.content;
+                  setSavedContent(data.content);
                   if (!hadLocalEdits) {
                     setContent(data.content);
                     contentRef.current = data.content;
@@ -391,34 +355,29 @@ export function App() {
                     });
                     setStatus(`conflict with ${payload.by}'s save`);
                   }
-                  setBlameRefresh((prev) => prev + 1);
+
                   setTimeout(foldCommentRegions, 200);
                 })
                 .catch(() => {});
             }
           } else {
             setStatus("saved");
-            setBlameRefresh((prev) => prev + 1);
           }
           break;
         }
         case "file:changed": {
-          const changedPayload = msg.payload as {
-            by?: string;
-            changedLines?: number[];
-          };
+          const changedPayload = msg.payload as { by?: string };
           const changedBy = changedPayload.by ?? "external";
-          const changedLines = changedPayload.changedLines ?? [];
           if (token) {
             fetchFile(token)
               .then((data) => {
                 const hadLocalEdits = contentRef.current !== mergeBaseRef.current;
                 savedContentRef.current = data.content;
+                setSavedContent(data.content);
                 if (!hadLocalEdits) {
                   setContent(data.content);
                   contentRef.current = data.content;
                   mergeBaseRef.current = data.content;
-                  flashChangedLines(changedLines);
                   setDirty(false);
                   setStatus(`changed by ${changedBy}`);
                 } else {
@@ -429,7 +388,7 @@ export function App() {
                   });
                   setStatus(`conflict with ${changedBy}'s change`);
                 }
-                setBlameRefresh((prev) => prev + 1);
+
                 setTimeout(foldCommentRegions, 200);
               })
               .catch(() => {});
@@ -460,7 +419,7 @@ export function App() {
         }
       }
     },
-    [token, flashChangedLines],
+    [token],
   );
 
   const focusEditor = useCallback(() => {
@@ -487,10 +446,11 @@ export function App() {
           return;
         }
         savedContentRef.current = currentContent;
+        setSavedContent(currentContent);
         mergeBaseRef.current = currentContent;
         setDirty(false);
         setStatus("saved");
-        setBlameRefresh((prev) => prev + 1);
+
         setTypingTrigger((prev) => prev + 1);
         setTimeout(foldCommentRegions, 200);
       })
@@ -820,7 +780,7 @@ export function App() {
   const handleRevert = useCallback((revertedContent: string) => {
     setContent(revertedContent);
     contentRef.current = revertedContent;
-    setBlameRefresh((prev) => prev + 1);
+
     setStatus("reverted");
   }, []);
 
@@ -835,10 +795,10 @@ export function App() {
           return;
         }
         savedContentRef.current = conflictData.myContent;
+        setSavedContent(conflictData.myContent);
         mergeBaseRef.current = conflictData.myContent;
         setDirty(false);
         setStatus("saved");
-        setBlameRefresh((prev) => prev + 1);
       })
       .catch((err: Error) => {
         setStatus(`Save error: ${err.message}`);
@@ -853,10 +813,10 @@ export function App() {
         setContent(data.content);
         contentRef.current = data.content;
         savedContentRef.current = data.content;
+        setSavedContent(data.content);
         mergeBaseRef.current = data.content;
         setDirty(false);
         setStatus("loaded server version");
-        setBlameRefresh((prev) => prev + 1);
       })
       .catch((err: Error) => {
         setStatus(`Fetch error: ${err.message}`);
@@ -874,6 +834,7 @@ export function App() {
         setContent(result.content);
         contentRef.current = result.content;
         savedContentRef.current = conflictData.conflictContent;
+        setSavedContent(conflictData.conflictContent);
         mergeBaseRef.current = conflictData.conflictContent;
         setConflictData(null);
         if (result.conflict) {
@@ -1045,44 +1006,6 @@ export function App() {
     setDirty(newContent !== savedContentRef.current);
   }, []);
 
-  // Fetch blame entries for tooltip
-  useEffect(() => {
-    if (!token) return;
-    fetchBlame(token)
-      .then((entries) => {
-        setBlameEntries(entries);
-      })
-      .catch(() => {});
-    fetchHistory(token)
-      .then((historyEntries) => {
-        if (historyEntries.length > 0) {
-          setLatestCommitHash(historyEntries[0].hash);
-        }
-      })
-      .catch(() => {});
-  }, [token, blameRefresh]);
-
-  // Handle blame tooltip on glyph hover
-  const handleEditorMouseMove = useCallback(
-    (lineNumber: number, topPixel: number) => {
-      if (blameEntries.length === 0) return;
-
-      for (const entry of blameEntries) {
-        if (lineNumber >= entry.lineStart && lineNumber <= entry.lineEnd) {
-          setBlameTooltip({
-            line: lineNumber,
-            top: topPixel,
-            author: entry.author,
-            timeAgo: timeAgo(entry.hash),
-          });
-          return;
-        }
-      }
-      setBlameTooltip(null);
-    },
-    [blameEntries],
-  );
-
   if (!token) {
     return (
       <div className="no-token-page">
@@ -1181,13 +1104,11 @@ export function App() {
               foldingStrategy: "auto",
             }}
           />
-          <BlameGutter
-            token={token}
+          <DiffGutter
             editor={editorRef.current}
             monaco={monacoRef.current}
-            refreshTrigger={blameRefresh}
-            blameEntries={blameEntries}
-            latestCommitHash={latestCommitHash}
+            savedContent={savedContent}
+            currentContent={content}
           />
           {commentPopup && (
             <div

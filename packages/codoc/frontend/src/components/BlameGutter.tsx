@@ -1,102 +1,64 @@
+import { computeChangedLines } from "@shared/diff";
 import { useEffect, useRef } from "react";
-import type { BlameEntry } from "../api";
 
-interface BlameGutterProps {
-  token: string;
+interface DiffGutterProps {
   editor: unknown;
   monaco: unknown;
-  refreshTrigger: number;
-  blameEntries: BlameEntry[];
-  latestCommitHash: string | null;
+  savedContent: string;
+  currentContent: string;
 }
 
-const HUMAN_COLOR = "#3b82f6";
-const AGENT_COLOR = "#22c55e";
+const ADDED_COLOR = "#2ea04370";
+const MODIFIED_COLOR = "#d29922";
 
-function buildDecorations(
-  entries: BlameEntry[],
-  latestHash: string | null,
-  Range: new (s: number, sc: number, e: number, ec: number) => unknown,
-): unknown[] {
-  const decorations: unknown[] = [];
-  for (const entry of entries) {
-    const isLatest = latestHash && entry.hash === latestHash;
-    const cssClass = entry.isAgent ? "codoc-blame-agent" : "codoc-blame-human";
-    decorations.push({
-      range: new Range(entry.lineStart, 1, entry.lineEnd, 1),
-      options: {
-        isWholeLine: true,
-        marginClassName: cssClass,
-        minimap: {
-          color: entry.isAgent ? AGENT_COLOR : HUMAN_COLOR,
-          position: 1,
-        },
-        overviewRuler: isLatest
-          ? { color: entry.isAgent ? AGENT_COLOR : HUMAN_COLOR, position: 1 }
-          : undefined,
-      },
-    });
-  }
-  return decorations;
-}
-
-export function BlameGutter(props: BlameGutterProps) {
-  const { editor, monaco, blameEntries, latestCommitHash } = props;
+export function DiffGutter(props: DiffGutterProps) {
+  const { editor, monaco, savedContent, currentContent } = props;
+  const decorationIds = useRef<string[]>([]);
   const injectedStyleRef = useRef<HTMLStyleElement | null>(null);
-  const entriesRef = useRef(blameEntries);
-  const latestHashRef = useRef(latestCommitHash);
-  entriesRef.current = blameEntries;
-  latestHashRef.current = latestCommitHash;
 
   useEffect(() => {
-    if (!editor || !monaco || blameEntries.length === 0) return;
+    if (!editor || !monaco) return;
 
     const monacoNs = monaco as {
       Range: new (s: number, sc: number, e: number, ec: number) => unknown;
     };
     const editorInstance = editor as {
       deltaDecorations: (old: string[], dec: unknown[]) => string[];
-      getModel: () => {
-        onDidChangeContent: (cb: () => void) => { dispose: () => void };
-      } | null;
     };
 
     if (!injectedStyleRef.current) {
       const style = document.createElement("style");
-      style.setAttribute("data-blame-gutter", "true");
+      style.setAttribute("data-diff-gutter", "true");
       style.textContent = [
-        `.codoc-blame-agent { background: ${AGENT_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
-        `.codoc-blame-human { background: ${HUMAN_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
+        `.codoc-diff-added { background: ${ADDED_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
+        `.codoc-diff-modified { background: ${MODIFIED_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
       ].join("\n");
       document.head.appendChild(style);
       injectedStyleRef.current = style;
     }
 
-    let ids: string[] = [];
-
-    const apply = () => {
-      const decs = buildDecorations(
-        entriesRef.current,
-        latestHashRef.current,
-        monacoNs.Range,
+    if (savedContent === currentContent) {
+      decorationIds.current = editorInstance.deltaDecorations(
+        decorationIds.current,
+        [],
       );
-      ids = editorInstance.deltaDecorations(ids, decs);
-    };
+      return;
+    }
 
-    apply();
+    const changedLineNumbers = computeChangedLines(savedContent, currentContent);
+    const decorations = changedLineNumbers.map((lineNum) => ({
+      range: new monacoNs.Range(lineNum, 1, lineNum, 1),
+      options: {
+        isWholeLine: true,
+        marginClassName: "codoc-diff-added",
+      },
+    }));
 
-    // Re-apply after programmatic content replacement (setValue destroys decorations)
-    const model = editorInstance.getModel();
-    const disposable = model?.onDidChangeContent(() => {
-      // Use setTimeout to batch with React re-renders
-      setTimeout(apply, 0);
-    });
-
-    return () => {
-      editorInstance.deltaDecorations(ids, []);
-      disposable?.dispose();
-    };
-  }, [editor, monaco, blameEntries, latestCommitHash]);
+    decorationIds.current = editorInstance.deltaDecorations(
+      decorationIds.current,
+      decorations,
+    );
+  }, [editor, monaco, savedContent, currentContent]);
 
   return null;
 }
