@@ -1,6 +1,7 @@
 import Editor, { DiffEditor, type OnMount, type Monaco } from "@monaco-editor/react";
 import type { CommentThread } from "@shared/comment-parser";
 import { stripHtmlComments } from "@shared/copy-markdown";
+import { computeChangedLines } from "@shared/diff";
 import type { editor } from "monaco-editor";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -104,6 +105,37 @@ export function App() {
   const glyphDragStartLine = useRef<number | null>(null);
   const glyphDragDecorationIds = useRef<string[]>([]);
   const savePendingRef = useRef<boolean>(false);
+  const flashDecorationIds = useRef<string[]>([]);
+
+  const flashChangedLines = useCallback((oldContent: string, newContent: string) => {
+    const editorInstance = editorRef.current;
+    const monacoNs = monacoRef.current;
+    if (!editorInstance || !monacoNs || oldContent === newContent) return;
+
+    const changedLineNumbers = computeChangedLines(oldContent, newContent);
+    if (changedLineNumbers.length === 0) return;
+
+    const decorations = changedLineNumbers.map((lineNum: number) => ({
+      range: new monacoNs.Range(lineNum, 1, lineNum, 1),
+      options: {
+        isWholeLine: true,
+        className: "codoc-yellow-flash",
+        stickiness: monacoNs.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
+      },
+    }));
+
+    flashDecorationIds.current = editorInstance.deltaDecorations(
+      flashDecorationIds.current,
+      decorations,
+    );
+
+    setTimeout(() => {
+      flashDecorationIds.current = editorInstance.deltaDecorations(
+        flashDecorationIds.current,
+        [],
+      );
+    }, 3200);
+  }, []);
 
   const foldCommentRegions = useCallback(() => {
     const ed = editorRef.current;
@@ -342,9 +374,11 @@ export function App() {
                   savedContentRef.current = data.content;
                   setSavedContent(data.content);
                   if (!hadLocalEdits) {
+                    const oldContent = contentRef.current;
                     setContent(data.content);
                     contentRef.current = data.content;
                     mergeBaseRef.current = data.content;
+                    flashChangedLines(oldContent, data.content);
                     setDirty(false);
                     setStatus(`saved by ${payload.by}`);
                   } else {
@@ -375,9 +409,11 @@ export function App() {
                 savedContentRef.current = data.content;
                 setSavedContent(data.content);
                 if (!hadLocalEdits) {
+                  const oldContent = contentRef.current;
                   setContent(data.content);
                   contentRef.current = data.content;
                   mergeBaseRef.current = data.content;
+                  flashChangedLines(oldContent, data.content);
                   setDirty(false);
                   setStatus(`changed by ${changedBy}`);
                 } else {
