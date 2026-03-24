@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { Command } from "commander";
@@ -7,9 +8,46 @@ import type { SessionState } from "../hooks/post-tool-use.js";
 import { IpcClient } from "../ipc.js";
 import { getDefaultSocketPath } from "../paths.js";
 
+function isSocketActive(socketPath: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const conn = net.createConnection(socketPath);
+    conn.on("connect", () => {
+      conn.destroy();
+      resolve(true);
+    });
+    conn.on("error", () => {
+      resolve(false);
+    });
+  });
+}
+
+async function waitForServer(socketPath: string, timeoutMs: number): Promise<boolean> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (fs.existsSync(socketPath) && (await isSocketActive(socketPath))) {
+      return true;
+    }
+    await new Promise((r) => setTimeout(r, 200));
+  }
+  return false;
+}
+
 async function runShare(file: string): Promise<void> {
   const socketPath = getDefaultSocketPath();
   const filePath = path.resolve(file);
+
+  if (!fs.existsSync(socketPath) || !(await isSocketActive(socketPath))) {
+    console.error("Waiting for codoc server to start...");
+    const ready = await waitForServer(socketPath, 30000);
+    if (!ready) {
+      console.error(
+        "codoc server did not start within 30s. Is the SessionStart hook configured?",
+      );
+      process.exitCode = 1;
+      return;
+    }
+  }
+
   const client = new IpcClient(socketPath);
 
   try {

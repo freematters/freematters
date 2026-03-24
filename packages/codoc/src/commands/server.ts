@@ -362,49 +362,22 @@ async function runServer(): Promise<void> {
     const child = childProcess.spawn(process.execPath, [cliPath, "server"], {
       env: { ...process.env, CODOC_DAEMON: "1" },
       detached: true,
-      stdio: ["ignore", "ignore", "pipe"],
-    });
-    let stderrOutput = "";
-    child.stderr!.on("data", (chunk: Buffer) => {
-      stderrOutput += chunk.toString();
+      stdio: "ignore",
     });
     child.unref();
-    (child.stderr as NodeJS.ReadableStream & { unref?: () => void }).unref?.();
-
-    for (let i = 0; i < 250; i++) {
-      await new Promise((r) => setTimeout(r, 100));
-      if (fs.existsSync(socketPath) && (await isSocketActive(socketPath))) {
-        alreadyRunning = true;
-        break;
-      }
-    }
-    if (!alreadyRunning) {
-      const detail = stderrOutput.trim();
-      const reason = detail
-        ? `codoc: server failed to start — ${detail}`
-        : "codoc: server failed to start (check config and port availability)";
-      process.stdout.write(`${JSON.stringify({ systemMessage: reason })}\n`);
-      return;
-    }
+    return;
   }
 
   if (alreadyRunning) {
-    let address = "";
     try {
       const client = new IpcClient(socketPath);
-      const resp = await client.send({
+      await client.send({
         method: "session-start",
         params: { sessionId },
       });
-      if (resp.ok) {
-        const data = resp.data as { port: number; tunnelUrl: string | null };
-        address = data.tunnelUrl ?? `http://127.0.0.1:${data.port}`;
-      }
     } catch {
       // non-fatal
     }
-    const msg = address ? `codoc server running at ${address}` : "codoc server running";
-    process.stdout.write(`${JSON.stringify({ systemMessage: msg })}\n`);
     return;
   }
 

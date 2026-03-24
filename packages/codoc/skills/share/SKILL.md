@@ -31,6 +31,10 @@ To reply, replace the `[REPLY_TEMPLATE]` line with:
 
 Escape `-->` as `\-\-\>`, newlines as `\n` within comment text.
 
+## Troubleshooting
+
+If the user says the link doesn't work, is broken, or returns 404, run `codoc share` again on the same file to get a fresh URL. The server or tunnel may have restarted, invalidating the previous token.
+
 ## Remote Access
 
 ```
