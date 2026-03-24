@@ -61,7 +61,7 @@ export function formatStateCard(card: StateCard, fsmGuide?: string): string {
   if (entries.length === 0) {
     lines.push("This is a terminal state. The workflow is complete.");
   } else {
-    lines.push("After finish, the allowed state transitions are:");
+    lines.push("After finishing, the allowed state transitions are:");
     for (const [label, target] of entries) {
       lines.push(`  ${label} → ${target}`);
     }
