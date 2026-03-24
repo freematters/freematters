@@ -5,7 +5,6 @@ import http from "node:http";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import { ScriptCallback } from "../callback.js";
 import {
@@ -19,12 +18,7 @@ import { FileWatcher } from "../file-watcher.js";
 import { GitOps } from "../git-ops.js";
 import { createHttpHandler } from "../http.js";
 import { IpcServer } from "../ipc.js";
-import { IpcClient } from "../ipc.js";
-import {
-  getDefaultSocketPath,
-  getDefaultTokensPath,
-  readSessionIdFromStdin,
-} from "../paths.js";
+import { getDefaultSocketPath, getDefaultTokensPath } from "../paths.js";
 import { PresenceTracker } from "../presence.js";
 import { SessionTracker } from "../session-tracker.js";
 import { TokenStore } from "../token-store.js";
@@ -341,44 +335,12 @@ function startTunnel(
 async function runServer(): Promise<void> {
   const socketPath = getDefaultSocketPath();
 
-  const stdinSessionId = await readSessionIdFromStdin();
-  const sessionId =
-    stdinSessionId ?? process.env.SESSION_ID ?? `session-${process.pid}-${Date.now()}`;
-  let alreadyRunning = false;
-
   if (fs.existsSync(socketPath)) {
     const active = await isSocketActive(socketPath);
     if (active) {
-      alreadyRunning = true;
+      console.error("Server already running on this socket");
+      return;
     }
-  }
-
-  if (!alreadyRunning && process.env.CODOC_DAEMON !== "1") {
-    const cliPath = path.resolve(
-      path.dirname(fileURLToPath(import.meta.url)),
-      "..",
-      "cli.js",
-    );
-    const child = childProcess.spawn(process.execPath, [cliPath, "server"], {
-      env: { ...process.env, CODOC_DAEMON: "1" },
-      detached: true,
-      stdio: "ignore",
-    });
-    child.unref();
-    return;
-  }
-
-  if (alreadyRunning) {
-    try {
-      const client = new IpcClient(socketPath);
-      await client.send({
-        method: "session-start",
-        params: { sessionId },
-      });
-    } catch {
-      // non-fatal
-    }
-    return;
   }
 
   const tokensPath = getDefaultTokensPath();

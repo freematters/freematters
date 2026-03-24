@@ -1,8 +1,10 @@
+import childProcess from "node:child_process";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import type { SessionState } from "../hooks/post-tool-use.js";
 import { IpcClient } from "../ipc.js";
@@ -32,17 +34,30 @@ async function waitForServer(socketPath: string, timeoutMs: number): Promise<boo
   return false;
 }
 
+function spawnDaemon(): void {
+  const cliPath = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "cli.js",
+  );
+  const child = childProcess.spawn(process.execPath, [cliPath, "server"], {
+    env: { ...process.env, CODOC_DAEMON: "1" },
+    detached: true,
+    stdio: "ignore",
+  });
+  child.unref();
+}
+
 async function runShare(file: string): Promise<void> {
   const socketPath = getDefaultSocketPath();
   const filePath = path.resolve(file);
 
   if (!fs.existsSync(socketPath) || !(await isSocketActive(socketPath))) {
-    console.error("Waiting for codoc server to start...");
+    spawnDaemon();
+    console.error("Starting codoc server...");
     const ready = await waitForServer(socketPath, 30000);
     if (!ready) {
-      console.error(
-        "codoc server did not start within 30s. Is the SessionStart hook configured?",
-      );
+      console.error("codoc server did not start within 30s.");
       process.exitCode = 1;
       return;
     }

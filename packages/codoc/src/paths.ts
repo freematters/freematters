@@ -3,12 +3,14 @@ import os from "node:os";
 import path from "node:path";
 
 export function getDefaultSocketPath(): string {
+  const sessionId = process.env.SESSION_ID;
   const user = process.env.USER ?? "unknown";
   const dir = path.join("/tmp", user);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  return path.join(dir, "codoc.sock");
+  const name = sessionId ? `codoc-${sessionId}.sock` : "codoc.sock";
+  return path.join(dir, name);
 }
 
 export function getDefaultTokensPath(): string {
