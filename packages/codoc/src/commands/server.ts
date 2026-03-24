@@ -381,10 +381,9 @@ async function runServer(): Promise<void> {
     if (!alreadyRunning) {
       const detail = stderrOutput.trim();
       const reason = detail
-        ? `Server failed to start within 5s:\n${detail}`
-        : "Server failed to start within 5s (no output from daemon — check config and port availability)";
-      console.error(reason);
-      process.exitCode = 1;
+        ? `codoc: server failed to start — ${detail}`
+        : "codoc: server failed to start (check config and port availability)";
+      process.stdout.write(`${JSON.stringify({ systemMessage: reason })}\n`);
       return;
     }
   }
