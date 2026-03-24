@@ -102,6 +102,8 @@ export function App() {
   const pollTypingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [pollTypingVisible, setPollTypingVisible] = useState<boolean>(false);
   const glyphDecorationIds = useRef<string[]>([]);
+  const previewPaneRef = useRef<HTMLDivElement | null>(null);
+  const scrollSyncSource = useRef<"editor" | "preview" | null>(null);
   const glyphDragStartLine = useRef<number | null>(null);
   const glyphDragDecorationIds = useRef<string[]>([]);
   const savePendingRef = useRef<boolean>(false);
@@ -766,6 +768,23 @@ export function App() {
         },
       });
 
+      editorInstance.onDidScrollChange(() => {
+        if (scrollSyncSource.current === "preview") return;
+        scrollSyncSource.current = "editor";
+        const preview = previewPaneRef.current;
+        if (!preview) return;
+        const scrollTop = editorInstance.getScrollTop();
+        const scrollHeight = editorInstance.getScrollHeight();
+        const clientHeight = editorInstance.getLayoutInfo().height;
+        const maxScroll = scrollHeight - clientHeight;
+        const ratio = maxScroll > 0 ? scrollTop / maxScroll : 0;
+        const previewMax = preview.scrollHeight - preview.clientHeight;
+        preview.scrollTop = ratio * previewMax;
+        requestAnimationFrame(() => {
+          scrollSyncSource.current = null;
+        });
+      });
+
       setTimeout(() => {
         foldCommentRegions();
         editorInstance.setPosition({ lineNumber: 1, column: 1 });
@@ -1166,7 +1185,24 @@ export function App() {
           )}
         </div>
         <div className="editor-divider" />
-        <div className="preview-pane">
+        <div
+          className="preview-pane"
+          ref={previewPaneRef}
+          onScroll={() => {
+            if (scrollSyncSource.current === "editor") return;
+            scrollSyncSource.current = "preview";
+            const ed = editorRef.current;
+            const preview = previewPaneRef.current;
+            if (!ed || !preview) return;
+            const previewMax = preview.scrollHeight - preview.clientHeight;
+            const ratio = previewMax > 0 ? preview.scrollTop / previewMax : 0;
+            const editorMax = ed.getScrollHeight() - ed.getLayoutInfo().height;
+            ed.setScrollTop(ratio * editorMax);
+            requestAnimationFrame(() => {
+              scrollSyncSource.current = null;
+            });
+          }}
+        >
           <MarkdownPreview
             content={content}
             username={username}
