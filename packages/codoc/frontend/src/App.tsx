@@ -291,7 +291,14 @@ export function App() {
         presenceSessionIdRef.current = sessionId;
         heartbeatInterval = setInterval(() => {
           if (presenceSessionIdRef.current) {
-            heartbeatPresence(token, presenceSessionIdRef.current).catch(() => {});
+            heartbeatPresence(token, presenceSessionIdRef.current).catch(() => {
+              const rejoinMode = readonly ? ("read" as const) : ("write" as const);
+              joinPresence(token, getStoredUsername(), rejoinMode)
+                .then((newId) => {
+                  presenceSessionIdRef.current = newId;
+                })
+                .catch(() => {});
+            });
           }
         }, 30000);
       })
