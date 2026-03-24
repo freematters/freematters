@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   type LogEntry,
   fetchDiff,
@@ -19,6 +19,8 @@ interface HistoryOverlayProps {
 
 export function HistoryOverlay(props: HistoryOverlayProps) {
   const { token, dirty, showLatestDiff, currentContent, onClose, onRevert } = props;
+  const currentContentRef = useRef(currentContent);
+  currentContentRef.current = currentContent;
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +44,7 @@ export function HistoryOverlay(props: HistoryOverlayProps) {
             .then((lastSaved) => {
               setDiffData({
                 original: lastSaved,
-                modified: currentContent,
+                modified: currentContentRef.current,
                 title: "Current vs Last Saved",
               });
             })

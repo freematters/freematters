@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef } from "react";
-import { type BlameEntry, fetchBlame } from "../api";
+import { useEffect, useRef } from "react";
+import type { BlameEntry } from "../api";
 
 interface BlameGutterProps {
   token: string;
@@ -14,89 +14,17 @@ const HUMAN_COLOR = "#3b82f6";
 const AGENT_COLOR = "#22c55e";
 
 export function BlameGutter(props: BlameGutterProps) {
-  const { token, editor, monaco, refreshTrigger, blameEntries, latestCommitHash } =
-    props;
-  const decorationIds = useRef<string[]>([]);
+  const { editor, monaco, blameEntries, latestCommitHash } = props;
+  const decorationCollection = useRef<{
+    clear: () => void;
+    set: (d: unknown[]) => void;
+  } | null>(null);
   const injectedStyleRef = useRef<HTMLStyleElement | null>(null);
 
-  const applyDecorations = useCallback(
-    (
-      entries: BlameEntry[],
-      monacoNs: {
-        editor: { TrackedRangeStickiness: { NeverGrowsWhenTypingAtEdges: number } };
-        Range: new (
-          startLine: number,
-          startCol: number,
-          endLine: number,
-          endCol: number,
-        ) => unknown;
-      },
-      editorInstance: {
-        deltaDecorations: (oldIds: string[], newDecorations: unknown[]) => string[];
-        getModel: () => { getLineCount: () => number } | null;
-      },
-      latestHash: string | null,
-    ) => {
-      const decorations: unknown[] = [];
-
-      if (!latestHash) {
-        decorationIds.current = editorInstance.deltaDecorations(
-          decorationIds.current,
-          [],
-        );
-        return;
-      }
-
-      if (!injectedStyleRef.current) {
-        const style = document.createElement("style");
-        style.setAttribute("data-blame-gutter", "true");
-        style.textContent = [
-          `.codoc-blame-agent { background: ${AGENT_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
-          `.codoc-blame-human { background: ${HUMAN_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
-        ].join("\n");
-        document.head.appendChild(style);
-        injectedStyleRef.current = style;
-      }
-
-      for (const entry of entries) {
-        const isLatest = latestHash && entry.hash === latestHash;
-        const cssClass = entry.isAgent ? "codoc-blame-agent" : "codoc-blame-human";
-        for (let line = entry.lineStart; line <= entry.lineEnd; line++) {
-          decorations.push({
-            range: new monacoNs.Range(line, 1, line, 1),
-            options: {
-              isWholeLine: true,
-              marginClassName: cssClass,
-              minimap: {
-                color: entry.isAgent ? AGENT_COLOR : HUMAN_COLOR,
-                position: 1,
-              },
-              overviewRuler: isLatest
-                ? {
-                    color: entry.isAgent ? AGENT_COLOR : HUMAN_COLOR,
-                    position: 1,
-                  }
-                : undefined,
-            },
-          });
-        }
-      }
-
-      decorationIds.current = editorInstance.deltaDecorations(
-        decorationIds.current,
-        decorations,
-      );
-    },
-    [],
-  );
-
-  const updateBlame = useCallback(() => {
-    if (!editor || !monaco) return;
+  useEffect(() => {
+    if (!editor || !monaco || blameEntries.length === 0) return;
 
     const monacoNs = monaco as {
-      editor: {
-        TrackedRangeStickiness: { NeverGrowsWhenTypingAtEdges: number };
-      };
       Range: new (
         startLine: number,
         startCol: number,
@@ -106,24 +34,60 @@ export function BlameGutter(props: BlameGutterProps) {
     };
 
     const editorInstance = editor as {
-      deltaDecorations: (oldIds: string[], newDecorations: unknown[]) => string[];
-      getModel: () => { getLineCount: () => number } | null;
+      createDecorationsCollection: (decorations: unknown[]) => {
+        clear: () => void;
+        set: (decorations: unknown[]) => void;
+      };
     };
 
-    if (blameEntries.length === 0) {
-      fetchBlame(token)
-        .then((entries: BlameEntry[]) => {
-          applyDecorations(entries, monacoNs, editorInstance, latestCommitHash);
-        })
-        .catch(() => {});
-    } else {
-      applyDecorations(blameEntries, monacoNs, editorInstance, latestCommitHash);
+    if (!injectedStyleRef.current) {
+      const style = document.createElement("style");
+      style.setAttribute("data-blame-gutter", "true");
+      style.textContent = [
+        `.codoc-blame-agent { background: ${AGENT_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
+        `.codoc-blame-human { background: ${HUMAN_COLOR} !important; width: 4px !important; margin-left: 3px !important; }`,
+      ].join("\n");
+      document.head.appendChild(style);
+      injectedStyleRef.current = style;
     }
-  }, [token, editor, monaco, blameEntries, latestCommitHash, applyDecorations]);
 
-  useEffect(() => {
-    updateBlame();
-  }, [updateBlame, refreshTrigger]);
+    const decorations: unknown[] = [];
+    for (const entry of blameEntries) {
+      const isLatest = latestCommitHash && entry.hash === latestCommitHash;
+      const cssClass = entry.isAgent ? "codoc-blame-agent" : "codoc-blame-human";
+      decorations.push({
+        range: new monacoNs.Range(entry.lineStart, 1, entry.lineEnd, 1),
+        options: {
+          isWholeLine: true,
+          marginClassName: cssClass,
+          minimap: {
+            color: entry.isAgent ? AGENT_COLOR : HUMAN_COLOR,
+            position: 1,
+          },
+          overviewRuler: isLatest
+            ? {
+                color: entry.isAgent ? AGENT_COLOR : HUMAN_COLOR,
+                position: 1,
+              }
+            : undefined,
+        },
+      });
+    }
+
+    if (decorationCollection.current) {
+      decorationCollection.current.set(decorations);
+    } else {
+      decorationCollection.current =
+        editorInstance.createDecorationsCollection(decorations);
+    }
+
+    return () => {
+      if (decorationCollection.current) {
+        decorationCollection.current.clear();
+        decorationCollection.current = null;
+      }
+    };
+  }, [editor, monaco, blameEntries, latestCommitHash]);
 
   return null;
 }
