@@ -38,7 +38,7 @@ function resolveWorkflowOrExit(input: string, json: boolean): string {
     return resolveWorkflow(input);
   } catch (err: unknown) {
     handleError(err, json); // handleError is typed `never` (always exits)
-    process.exit(2); // unreachable — satisfies return type if handleError signature changes
+    process.exit(2); // satisfies return type (handleError never returns)
   }
 }
 

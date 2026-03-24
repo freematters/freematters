@@ -268,7 +268,7 @@ export function formatDuration(ms: number): string {
 // --- Graph Visualization (Mermaid) ---
 
 /**
- * Sanitize a state name for mermaid stateDiagram-v2.
+ * Sanitize a state name for Mermaid stateDiagram-v2.
  * Mermaid doesn't allow hyphens or slashes in bare state IDs.
  * Replace them with underscores.
  */
