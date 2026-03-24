@@ -456,10 +456,23 @@ export function App() {
     const baseContent = savedContentRef.current;
     setStatus("saving...");
     savePendingRef.current = true;
+    setWaitingForUpdate(true);
+    if (waitingTimerRef.current !== null) {
+      clearTimeout(waitingTimerRef.current);
+    }
+    waitingTimerRef.current = setTimeout(() => {
+      setWaitingForUpdate(false);
+      waitingTimerRef.current = null;
+    }, 60000);
     saveFile(token, currentContent, baseContent)
       .then((result) => {
         savePendingRef.current = false;
         if (result.conflict) {
+          setWaitingForUpdate(false);
+          if (waitingTimerRef.current !== null) {
+            clearTimeout(waitingTimerRef.current);
+            waitingTimerRef.current = null;
+          }
           setConflictData({
             conflictContent: result.conflictContent ?? "",
             myContent: currentContent,
@@ -474,20 +487,16 @@ export function App() {
         setDirty(false);
         setStatus("saved");
 
-        setWaitingForUpdate(true);
-        if (waitingTimerRef.current !== null) {
-          clearTimeout(waitingTimerRef.current);
-        }
-        waitingTimerRef.current = setTimeout(() => {
-          setWaitingForUpdate(false);
-          waitingTimerRef.current = null;
-        }, 60000);
-
         setTypingTrigger((prev) => prev + 1);
         setTimeout(foldCommentRegions, 200);
       })
       .catch((err: Error) => {
         savePendingRef.current = false;
+        setWaitingForUpdate(false);
+        if (waitingTimerRef.current !== null) {
+          clearTimeout(waitingTimerRef.current);
+          waitingTimerRef.current = null;
+        }
         setStatus(`Save error: ${err.message}`);
       });
   }, [token, readonly, focusEditor, foldCommentRegions]);
@@ -1107,19 +1116,17 @@ export function App() {
               <span className="codoc-typing-dot" />
             </span>
           )}
+          {waitingForUpdate && (
+            <span className="typing-indicator">
+              <span className="codoc-typing-dot" />
+              <span className="codoc-typing-dot" />
+              <span className="codoc-typing-dot" />
+            </span>
+          )}
           {!readonly && (
-            <>
-              <button className={dirty ? "btn btn-primary" : "btn"} onClick={handleSave}>
-                Save<span className="btn-shortcut">⌘S</span>
-              </button>
-              {waitingForUpdate && (
-                <span className="typing-indicator">
-                  <span className="codoc-typing-dot" />
-                  <span className="codoc-typing-dot" />
-                  <span className="codoc-typing-dot" />
-                </span>
-              )}
-            </>
+            <button className={dirty ? "btn btn-primary" : "btn"} onClick={handleSave}>
+              Save<span className="btn-shortcut">⌘S</span>
+            </button>
           )}
           <button
             className={dirty ? "btn btn-accent" : "btn btn-disabled"}
