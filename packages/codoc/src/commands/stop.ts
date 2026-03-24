@@ -64,9 +64,6 @@ export function stopCommand(): Command {
       process.stdout.write(
         `${JSON.stringify({ systemMessage: `codoc: ${result.message}` })}\n`,
       );
-      if (!result.ok) {
-        process.exitCode = 1;
-      }
     });
   return cmd;
 }
