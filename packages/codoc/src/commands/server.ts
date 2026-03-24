@@ -7,6 +7,8 @@ import os from "node:os";
 import path from "node:path";
 import { Command } from "commander";
 import { ScriptCallback } from "../callback.js";
+
+const GIT_FILE_NAME = "doc.md";
 import {
   ensureCloudflared,
   getTunnelSpawnArgs,
@@ -212,9 +214,19 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
         const data = result.data as { token: string; url: string };
         const filePath = params.filePath as string;
         const resolvedPath = path.resolve(filePath);
-        if (gitOpsMap.has(data.token)) {
+
+        const existingGitOps = gitOpsMap.get(data.token);
+        if (existingGitOps) {
+          try {
+            const gitFilePath = path.join(existingGitOps.getWorkTree(), GIT_FILE_NAME);
+            fs.copyFileSync(resolvedPath, gitFilePath);
+            await existingGitOps.commit(GIT_FILE_NAME, "share", "system");
+          } catch {
+            // commit failure is non-fatal (no changes to commit)
+          }
           return;
         }
+
         fileWatcher.watch(resolvedPath, (changedPath: string, newContent: string) => {
           const contentHash = crypto
             .createHash("sha256")
@@ -249,9 +261,9 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
         const gitOps = new GitOps(gitDir, gitBase);
         try {
           await gitOps.init();
-          const gitFilePath = path.join(gitBase, "doc.md");
+          const gitFilePath = path.join(gitBase, GIT_FILE_NAME);
           fs.copyFileSync(resolvedPath, gitFilePath);
-          await gitOps.commit("doc.md", "initial", "system");
+          await gitOps.commit(GIT_FILE_NAME, "initial", "system");
           gitOpsMap.set(data.token, gitOps);
         } catch {
           // git init failure is non-fatal
