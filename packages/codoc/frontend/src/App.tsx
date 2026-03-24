@@ -180,30 +180,11 @@ export function App() {
       });
   }, []);
 
-  const flashChangedLines = useCallback((diff: string, newContent: string) => {
+  const flashChangedLines = useCallback((changedLineNumbers: number[]) => {
     const editorInstance = editorRef.current;
     const monacoNs = monacoRef.current;
 
-    if (!editorInstance || !monacoNs || !diff) return;
-
-    // Map diff "+" lines to their line numbers in newContent
-    const newLines = newContent.split("\n");
-    const addedLines = diff
-      .split("\n")
-      .filter((l) => l.startsWith("+ "))
-      .map((l) => l.slice(2));
-
-    const changedLineNumbers: number[] = [];
-    let searchFrom = 0;
-    for (const added of addedLines) {
-      const idx = newLines.indexOf(added, searchFrom);
-      if (idx !== -1) {
-        changedLineNumbers.push(idx + 1);
-        searchFrom = idx + 1;
-      }
-    }
-
-    if (changedLineNumbers.length === 0) return;
+    if (!editorInstance || !monacoNs || changedLineNumbers.length === 0) return;
 
     const decorations = changedLineNumbers.map((lineNum) => ({
       range: new monacoNs.Range(lineNum, 1, lineNum, 1),
@@ -388,10 +369,10 @@ export function App() {
         case "file:changed": {
           const changedPayload = msg.payload as {
             by?: string;
-            diff?: string;
+            changedLines?: number[];
           };
           const changedBy = changedPayload.by ?? "external";
-          const diff = changedPayload.diff ?? "";
+          const changedLines = changedPayload.changedLines ?? [];
           if (token) {
             fetchFile(token)
               .then((data) => {
@@ -401,7 +382,7 @@ export function App() {
                   setContent(data.content);
                   contentRef.current = data.content;
                   mergeBaseRef.current = data.content;
-                  flashChangedLines(diff, data.content);
+                  flashChangedLines(changedLines);
                   setDirty(false);
                   setStatus(`changed by ${changedBy}`);
                 } else {

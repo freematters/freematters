@@ -1,4 +1,5 @@
 const HEARTBEAT_TIMEOUT_MS = 30000;
+const OFFLINE_DELAY_MS = 10000;
 
 export type StatusChangeCallback = (token: string | null, online: boolean) => void;
 
@@ -11,11 +12,13 @@ export class SessionTracker {
   private activePolls: Set<string>;
   private heartbeats: Map<string, HeartbeatEntry>;
   private onStatusChange: StatusChangeCallback | null;
+  private offlineTimers: Map<string, ReturnType<typeof setTimeout>>;
 
   constructor() {
     this.activePolls = new Set();
     this.heartbeats = new Map();
     this.onStatusChange = null;
+    this.offlineTimers = new Map();
   }
 
   setOnStatusChange(callback: StatusChangeCallback): void {
@@ -23,6 +26,11 @@ export class SessionTracker {
   }
 
   recordPoll(token: string): void {
+    const existing = this.offlineTimers.get(token);
+    if (existing) {
+      clearTimeout(existing);
+      this.offlineTimers.delete(token);
+    }
     this.activePolls.add(token);
     if (this.onStatusChange) {
       this.onStatusChange(token, true);
@@ -31,8 +39,14 @@ export class SessionTracker {
 
   removePoll(token: string): void {
     this.activePolls.delete(token);
-    if (this.onStatusChange) {
-      this.onStatusChange(token, this.isAgentOnline(token));
+    if (!this.isAgentOnline(token)) {
+      const timer = setTimeout(() => {
+        this.offlineTimers.delete(token);
+        if (this.onStatusChange && !this.isAgentOnline(token)) {
+          this.onStatusChange(token, false);
+        }
+      }, OFFLINE_DELAY_MS);
+      this.offlineTimers.set(token, timer);
     }
   }
 

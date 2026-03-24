@@ -69,3 +69,56 @@ export function computeDiff(oldContent: string, newContent: string): string {
 
   return parts.join("\n");
 }
+
+export function computeChangedLines(oldContent: string, newContent: string): number[] {
+  if (oldContent === newContent) return [];
+
+  const oldLines = oldContent.split("\n");
+  const newLines = newContent.split("\n");
+
+  if (oldLines.length > 0 && oldLines[oldLines.length - 1] === "") oldLines.pop();
+  if (newLines.length > 0 && newLines[newLines.length - 1] === "") newLines.pop();
+
+  const m = oldLines.length;
+  const n = newLines.length;
+
+  let prev = new Array<number>(n + 1).fill(0);
+  let curr = new Array<number>(n + 1).fill(0);
+  const dirs: Uint8Array[] = [];
+  for (let i = 0; i <= m; i++) dirs[i] = new Uint8Array(n + 1);
+
+  for (let i = 1; i <= m; i++) {
+    curr[0] = 0;
+    for (let j = 1; j <= n; j++) {
+      if (oldLines[i - 1] === newLines[j - 1]) {
+        curr[j] = prev[j - 1] + 1;
+        dirs[i][j] = 1;
+      } else if (prev[j] >= curr[j - 1]) {
+        curr[j] = prev[j];
+        dirs[i][j] = 2;
+      } else {
+        curr[j] = curr[j - 1];
+        dirs[i][j] = 3;
+      }
+    }
+    [prev, curr] = [curr, prev];
+    curr.fill(0);
+  }
+
+  const changed: number[] = [];
+  let i = m;
+  let j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && dirs[i][j] === 1) {
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dirs[i][j] === 3)) {
+      changed.push(j);
+      j--;
+    } else {
+      i--;
+    }
+  }
+  changed.reverse();
+  return changed;
+}
