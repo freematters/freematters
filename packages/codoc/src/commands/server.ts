@@ -371,7 +371,7 @@ async function runServer(): Promise<void> {
     child.unref();
     (child.stderr as NodeJS.ReadableStream & { unref?: () => void }).unref?.();
 
-    for (let i = 0; i < 50; i++) {
+    for (let i = 0; i < 250; i++) {
       await new Promise((r) => setTimeout(r, 100));
       if (fs.existsSync(socketPath) && (await isSocketActive(socketPath))) {
         alreadyRunning = true;
