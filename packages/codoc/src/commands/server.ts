@@ -97,7 +97,6 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
   let resolvedTunnelUrl = tunnelUrl;
   const getBaseUrl = () => resolvedTunnelUrl ?? `http://127.0.0.1:${actualPort}`;
   const lastSavedContentHash = new Map<string, string>();
-  const fileWatcher = new FileWatcher();
 
   const handler = createHttpHandler(
     tokenStore,
@@ -124,13 +123,6 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
     defaultName,
     presenceTracker,
     lastSavedContentHash,
-    (filePath: string, cb: (newContent: string) => void) => {
-      if (fileWatcher) {
-        fileWatcher.addOneTimeListener(filePath, (_path: string, content: string) => {
-          cb(content);
-        });
-      }
-    },
   );
   const httpServer = http.createServer(handler);
 
@@ -163,6 +155,7 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
   })();
 
   wsServer = new WebSocketServer(httpServer, tokenStore);
+  const fileWatcher = new FileWatcher();
 
   sessionTracker.setOnStatusChange((token: string | null, online: boolean) => {
     if (wsServer && token) {
