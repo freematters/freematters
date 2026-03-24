@@ -206,6 +206,14 @@ export class IpcServer {
     if (!fs.existsSync(filePath)) {
       return { ok: false, error: `File not found: ${filePath}` };
     }
+    try {
+      fs.accessSync(filePath, fs.constants.W_OK);
+    } catch {
+      return {
+        ok: false,
+        error: `File not writable: ${filePath} (read-only filesystem?)`,
+      };
+    }
     const readonly = params.readonly === true;
     const result = this.tokenStore.register(filePath, readonly);
     const baseUrl = this.tunnelUrl ?? `http://127.0.0.1:${this.httpPort}`;
