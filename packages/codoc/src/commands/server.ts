@@ -239,6 +239,12 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
           const entry = tokenStore.list().find((e) => e.filePath === changedPath);
           if (entry) {
             wsServer.notifyFileChanged(entry.token, newContent, [], "external");
+            const gitOps = gitOpsMap.get(entry.token);
+            if (gitOps) {
+              const gitFilePath = path.join(gitOps.getWorkTree(), GIT_FILE_NAME);
+              fs.copyFileSync(changedPath, gitFilePath);
+              gitOps.commit(GIT_FILE_NAME, "external", "agent").catch(() => {});
+            }
             if (scriptCallback) {
               const editUrl = `${getBaseUrl()}/edit/${entry.token}`;
               scriptCallback.execute(
