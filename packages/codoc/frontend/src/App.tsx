@@ -1086,15 +1086,18 @@ export function App() {
           )}
           {!readonly && (
             <button className={dirty ? "btn btn-primary" : "btn"} onClick={handleSave}>
-              {dirty ? "Save" : "Save"}
-              <span className="btn-shortcut">⌘S</span>
+              Save<span className="btn-shortcut">⌘S</span>
             </button>
           )}
+          <button
+            className={dirty ? "btn btn-accent" : "btn btn-disabled"}
+            onClick={handleQuickDiff}
+            disabled={!dirty}
+          >
+            Current Diff<span className="btn-shortcut">⇧⌘D</span>
+          </button>
           <button className="btn" onClick={handleShowHistory}>
             History<span className="btn-shortcut">⇧⌘H</span>
-          </button>
-          <button className="btn" onClick={handleQuickDiff} disabled={!dirty}>
-            Current Diff<span className="btn-shortcut">⇧⌘D</span>
           </button>
           {!readonly && (
             <button className="btn" onClick={handleShowShare}>

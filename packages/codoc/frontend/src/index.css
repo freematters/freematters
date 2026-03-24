@@ -54,6 +54,24 @@ body {
   background: #106ebe;
 }
 
+.btn-accent {
+  background: #d29922;
+  color: #fff;
+}
+
+.btn-accent:hover {
+  background: #b8860b;
+}
+
+.btn-disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn-disabled:hover {
+  background: var(--bg-secondary);
+}
+
 .btn-active {
   background: var(--accent) !important;
   color: #fff !important;
