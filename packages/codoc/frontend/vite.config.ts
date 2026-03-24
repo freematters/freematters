@@ -12,6 +12,15 @@ export default defineConfig({
   build: {
     outDir: "../dist/static",
     emptyOutDir: true,
+    rollupOptions: {
+      external: [
+        "react",
+        "react/jsx-runtime",
+        "react-dom/client",
+        "@monaco-editor/react",
+        "monaco-editor",
+      ],
+    },
   },
   server: {
     proxy: {
