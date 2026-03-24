@@ -335,8 +335,22 @@ export function App() {
       switch (msg.type) {
         case "file:content": {
           const payload = msg.payload as { content: string; version: number };
-          setContent(payload.content);
-          contentRef.current = payload.content;
+          const hadLocalEdits = contentRef.current !== mergeBaseRef.current;
+          if (!hadLocalEdits) {
+            setContent(payload.content);
+            contentRef.current = payload.content;
+            savedContentRef.current = payload.content;
+            mergeBaseRef.current = payload.content;
+            setDirty(false);
+          } else if (payload.content !== savedContentRef.current) {
+            savedContentRef.current = payload.content;
+            setConflictData({
+              conflictContent: payload.content,
+              myContent: contentRef.current,
+              baseContent: mergeBaseRef.current,
+            });
+            setStatus("conflict with server content");
+          }
           break;
         }
         case "file:saved": {
