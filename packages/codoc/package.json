@@ -1,0 +1,34 @@
+{
+  "name": "@freematters/codoc",
+  "version": "0.1.0",
+  "description": "Claude Code plugin for real-time collaborative markdown editing",
+  "type": "module",
+  "bin": {
+    "codoc": "dist/cli.js"
+  },
+  "files": ["dist/", "skills/", "hooks/", ".claude-plugin/"],
+  "scripts": {
+    "build": "tsc && node dist/cli.js _generate-hooks && npm --prefix frontend install && npm --prefix frontend run build",
+    "prepublishOnly": "cd frontend && npm install && cd .. && npm run build",
+    "postinstall": "codoc install claude 2>/dev/null || true",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "npx playwright test",
+    "check": "biome check --write --error-on-warnings --config-path=. .",
+    "clean": "rm -rf dist"
+  },
+  "author": "freematters",
+  "license": "MIT",
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "commander": "^13.1.0",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.8.0",
+    "vitest": "^3.0.0"
+  }
+}
