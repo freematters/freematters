@@ -45,7 +45,7 @@ export function HistoryOverlay(props: HistoryOverlayProps) {
               setDiffData({
                 original: lastSaved,
                 modified: currentContentRef.current,
-                title: "Current vs Last Saved",
+                title: "Last Saved → Current",
               });
             })
             .catch(() => {});
