@@ -118,26 +118,29 @@ export function App() {
 
   const foldCommentRegions = useCallback(() => {
     const ed = editorRef.current;
-    if (!ed) return;
+    const monacoNs = monacoRef.current;
+    if (!ed || !monacoNs) return;
     const model = ed.getModel();
     if (!model) return;
     const lineCount = model.getLineCount();
-    const commentStartLines: number[] = [];
-    let inBlock = false;
+    const regions: { start: number; end: number }[] = [];
+    let blockStart = -1;
     for (let i = 1; i <= lineCount; i++) {
       const line = model.getLineContent(i).trimStart();
-      if (!inBlock && line === "<!--") {
-        commentStartLines.push(i);
-        inBlock = true;
-      } else if (inBlock && line === "-->") {
-        inBlock = false;
+      if (blockStart === -1 && line === "<!--") {
+        blockStart = i;
+      } else if (blockStart !== -1 && line === "-->") {
+        regions.push({ start: blockStart, end: i });
+        blockStart = -1;
       }
     }
+    if (regions.length === 0) return;
+    const selections = regions.map(
+      (r) => new monacoNs.Selection(r.start, 1, r.start, 1),
+    );
     const pos = ed.getPosition();
-    for (const startLine of commentStartLines) {
-      ed.setPosition({ lineNumber: startLine, column: 1 });
-      ed.trigger("fold", "editor.fold", {});
-    }
+    ed.setSelections(selections);
+    ed.trigger("fold", "editor.fold", {});
     if (pos) {
       ed.setPosition(pos);
     }
