@@ -101,17 +101,11 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
   const handler = createHttpHandler(
     tokenStore,
     (token: string, content: string, author: string) => {
-      const entry = tokenStore.resolve(token);
-      if (entry) {
-        lastSavedContentHash.set(
-          entry.filePath,
-          crypto.createHash("sha256").update(content).digest("hex"),
-        );
-      }
       if (wsServer) {
         wsServer.notifySaved(token, author);
       }
       if (scriptCallback) {
+        const entry = tokenStore.resolve(token);
         if (entry) {
           const editUrl = `${getBaseUrl()}/edit/${token}`;
           scriptCallback.execute(entry.filePath, "save", token, editUrl);
@@ -237,6 +231,7 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
           if (lastHash === contentHash) {
             return;
           }
+          lastSavedContentHash.set(changedPath, contentHash);
           const entry = tokenStore.list().find((e) => e.filePath === changedPath);
           if (entry) {
             wsServer.notifyFileChanged(entry.token, newContent, [], "external");
