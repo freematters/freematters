@@ -286,9 +286,6 @@ export class IpcServer {
     if (this.sessionTracker) {
       this.sessionTracker.removePoll(pendingPoll.token);
     }
-    if (pendingPoll.presenceSessionId && this.presenceLeaveCallback) {
-      this.presenceLeaveCallback(pendingPoll.presenceSessionId);
-    }
 
     const diff = computeDiff(pendingPoll.originalContent, newContent);
     const newComments = parseComments(newContent);

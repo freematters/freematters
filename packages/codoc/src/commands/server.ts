@@ -122,6 +122,7 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
     sessionTracker,
     defaultName,
     presenceTracker,
+    lastSavedContentHash,
   );
   const httpServer = http.createServer(handler);
 

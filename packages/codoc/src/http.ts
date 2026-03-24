@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
 import type http from "node:http";
 import path from "node:path";
@@ -526,6 +527,7 @@ export function createHttpHandler(
   sessionTracker: SessionTracker | undefined,
   defaultName: string | undefined,
   presenceTracker: PresenceTracker | undefined,
+  savedContentHashMap?: Map<string, string>,
 ): http.RequestListener {
   return (req: http.IncomingMessage, res: http.ServerResponse) => {
     const method = req.method ?? "GET";
@@ -636,6 +638,12 @@ export function createHttpHandler(
             if (typeof parsed.content !== "string") {
               sendJson(res, 400, { error: "content must be a string" });
               return;
+            }
+            if (savedContentHashMap) {
+              savedContentHashMap.set(
+                entry.filePath,
+                crypto.createHash("sha256").update(parsed.content).digest("hex"),
+              );
             }
             fs.writeFileSync(entry.filePath, parsed.content);
 
