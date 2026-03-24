@@ -1,3 +1,5 @@
+import { Marked } from "marked";
+import { markedTerminal } from "marked-terminal";
 import { CliError } from "./errors.js";
 import type { FsmState } from "./fsm.js";
 import { FsmError } from "./fsm.js";
@@ -199,6 +201,59 @@ export function formatReminder(card: StateCard, fsmGuide?: string): string {
   }
 
   return lines.join("\n");
+}
+
+// --- Markdown Rendering ---
+
+function createMarked(): Marked {
+  const ext = markedTerminal() as unknown as {
+    renderer: Record<string, (...args: unknown[]) => string>;
+    useNewRenderer: boolean;
+  };
+
+  // Workaround for marked-terminal@7.3.0: inline tokens (bold, italic, etc.)
+  // inside list items are not rendered. The `text` renderer receives the raw
+  // `text` property instead of recursing into `tokens`. Override it to call
+  // parseInline when inline children exist.
+  // Upstream issue: https://github.com/mikaelbr/marked-terminal/issues/236
+  // Remove this workaround when the upstream fix is released.
+  const origText = ext.renderer?.text;
+  if (typeof origText !== "function") {
+    // marked-terminal API changed — skip patch, fall back to default rendering
+    return new Marked(ext as never);
+  }
+  ext.renderer.text = function (
+    this: { parser: { parseInline: (tokens: unknown[]) => string } },
+    token: unknown,
+  ) {
+    if (
+      typeof token === "object" &&
+      token !== null &&
+      "tokens" in token &&
+      Array.isArray((token as { tokens?: unknown[] }).tokens) &&
+      (token as { tokens: unknown[] }).tokens.length > 0
+    ) {
+      return this.parser.parseInline((token as { tokens: unknown[] }).tokens);
+    }
+    return origText.call(this, token);
+  };
+
+  // Replace * bullet with - for unordered lists
+  const origList = ext.renderer.list;
+  if (typeof origList === "function") {
+    ext.renderer.list = function (this: unknown, ...args: unknown[]) {
+      const result = origList.call(this, ...args) as string;
+      return result.replace(/^( *)(\* )/gm, "$1- ");
+    };
+  }
+
+  return new Marked(ext as never);
+}
+
+const marked = createMarked();
+
+export function renderMarkdown(text: string): string {
+  return (marked.parse(text) as string).trimEnd();
 }
 
 // --- Duration Formatting ---

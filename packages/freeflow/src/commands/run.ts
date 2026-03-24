@@ -3,8 +3,6 @@ import { basename, dirname, join } from "node:path";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { createSdkMcpServer, tool } from "@anthropic-ai/claude-agent-sdk";
-import { Marked } from "marked";
-import { markedTerminal } from "marked-terminal";
 import { z } from "zod";
 import { agentLog, colors as c, logSdkMessage } from "../agent-log.js";
 import { MultiTurnSession } from "../e2e/multi-turn-session.js";
@@ -14,16 +12,12 @@ import {
   formatLiteCard,
   formatStateCard,
   handleError,
+  renderMarkdown,
   stateCardFromFsm,
 } from "../output.js";
 import { symlinkSessionLog } from "../session-log.js";
+import { Spinner } from "../spinner.js";
 import { type RunStatus, Store } from "../store.js";
-
-const marked = new Marked(markedTerminal() as never);
-
-function renderMarkdown(text: string): string {
-  return (marked.parse(text) as string).trimEnd();
-}
 
 export interface RunArgs {
   fsmPath: string;
@@ -103,6 +97,7 @@ export function createFsmTools(
   runId: string,
   logFn: (msg: string, color?: string) => void = () => {},
   lite?: boolean,
+  spinner?: Spinner,
 ): {
   fsm_goto: FsmToolHandler;
   fsm_current: FsmToolHandler;
@@ -111,7 +106,7 @@ export function createFsmTools(
   return {
     fsm_goto: fsmGotoHandler(fsm, store, runId, logFn, lite),
     fsm_current: fsmCurrentHandler(fsm, store, runId),
-    request_input: requestInputHandler(fsm, store, runId),
+    request_input: requestInputHandler(fsm, store, runId, spinner),
   };
 }
 
@@ -121,8 +116,9 @@ export function createFsmMcpServer(
   runId: string,
   logFn: (msg: string, color?: string) => void = () => {},
   lite?: boolean,
+  spinner?: Spinner,
 ) {
-  const tools = createFsmTools(fsm, store, runId, logFn, lite);
+  const tools = createFsmTools(fsm, store, runId, logFn, lite, spinner);
   const fsmGoto = tool(
     "fsm_goto",
     "Transition FSM to a new state",
@@ -283,7 +279,12 @@ function fsmGotoHandler(
   };
 }
 
-function requestInputHandler(fsm: Fsm, store: Store, runId: string): FsmToolHandler {
+function requestInputHandler(
+  fsm: Fsm,
+  store: Store,
+  runId: string,
+  spinner?: Spinner,
+): FsmToolHandler {
   return async (rawArgs) => {
     const args = rawArgs as { prompt: string };
     try {
@@ -307,8 +308,14 @@ function requestInputHandler(fsm: Fsm, store: Store, runId: string): FsmToolHand
         }
       }
 
-      process.stderr.write(`${c.yellow}${args.prompt}${c.reset}\n`);
+      spinner?.stop();
+      process.stderr.write(`\n${renderMarkdown(args.prompt)}\n\n`);
       const answer = await promptUser(`${c.green}> ${c.reset}`);
+      // Rewrite the input line with unified dark background
+      process.stderr.write(
+        `\x1b[A\x1b[2K\r\x1b[48;5;236m ${c.green}>${c.reset}\x1b[48;5;236m ${answer} ${c.reset}\n`,
+      );
+      spinner?.start("Thinking...");
       return {
         content: [{ type: "text" as const, text: answer }],
       };
@@ -430,7 +437,8 @@ export async function runCore(
 
   logFn(`state=${fsm.initial} (initial)`, c.green);
 
-  const fsmServer = createFsmMcpServer(fsm, store, runId, logFn, opts.lite);
+  const spinner = new Spinner();
+  const fsmServer = createFsmMcpServer(fsm, store, runId, logFn, opts.lite, spinner);
 
   const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
   const stateCard = formatStateCard(card);
@@ -458,6 +466,7 @@ export async function runCore(
   let sessionId: string | null = null;
   const pendingTasks = new Set<string>();
   session.send(initialMessage);
+  spinner.start("Thinking...");
 
   try {
     for (;;) {
@@ -471,13 +480,16 @@ export async function runCore(
         }
 
         if (opts.verbose) {
+          spinner.stop();
           logSdkMessage(message, {
             sessionNum: attempt,
             skipTools: ["mcp__freeflow__request_input"],
           });
+          if (message.type !== "result") spinner.start();
         }
 
         if (message.type === "result") {
+          spinner.stop();
           const resultMsg = message as {
             type: "result";
             result: string;
@@ -489,7 +501,7 @@ export async function runCore(
           if (resultMsg.is_error) {
             isError = true;
           }
-          process.stdout.write(`${renderMarkdown(resultMsg.result)}\n`);
+          process.stdout.write(`\n${renderMarkdown(resultMsg.result)}\n`);
         } else if (message.type === "system") {
           const sysMsg = message as {
             type: "system";
@@ -553,8 +565,10 @@ export async function runCore(
       session.send(
         `The workflow is not complete yet. Continue from the current state.\n\n${formatStateCard(stateCardFromFsm(snap.state, fsm.states[snap.state] ?? { transitions: {} }))}`,
       );
+      spinner.start("Thinking...");
     }
   } finally {
+    spinner.stop();
     session.close();
   }
 
