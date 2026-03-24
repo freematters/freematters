@@ -63,7 +63,7 @@ export function loadConfig(configPath: string): CodocConfig {
 }
 
 export function parseTunnelUrl(output: string): string | null {
-  const match = output.match(/https:\/\/[a-zA-Z0-9-]+\.trycloudflare\.com/);
+  const match = output.match(/https:\/\/(?!api\.)[a-zA-Z0-9-]+\.trycloudflare\.com/);
   if (match) {
     return match[0];
   }
