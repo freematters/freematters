@@ -3,6 +3,7 @@ import fs from "node:fs";
 import type http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseComments } from "./comment-parser.js";
 import { computeDiff } from "./diff.js";
 import type { GitOps } from "./git-ops.js";
 import type { PresenceTracker } from "./presence.js";
@@ -195,19 +196,16 @@ case "$CMD" in
       -d "{\\"sessionId\\": \\"$SESSION_ID\\"}" > /dev/null 2>&1; }
     trap poll_cleanup EXIT
     echo "Polling for changes..." >&2
-    LAST_HASH=""
     while true; do
       curl -sf -X POST "$CODOC_SERVER/api/presence/$TOKEN/heartbeat" \\
         -H "Content-Type: application/json" \\
         -d "{\\"sessionId\\": \\"$SESSION_ID\\"}" > /dev/null 2>&1
-      CONTENT=$(curl -sf "$CODOC_SERVER/api/file/$TOKEN" | jq -r '.content')
-      HASH=$(echo "$CONTENT" | sha256)
-      if [ -n "$LAST_HASH" ] && [ "$HASH" != "$LAST_HASH" ]; then
-        echo "Document changed."
+      RESULT=$(curl -sf "$CODOC_SERVER/api/poll/$TOKEN?timeout=30")
+      CHANGED=$(echo "$RESULT" | jq -r '.changed')
+      if [ "$CHANGED" = "true" ]; then
+        echo "$RESULT" | jq -r '.diff'
         break
       fi
-      LAST_HASH="$HASH"
-      sleep 2
     done
     ;;
   who)
@@ -367,20 +365,37 @@ curl -sf ${apiBase}/api/presence/${token} | jq '.users'
 
 ---
 
-## 3. Shell-based polling
+## 3. Long-poll for changes
 
-Poll for changes using a simple bash loop:
+Use the long-poll endpoint to wait for file changes efficiently. It blocks until
+the file changes or the timeout expires, then returns the diff:
+
+\`\`\`
+GET /api/poll/:token?timeout=30
+\`\`\`
+
+**Response** (changed):
+\`\`\`json
+{"changed": true, "diff": "+ added line\\n- removed line", "comments": [...], "content": "full content"}
+\`\`\`
+
+**Response** (timeout, no change):
+\`\`\`json
+{"changed": false}
+\`\`\`
 
 \`\`\`bash
-LAST_HASH=""
 while true; do
-  CONTENT=$(curl -sf ${apiBase}/api/file/${token} | jq -r '.content')
-  HASH=$(echo "$CONTENT" | sha256sum | cut -d' ' -f1)
-  if [ -n "$LAST_HASH" ] && [ "$HASH" != "$LAST_HASH" ]; then
-    echo "Changed"; break
+  RESULT=$(curl -sf "${apiBase}/api/poll/${token}?timeout=30")
+  CHANGED=$(echo "$RESULT" | jq -r '.changed')
+  if [ "$CHANGED" = "true" ]; then
+    echo "$RESULT" | jq -r '.diff'
+    break
   fi
-  LAST_HASH="$HASH"
-  sleep 2
+  # Send heartbeat between polls
+  curl -sf -X POST ${apiBase}/api/presence/${token}/heartbeat \\
+    -H "Content-Type: application/json" \\
+    -d "{\\\"sessionId\\\": \\\"$SESSION_ID\\\"}" > /dev/null 2>&1
 done
 \`\`\`
 
@@ -520,6 +535,8 @@ curl -sf -X POST $SERVER/api/presence/$TOKEN/leave \\
 `;
 }
 
+export type PollCallback = (filePath: string, cb: (newContent: string) => void) => void;
+
 export function createHttpHandler(
   tokenStore: TokenStore,
   onSave: SaveCallback | undefined,
@@ -528,6 +545,7 @@ export function createHttpHandler(
   defaultName: string | undefined,
   presenceTracker: PresenceTracker | undefined,
   savedContentHashMap?: Map<string, string>,
+  onPollRegister?: PollCallback,
 ): http.RequestListener {
   return (req: http.IncomingMessage, res: http.ServerResponse) => {
     const method = req.method ?? "GET";
@@ -592,6 +610,64 @@ export function createHttpHandler(
           sendJson(res, 500, { error: e.message });
         }
       }
+      return;
+    }
+
+    // GET /api/poll/:token — long-poll, blocks until file changes, returns diff
+    if (
+      method === "GET" &&
+      segments[0] === "api" &&
+      segments[1] === "poll" &&
+      segments.length === 3
+    ) {
+      const token = segments[2];
+      const entry = tokenStore.resolve(token);
+      if (!entry) {
+        send404(res);
+        return;
+      }
+      if (!onPollRegister) {
+        sendJson(res, 501, { error: "Poll not available" });
+        return;
+      }
+
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const timeoutMs = Math.min(
+        Number.parseInt(url.searchParams.get("timeout") ?? "30", 10) * 1000,
+        120000,
+      );
+
+      let originalContent: string;
+      try {
+        originalContent = fs.readFileSync(entry.filePath, "utf-8");
+      } catch {
+        sendJson(res, 500, { error: "Cannot read file" });
+        return;
+      }
+
+      let responded = false;
+      const timer = setTimeout(() => {
+        if (!responded) {
+          responded = true;
+          sendJson(res, 200, { changed: false });
+        }
+      }, timeoutMs);
+
+      onPollRegister(entry.filePath, (newContent: string) => {
+        if (responded) return;
+        responded = true;
+        clearTimeout(timer);
+        const diff = computeDiff(originalContent, newContent);
+        const comments = parseComments(newContent);
+        sendJson(res, 200, { changed: true, diff, comments, content: newContent });
+      });
+
+      req.on("close", () => {
+        if (!responded) {
+          responded = true;
+          clearTimeout(timer);
+        }
+      });
       return;
     }
 
