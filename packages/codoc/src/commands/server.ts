@@ -362,9 +362,14 @@ async function runServer(): Promise<void> {
     const child = childProcess.spawn(process.execPath, [cliPath, "server"], {
       env: { ...process.env, CODOC_DAEMON: "1" },
       detached: true,
-      stdio: "ignore",
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    let stderrOutput = "";
+    child.stderr!.on("data", (chunk: Buffer) => {
+      stderrOutput += chunk.toString();
     });
     child.unref();
+    (child.stderr as NodeJS.ReadableStream & { unref?: () => void }).unref?.();
 
     for (let i = 0; i < 50; i++) {
       await new Promise((r) => setTimeout(r, 100));
@@ -374,7 +379,11 @@ async function runServer(): Promise<void> {
       }
     }
     if (!alreadyRunning) {
-      console.error("Server failed to start within 5s");
+      const detail = stderrOutput.trim();
+      const reason = detail
+        ? `Server failed to start within 5s:\n${detail}`
+        : "Server failed to start within 5s (no output from daemon — check config and port availability)";
+      console.error(reason);
       process.exitCode = 1;
       return;
     }
