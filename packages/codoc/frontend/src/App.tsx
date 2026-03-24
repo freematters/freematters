@@ -115,6 +115,7 @@ export function App() {
   const glyphDecorationIds = useRef<string[]>([]);
   const glyphDragStartLine = useRef<number | null>(null);
   const glyphDragDecorationIds = useRef<string[]>([]);
+  const savePendingRef = useRef<boolean>(false);
 
   const foldCommentRegions = useCallback(() => {
     const ed = editorRef.current;
@@ -146,14 +147,26 @@ export function App() {
     }
   }, []);
 
-  const handleUsernameChange = useCallback((newUsername: string) => {
-    setUsername(newUsername);
-    try {
-      localStorage.setItem("codoc_username", newUsername);
-    } catch {
-      // ignore storage errors
-    }
-  }, []);
+  const handleUsernameChange = useCallback(
+    (newUsername: string) => {
+      setUsername(newUsername);
+      try {
+        localStorage.setItem("codoc_username", newUsername);
+      } catch {
+        // ignore storage errors
+      }
+      if (token && presenceSessionIdRef.current) {
+        const mode = readonly ? ("read" as const) : ("write" as const);
+        leavePresence(token, presenceSessionIdRef.current).catch(() => {});
+        joinPresence(token, newUsername, mode)
+          .then((newId) => {
+            presenceSessionIdRef.current = newId;
+          })
+          .catch(() => {});
+      }
+    },
+    [token, readonly],
+  );
 
   useEffect(() => {
     const parsed = getTokenFromUrl();
@@ -357,9 +370,8 @@ export function App() {
           const payload = msg.payload as {
             by: string;
             version: number;
-            self?: boolean;
           };
-          if (!payload.self) {
+          if (!savePendingRef.current) {
             if (token) {
               fetchFile(token)
                 .then((data) => {
@@ -461,8 +473,10 @@ export function App() {
     const currentContent = contentRef.current;
     const baseContent = savedContentRef.current;
     setStatus("saving...");
+    savePendingRef.current = true;
     saveFile(token, currentContent, baseContent)
       .then((result) => {
+        savePendingRef.current = false;
         if (result.conflict) {
           setConflictData({
             conflictContent: result.conflictContent ?? "",
@@ -481,6 +495,7 @@ export function App() {
         setTimeout(foldCommentRegions, 200);
       })
       .catch((err: Error) => {
+        savePendingRef.current = false;
         setStatus(`Save error: ${err.message}`);
       });
   }, [token, readonly, focusEditor, foldCommentRegions]);
