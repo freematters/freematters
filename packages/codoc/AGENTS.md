@@ -46,3 +46,7 @@ Server is auto-started/stopped by SessionStart/SessionEnd hooks (ref-counted acr
 - `src/http.ts` — HTTP routes + `/codoc.sh` remote CLI generation
 - `src/ipc.ts` — Unix socket IPC with session ref-counting
 - `src/comment-parser.ts` — shared between backend and frontend via `@shared` alias
+
+## Comment Convention
+
+A comment block (`<!-- ... -->`) applies to the line immediately above it. When adding comments, always place them directly after the line being discussed.

@@ -25,6 +25,8 @@ If the user says the link doesn't work, is broken, or returns 404:
 
 ## Comment Block Format
 
+A comment block applies to the line immediately above it — place your comment right after the line you want to discuss.
+
 Comments are grouped in multi-line blocks:
 ```
 <!--
