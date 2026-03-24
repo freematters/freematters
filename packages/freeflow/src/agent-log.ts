@@ -21,7 +21,7 @@ export function agentLog(msg: string, color: string = colors.dim): void {
   );
 }
 
-function truncate(s: string, max: number): string {
+export function truncate(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, max)}...` : s;
 }
 

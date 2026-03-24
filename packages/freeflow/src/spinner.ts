@@ -22,14 +22,20 @@ export class Spinner {
   private lastLen = 0;
   private ttyFd: number | null = null;
 
+  private ensureTty(): boolean {
+    if (this.ttyFd !== null) return true;
+    try {
+      this.ttyFd = openSync("/dev/tty", "w");
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   start(text?: string): void {
     if (text) this.text = text;
     if (this.timer) return;
-    try {
-      this.ttyFd = openSync("/dev/tty", "w");
-    } catch {
-      return;
-    }
+    if (!this.ensureTty()) return;
     this.render();
     this.timer = setInterval(() => this.render(), INTERVAL);
   }
@@ -38,16 +44,39 @@ export class Spinner {
     this.text = text.length > MAX_WIDTH ? `${text.slice(0, MAX_WIDTH - 3)}...` : text;
   }
 
-  stop(): void {
+  /** Pause animation and clear the line, but keep the tty fd open. */
+  pause(): void {
     if (!this.timer) return;
     clearInterval(this.timer);
     this.timer = null;
+    this.writeTty(`\r${" ".repeat(this.lastLen)}\r`);
+    this.lastLen = 0;
+  }
+
+  /** Resume animation after pause. */
+  resume(): void {
+    if (this.timer) return;
+    if (this.ttyFd === null) return;
+    this.render();
+    this.timer = setInterval(() => this.render(), INTERVAL);
+  }
+
+  /** Stop animation and clear the line. Keeps tty fd open for reuse. */
+  stop(): void {
+    this.pause();
+  }
+
+  /** Close the tty fd. Call once when done with the spinner. */
+  destroy(): void {
+    this.pause();
     if (this.ttyFd !== null) {
-      this.writeTty(`\r${" ".repeat(this.lastLen)}\r`);
-      closeSync(this.ttyFd);
+      try {
+        closeSync(this.ttyFd);
+      } catch {
+        // fd already closed
+      }
       this.ttyFd = null;
     }
-    this.lastLen = 0;
   }
 
   get active(): boolean {
