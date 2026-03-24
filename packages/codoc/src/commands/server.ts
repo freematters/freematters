@@ -375,13 +375,22 @@ async function runServer(): Promise<void> {
   }
 
   if (alreadyRunning) {
+    let address = "";
     try {
       const client = new IpcClient(socketPath);
-      await client.send({ method: "session-start", params: { sessionId } });
+      const resp = await client.send({
+        method: "session-start",
+        params: { sessionId },
+      });
+      if (resp.ok) {
+        const data = resp.data as { port: number; tunnelUrl: string | null };
+        address = data.tunnelUrl ?? `http://127.0.0.1:${data.port}`;
+      }
     } catch {
       // non-fatal
     }
-    process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "Server started (daemon)" } })}\n`);
+    const msg = address ? `codoc server running at ${address}` : "codoc server running";
+    process.stdout.write(`${JSON.stringify({ systemMessage: msg })}\n`);
     return;
   }
 

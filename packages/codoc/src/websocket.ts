@@ -87,15 +87,15 @@ export class WebSocketServer {
 
   notifySaved(token: string, by: string): void {
     const version = this.incrementVersion(token);
-    const msg: WsMessage = {
-      type: "file:saved",
-      payload: { by, version },
-    };
-    const data = JSON.stringify(msg);
 
     for (const s of this.subscriptions) {
       if (s.token === token && s.ws.readyState === WebSocket.OPEN) {
-        s.ws.send(data);
+        const self = s.author === by;
+        const msg: WsMessage = {
+          type: "file:saved",
+          payload: { by, version, self },
+        };
+        s.ws.send(JSON.stringify(msg));
       }
     }
   }

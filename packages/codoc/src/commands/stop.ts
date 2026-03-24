@@ -61,7 +61,9 @@ export function stopCommand(): Command {
         process.env.SESSION_ID ??
         `session-${process.pid}-${Date.now()}`;
       const result = await runStop(socketPath, opts.force === true, sessionId);
-      process.stdout.write(`${JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionEnd", additionalContext: result.message } })}\n`);
+      process.stdout.write(
+        `${JSON.stringify({ systemMessage: `codoc: ${result.message}` })}\n`,
+      );
       if (!result.ok) {
         process.exitCode = 1;
       }

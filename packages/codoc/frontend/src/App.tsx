@@ -774,6 +774,7 @@ export function App() {
       const newContent = lines.join("\n");
       contentRef.current = newContent;
       setContent(newContent);
+      setDirty(newContent !== savedContentRef.current);
       setCommentPopup(null);
 
       focusEditor();

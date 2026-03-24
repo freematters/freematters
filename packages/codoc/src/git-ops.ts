@@ -205,11 +205,6 @@ function parseBlameOutput(output: string): BlameEntry[] {
     if (authorMatch) {
       currentAuthor = authorMatch[1];
       authorMap.set(currentHash, currentAuthor);
-      continue;
-    }
-
-    if (line.startsWith("\t")) {
-      continue;
     }
   }
 

@@ -344,7 +344,14 @@ export class IpcServer {
       return { ok: false, error: "Missing sessionId parameter" };
     }
     this.activeSessions.add(sessionId);
-    return { ok: true, data: { sessions: this.activeSessions.size } };
+    return {
+      ok: true,
+      data: {
+        sessions: this.activeSessions.size,
+        port: this.httpPort,
+        tunnelUrl: this.tunnelUrl,
+      },
+    };
   }
 
   private handleSessionEnd(params: Record<string, unknown>): IpcResponse {

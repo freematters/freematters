@@ -96,7 +96,9 @@ async function runInstall(platform: string): Promise<void> {
       console.log("Create ~/.codoc/config.json manually before using codoc.");
     } else {
       console.log("\nFirst-time setup: creating ~/.codoc/config.json\n");
-      const tunnelAnswer = await ask("Use Cloudflare Tunnel for remote access? (y/n): ");
+      const tunnelAnswer = await ask(
+        "Use Cloudflare Tunnel for remote access? (y/n): ",
+      );
       const tunnel = tunnelAnswer.toLowerCase() === "y" ? "cloudflare" : null;
       const portAnswer = await ask("HTTP port (default 3000): ");
       const port = portAnswer ? Number.parseInt(portAnswer, 10) : 3000;
