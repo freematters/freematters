@@ -44,6 +44,7 @@ export interface ServerHandle {
   socketPath: string;
   tunnelUrl: string | null;
   setTunnelUrl: (url: string) => void;
+  startIpc: () => Promise<void>;
   shutdown: () => Promise<void>;
 }
 
@@ -283,8 +284,6 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
     shutdown().catch(() => {});
   });
 
-  await ipcServer.start();
-
   return {
     port: actualPort,
     socketPath,
@@ -293,6 +292,7 @@ export async function startServer(options: ServerOptions): Promise<ServerHandle>
       resolvedTunnelUrl = url;
       ipcServer.setTunnelUrl(url);
     },
+    startIpc: () => ipcServer.start(),
     shutdown,
   };
 }
@@ -439,6 +439,8 @@ async function runServer(): Promise<void> {
         }
       }
     }
+
+    await handle.startIpc();
 
     const onSignal = () => {
       if (tunnelProcess) {
