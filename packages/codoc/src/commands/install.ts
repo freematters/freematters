@@ -30,6 +30,17 @@ function generateHooksJson(cliPath: string): object {
   const cmd = `${nodeExe} ${cliPath}`;
   return {
     hooks: {
+      SessionStart: [
+        {
+          hooks: [
+            {
+              type: "command",
+              command: `${cmd} server`,
+              timeout: 30,
+            },
+          ],
+        },
+      ],
       SessionEnd: [
         {
           hooks: [

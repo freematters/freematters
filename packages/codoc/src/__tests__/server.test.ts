@@ -316,12 +316,14 @@ describe("Server lifecycle (startServer)", () => {
 
   it("should bind HTTP port and Unix socket", async () => {
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
     expect(handle.port).toBeGreaterThan(0);
     expect(fs.existsSync(socketPath)).toBe(true);
   });
 
   it("should refuse to start when socket already exists and is active", async () => {
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
     await expect(startServer({ port: 0, socketPath, tokensPath })).rejects.toThrow(
       /already running/i,
     );
@@ -331,11 +333,13 @@ describe("Server lifecycle (startServer)", () => {
     // Create a stale socket file (just a regular file, no server behind it)
     fs.writeFileSync(socketPath, "");
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
     expect(handle.port).toBeGreaterThan(0);
   });
 
   it("codoc share via IPC returns URL", async () => {
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
     const testFile = path.join(os.tmpdir(), `codoc-lifecycle-${process.pid}.md`);
     fs.writeFileSync(testFile, "# Lifecycle Test\n");
 
@@ -357,6 +361,7 @@ describe("Server lifecycle (startServer)", () => {
 
   it("codoc stop shuts down server and removes socket", async () => {
     handle = await startServer({ port: 0, socketPath, tokensPath });
+    await handle.startIpc();
     const client = new IpcClient(socketPath);
     const response = await client.send({ method: "stop", params: {} });
     expect(response.ok).toBe(true);
