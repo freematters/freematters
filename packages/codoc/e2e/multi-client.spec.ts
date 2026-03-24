@@ -1219,3 +1219,208 @@ test.describe("Multi-client E2E: Poll final state with intermediate changes", ()
     await new Promise((resolve) => setTimeout(resolve, 500));
   });
 });
+
+// ============================================================
+// Test suite: Save triggers single notification, no UI glitches
+// ============================================================
+test.describe("Multi-client E2E: Save triggers poll diff, no duplicate UI artifacts", () => {
+  let serverHandle: ServerHandle | null = null;
+  let editToken = "";
+  let testFilePath = "";
+  let socketPath = "";
+  let tokensPath = "";
+  let serverPort = 0;
+
+  test.beforeAll(async () => {
+    socketPath = uniquePath("sd-sock", ".sock");
+    tokensPath = uniquePath("sd-tokens", ".json");
+    testFilePath = uniquePath("sd-file", ".md");
+
+    fs.writeFileSync(testFilePath, "# Save Dedup\n\nBaseline content.\n");
+
+    const serverModule = await import(
+      path.join(projectRoot, "dist", "commands", "server.js")
+    );
+    const ipcModule = await import(path.join(projectRoot, "dist", "ipc.js"));
+
+    serverHandle = await serverModule.startServer({
+      port: 0,
+      socketPath,
+      tokensPath,
+    });
+    await serverHandle!.startIpc();
+    serverPort = serverHandle!.port;
+
+    const client: IpcClientLike = new ipcModule.IpcClient(socketPath);
+    const shareRes = await client.send({
+      method: "share",
+      params: { filePath: testFilePath },
+    });
+    if (!shareRes.ok) throw new Error(`Share failed: ${shareRes.error}`);
+    editToken = (shareRes.data as { token: string }).token;
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  });
+
+  test.afterAll(async () => {
+    if (serverHandle) {
+      await serverHandle.shutdown();
+      serverHandle = null;
+    }
+    try {
+      fs.unlinkSync(socketPath);
+    } catch {}
+    try {
+      fs.unlinkSync(tokensPath);
+    } catch {}
+    try {
+      fs.unlinkSync(testFilePath);
+    } catch {}
+  });
+
+  test("save delivers diff to poll, presence list stays stable, at most one typing indicator appears within 5s", async ({
+    browser,
+  }) => {
+    const editUrl = `http://127.0.0.1:${serverPort}/edit/${editToken}`;
+
+    // Join a poll user into presence so the browser shows them
+    const joinRes = await httpPost(
+      serverPort,
+      `/api/presence/${editToken}/join`,
+      JSON.stringify({ author: "poll-agent", mode: "read" }),
+    );
+    expect(joinRes.statusCode).toBe(200);
+    const pollSessionId = JSON.parse(joinRes.body).sessionId;
+
+    // Open browser
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto(editUrl);
+    await waitForMonaco(page);
+
+    // Wait for presence to appear in the UI
+    await page.waitForTimeout(1000);
+
+    // Set editor content to a known state and save to establish baseline
+    await page.evaluate((content: string) => {
+      (
+        window as unknown as {
+          monaco: {
+            editor: {
+              getEditors: () => Array<{ setValue: (v: string) => void }>;
+            };
+          };
+        }
+      ).monaco.editor
+        .getEditors()[0]
+        .setValue(content);
+    }, "# Save Dedup\n\nBaseline content.\n");
+    await page.keyboard.press(`${modKey}+s`);
+    await page.waitForTimeout(2000);
+
+    // Start IPC poll (simulates agent waiting for changes)
+    const pollPromise = ipcPoll(socketPath, editToken, 15000);
+    await page.waitForTimeout(500);
+
+    // Capture presence snapshot before save
+    const presenceBefore = await page.evaluate(() => {
+      const pills = document.querySelectorAll(".presence-user");
+      return Array.from(pills).map((el) => el.textContent ?? "");
+    });
+
+    // Set up a 5-second observer for:
+    // 1. presence-users changes
+    // 2. typing-indicator count (must never exceed 1)
+    const observerPromise = page.evaluate(() => {
+      return new Promise<{
+        presenceChanged: boolean;
+        maxTypingIndicators: number;
+        presenceSnapshots: string[][];
+      }>((resolve) => {
+        let presenceChanged = false;
+        let maxTypingIndicators = 0;
+        const presenceSnapshots: string[][] = [];
+
+        const initialPresence = Array.from(
+          document.querySelectorAll(".presence-user"),
+        ).map((el) => el.textContent ?? "");
+        presenceSnapshots.push(initialPresence);
+
+        const interval = setInterval(() => {
+          // Check typing indicators count
+          const typingIndicators = document.querySelectorAll(".typing-indicator");
+          if (typingIndicators.length > maxTypingIndicators) {
+            maxTypingIndicators = typingIndicators.length;
+          }
+
+          // Check presence-users stability
+          const currentPresence = Array.from(
+            document.querySelectorAll(".presence-user"),
+          ).map((el) => el.textContent ?? "");
+          const initial = presenceSnapshots[0];
+          if (
+            currentPresence.length !== initial.length ||
+            currentPresence.some((v, i) => v !== initial[i])
+          ) {
+            presenceChanged = true;
+            presenceSnapshots.push(currentPresence);
+          }
+        }, 200);
+
+        setTimeout(() => {
+          clearInterval(interval);
+          resolve({
+            presenceChanged,
+            maxTypingIndicators,
+            presenceSnapshots,
+          });
+        }, 5000);
+      });
+    });
+
+    // Edit content and save
+    await page.evaluate((content: string) => {
+      (
+        window as unknown as {
+          monaco: {
+            editor: {
+              getEditors: () => Array<{ setValue: (v: string) => void }>;
+            };
+          };
+        }
+      ).monaco.editor
+        .getEditors()[0]
+        .setValue(content);
+    }, "# Save Dedup\n\nEdited by browser.\n");
+
+    await page.keyboard.press(`${modKey}+s`);
+
+    // Wait for poll to resolve — this should happen quickly
+    const pollRes = await pollPromise;
+    expect(pollRes.ok).toBe(true);
+    const pollDiff = (pollRes.data as { diff: string }).diff;
+    expect(pollDiff.length).toBeGreaterThan(0);
+
+    // Wait for the 5-second observer to finish
+    const observerResult = await observerPromise;
+
+    // Assertion 1: presence list must NOT change during the 5s window
+    expect(observerResult.presenceChanged).toBe(false);
+
+    // Assertion 2: at most 1 typing indicator at any point in time
+    expect(observerResult.maxTypingIndicators).toBeLessThanOrEqual(1);
+
+    // Verify disk content is correct
+    const disk = fs.readFileSync(testFilePath, "utf-8");
+    expect(disk).toContain("Edited by browser");
+
+    // Cleanup presence
+    await httpPost(
+      serverPort,
+      `/api/presence/${editToken}/leave`,
+      JSON.stringify({ sessionId: pollSessionId }),
+    );
+
+    await ctx.close();
+  });
+});
