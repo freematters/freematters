@@ -32,7 +32,6 @@ export function goto(args: GotoArgs): void {
 
     const meta = store.readMeta(args.runId);
     const fsm = loadFsm(meta.fsm_path);
-    const isLite = meta.lite === true;
 
     const result = store.withLock(args.runId, () => {
       const snapshot = store.readSnapshot(args.runId);
@@ -77,15 +76,11 @@ ${labels}`,
         );
       }
 
-      // Track visited states only in lite mode
-      let alreadyVisited = false;
-      let visitedStates: string[] | undefined;
-      if (isLite) {
-        const visitedSet = new Set(snapshot.visited_states ?? []);
-        alreadyVisited = visitedSet.has(args.target);
-        visitedSet.add(args.target);
-        visitedStates = [...visitedSet];
-      }
+      // Always track visited states
+      const visitedSet = new Set(snapshot.visited_states ?? []);
+      const alreadyVisited = visitedSet.has(args.target);
+      visitedSet.add(args.target);
+      const visitedStates = [...visitedSet];
 
       const isDone = args.target === "done";
       const newStatus: RunStatus = isDone ? "completed" : "active";
@@ -103,7 +98,7 @@ ${labels}`,
         {
           run_status: newStatus,
           state: args.target,
-          ...(visitedStates !== undefined && { visited_states: visitedStates }),
+          visited_states: visitedStates,
         },
         { lockHeld: true },
       );
@@ -143,10 +138,12 @@ ${labels}`,
     } else if (card.subagent) {
       const cardOutput = formatSubagentDispatch(card, args.runId);
       process.stdout.write(`${cardOutput}\n`);
-    } else if (isLite && result.alreadyVisited) {
+    } else if (result.alreadyVisited) {
       process.stdout.write(`${formatLiteCard(card)}\n`);
     } else {
-      process.stdout.write(`${formatStateCard(card)}\n`);
+      process.stdout.write(
+        `${formatStateCard(card, undefined, { includeGuide: false, includeReminders: false })}\n`,
+      );
     }
   } catch (err: unknown) {
     handleError(err, args.json);

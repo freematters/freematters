@@ -56,7 +56,7 @@ export function start(args: StartArgs): void {
       {
         run_status: "active",
         state: fsm.initial,
-        ...(args.lite ? { visited_states: [fsm.initial] } : {}),
+        visited_states: [fsm.initial],
       },
     );
 
