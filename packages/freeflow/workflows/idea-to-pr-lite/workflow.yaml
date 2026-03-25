@@ -1,0 +1,53 @@
+# Idea-to-PR Lite — streamlined pipeline from rough idea to merged pull request.
+#
+# Lite variant that uses spec-gen-lite for simplified design and plan
+# artifacts while keeping all other phases identical to idea-to-pr.
+#
+# Flow:
+#
+#   spec (spec-gen-lite) → decide
+#                         /   |   \
+#                   auto  step  stop
+#                     |    |      |
+#                 implement       done
+#               (spec-to-code)
+#                     |
+#                 confirm-pr
+#                (auto skips)
+#                   /    \
+#              submit-pr  done
+#            (pr-lifecycle)
+#                   |
+#                 done
+
+version: 1.2
+extends_guide: ../idea-to-pr/workflow.yaml
+guide: |
+  {{base}}
+
+initial: spec
+
+states:
+  spec:
+    workflow: ../spec-gen-lite/workflow.yaml
+    transitions:
+      completed: decide
+
+  decide:
+    from: "../idea-to-pr/workflow.yaml#decide"
+
+  implement:
+    workflow: ../spec-to-code/workflow.yaml
+    transitions:
+      completed: confirm-pr
+
+  confirm-pr:
+    from: "../idea-to-pr/workflow.yaml#confirm-pr"
+
+  submit-pr:
+    workflow: ../github-pr-lifecycle/workflow.yaml
+    transitions:
+      completed: done
+
+  done:
+    from: "../idea-to-pr/workflow.yaml#done"
