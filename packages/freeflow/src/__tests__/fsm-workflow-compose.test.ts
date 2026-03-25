@@ -207,8 +207,9 @@ describe("workflow composition — output guide precedence", () => {
     };
     const card = stateCardFromFsm("test", withGuide);
 
-    expect(formatStateCard(card, "Fsm-level guide.")).toContain("State-level guide.");
-    expect(formatStateCard(card, "Fsm-level guide.")).not.toContain("Fsm-level guide.");
+    // Guide is only rendered in fflow start header, not in formatStateCard
+    // but the card still carries guide for formatReminder
+    expect(card.guide).toBe("State-level guide.");
     expect(formatReminder(card, "Fsm-level guide.")).toContain("State-level guide.");
   });
 
@@ -216,8 +217,8 @@ describe("workflow composition — output guide precedence", () => {
     const noGuide = { prompt: "Do something.", transitions: { next: "done" } };
     const card = stateCardFromFsm("test", noGuide);
 
-    expect(formatStateCard(card, "Fsm-level guide.")).toContain("Fsm-level guide.");
-    expect(formatStateCard(card)).not.toContain("guide");
+    expect(card.guide).toBeUndefined();
+    expect(formatReminder(card, "Fsm-level guide.")).toContain("Fsm-level guide.");
   });
 });
 

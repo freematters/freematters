@@ -34,15 +34,8 @@ export function stateCardFromFsm(stateName: string, fsmState: FsmState): StateCa
 const TODO_HEADER =
   "You MUST create a task for each of these items and complete them in order:";
 
-export function formatStateCard(card: StateCard, fsmGuide?: string): string {
+export function formatStateCard(card: StateCard): string {
   const lines: string[] = [];
-
-  // State-level guide takes precedence over FSM-level guide
-  const guide = card.guide ?? fsmGuide;
-  if (guide) {
-    lines.push(guide);
-    lines.push("");
-  }
 
   lines.push(`You are in **${card.state}** state.`);
   lines.push("");
@@ -137,7 +130,7 @@ export function formatLiteCard(card: StateCard): string {
   lines.push(
     `Re-entering **${card.state}** state. Instructions unchanged from previous visit.`,
   );
-  lines.push("Run `fflow current` or call `fsm_current` to review full instructions.");
+  lines.push("Run `fflow current` to review full instructions if you forget.");
 
   if (card.todos && card.todos.length > 0) {
     lines.push("");

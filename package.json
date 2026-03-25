@@ -9,7 +9,8 @@
     "test:integration": "npm run test:integration -w packages/freeflow",
     "test:claude": "npm run test:claude -w packages/freeflow",
     "check": "biome check --write --error-on-warnings . && npm run check -w packages/codoc",
-    "clean": "npm run clean --workspaces --if-present"
+    "clean": "npm run clean --workspaces --if-present",
+    "fflow": "npm run build -w packages/freeflow && node packages/freeflow/dist/cli.js"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.0"

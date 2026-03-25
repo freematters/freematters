@@ -30,7 +30,8 @@ npm run check         # biome lint/format
 
 ## Development
 
-- Always use the local build (`node packages/freeflow/dist/cli.js`) instead of the globally installed `fflow` when developing. The global binary points to the main repo and may not reflect worktree changes. Run `npm run build` in `packages/freeflow/` first.
+- Run `npm run fflow -- <args>` to build and run the local fflow CLI. This ensures you always test the development version, not the globally installed one.
+- In worktrees, the global `fflow` binary points to the main repo. Always use `npm run fflow` instead.
 
 ## Conventions
 

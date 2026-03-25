@@ -140,10 +140,46 @@ describe("Full round-trip: lite mode", () => {
   });
 });
 
-// ─── Non-lite round-trip: all full cards ─────────────────────────
+// ─── Guide and reminders behavior ─────────────────────────
 
-describe("Non-lite round-trip: all full cards", () => {
-  test("start (no --lite) → goto B → goto A → all outputs are full cards", () => {
+describe("Guide and reminders in state cards", () => {
+  test("fflow start includes guide in header", () => {
+    const root = join(tmp, "guide-start-root");
+    const id = uniqueRunId("guide-start");
+
+    const result = runCli(`start ${fsmMulti} --run-id ${id}`, { root });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Multi-state workflow");
+    expect(result.stdout).toContain("Execute this state's instructions NOW");
+    expect(result.stdout).toContain("MUST NOT truncate");
+  });
+
+  test("fflow start --lite includes guide in header", () => {
+    const root = join(tmp, "guide-lite-root");
+    const id = uniqueRunId("guide-lite");
+
+    const result = runCli(`start ${fsmMulti} --run-id ${id} --lite`, { root });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Multi-state workflow");
+  });
+
+  test("fflow goto first visit has reminders but no guide", () => {
+    const root = join(tmp, "guide-goto-root");
+    const id = uniqueRunId("guide-goto");
+
+    runCli(`start ${fsmMulti} --run-id ${id}`, { root });
+    const gotoResult = runCli(`goto review --run-id ${id} --on ready`, { root });
+    expect(gotoResult.exitCode).toBe(0);
+    expect(gotoResult.stdout).toContain("Execute this state's instructions NOW");
+    expect(gotoResult.stdout).toContain("MUST NOT truncate");
+    expect(gotoResult.stdout).not.toContain("Multi-state workflow");
+  });
+});
+
+// ─── Non-lite round-trip: full cards always ───────────────
+
+describe("Non-lite round-trip: always full cards", () => {
+  test("start (no --lite) → goto B → goto A → revisit shows full card", () => {
     const root = join(tmp, "nonlite-roundtrip-root");
     const id = uniqueRunId("nonlite-rt");
 
@@ -152,23 +188,27 @@ describe("Non-lite round-trip: all full cards", () => {
     expect(startResult.exitCode).toBe(0);
     expect(startResult.stdout).toContain("You are in **start** state.");
 
-    // 2. Goto review
+    // 2. Goto review (first visit → full card)
     const gotoReview = runCli(`goto review --run-id ${id} --on ready`, {
       root,
     });
     expect(gotoReview.exitCode).toBe(0);
     expect(gotoReview.stdout).toContain("You are in **review** state.");
     expect(gotoReview.stdout).toContain("Review the work.");
-    expect(gotoReview.stdout).not.toContain("Re-entering");
 
-    // 3. Goto back to start (re-visit, but non-lite → should still be full card)
+    // 3. Goto back to start (re-visit → still full card, not lite)
     const gotoBack = runCli(`goto start --run-id ${id} --on rejected`, {
       root,
     });
     expect(gotoBack.exitCode).toBe(0);
     expect(gotoBack.stdout).toContain("You are in **start** state.");
-    expect(gotoBack.stdout).toContain("Begin work.");
     expect(gotoBack.stdout).toContain("Your instructions:");
+    expect(gotoBack.stdout).toContain("Begin work.");
     expect(gotoBack.stdout).not.toContain("Re-entering");
+
+    // 4. Verify snapshot does NOT track visited_states without --lite
+    const store = new Store(root);
+    const snapshot = store.readSnapshot(id);
+    expect(snapshot?.visited_states).toBeUndefined();
   });
 });
