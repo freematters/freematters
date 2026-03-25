@@ -48,13 +48,16 @@ pub async fn geocode(name: &str, lang: Option<&str>) -> Result<Location> {
         .build()
         .context("Failed to create HTTP client")?;
 
-    let mut url = format!("{GEOCODING_URL}?name={}&count=1", urlencoding(name));
-    if let Some(lang) = lang {
-        url.push_str(&format!("&language={}", urlencoding(lang)));
+    let mut params = vec![("name", name), ("count", "1")];
+    let lang_val;
+    if let Some(l) = lang {
+        lang_val = l;
+        params.push(("language", lang_val));
     }
 
     let resp = client
-        .get(&url)
+        .get(GEOCODING_URL)
+        .query(&params)
         .send()
         .await
         .context("Unable to reach weather service. Check your internet connection.")?;
@@ -68,16 +71,6 @@ pub async fn geocode(name: &str, lang: Option<&str>) -> Result<Location> {
         .with_context(|| format!("Location '{}' not found. Try a different city name.", name))
 }
 
-/// Simple percent-encoding for the query parameter.
-fn urlencoding(s: &str) -> String {
-    s.chars()
-        .map(|c| match c {
-            'A'..='Z' | 'a'..='z' | '0'..='9' | '-' | '_' | '.' | '~' => c.to_string(),
-            ' ' => "%20".to_string(),
-            _ => format!("%{:02X}", c as u32),
-        })
-        .collect()
-}
 
 #[cfg(test)]
 mod tests {

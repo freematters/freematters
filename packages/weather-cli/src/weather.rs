@@ -63,6 +63,15 @@ fn parse_forecast_response(body: &str) -> Result<Forecast> {
         .daily
         .context("Unexpected response from weather service: missing daily data")?;
 
+    let n = daily.time.len();
+    if daily.temperature_2m_max.len() != n
+        || daily.temperature_2m_min.len() != n
+        || daily.weather_code.len() != n
+        || daily.precipitation_sum.len() != n
+    {
+        bail!("Unexpected response: mismatched daily array lengths");
+    }
+
     let days: Vec<DayForecast> = daily
         .time
         .iter()
