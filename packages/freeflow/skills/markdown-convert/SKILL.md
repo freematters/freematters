@@ -1,11 +1,11 @@
 ---
 name: markdown-convert
-description: Convert between YAML and Markdown workflow formats. Use when the user asks to convert a .workflow.yaml to .workflow.md or vice versa.
+description: Convert between YAML and Markdown workflow formats. Use when the user asks to convert a .yaml to .md or vice versa.
 ---
 
 # Markdown Workflow Convert
 
-Convert a workflow file between YAML (`.workflow.yaml`) and Markdown (`.workflow.md`) formats.
+Convert a workflow file between YAML (`.yaml`) and Markdown (`.md`) formats.
 
 ## Usage
 
@@ -22,14 +22,18 @@ The conversion direction is determined by the input file extension:
 
 | Input Extension | Output Extension | Direction |
 |---|---|---|
+| `.yaml` / `.yml` | `.md` | YAML to Markdown |
 | `.workflow.yaml` / `.workflow.yml` | `.workflow.md` | YAML to Markdown |
+| `.md` | `.yaml` | Markdown to YAML |
 | `.workflow.md` | `.workflow.yaml` | Markdown to YAML |
 
 ## Default Output
 
-When `-o` is not specified, the output file is written alongside the input with the swapped extension:
+When `-o` is not specified, the output file is written alongside the input with the swapped extension. The `.workflow.` infix is preserved when present:
 
+- `workflow.yaml` produces `workflow.md`
 - `my-flow.workflow.yaml` produces `my-flow.workflow.md`
+- `workflow.md` produces `workflow.yaml`
 - `my-flow.workflow.md` produces `my-flow.workflow.yaml`
 
 ## Process
@@ -68,5 +72,5 @@ fflow finish --run-id test-convert
 
 ## Error Handling
 
-- **Unsupported extension**: If the file does not end in `.workflow.yaml`, `.workflow.yml`, or `.workflow.md`, the command exits with `ARGS_INVALID`.
+- **Unsupported extension**: If the file does not end in `.yaml`, `.yml`, or `.md`, the command exits with `ARGS_INVALID`.
 - **Invalid workflow**: If the input file fails validation during `loadFsm()`, the command reports the validation error. Fix the source file first (consider using `/fflow markdown fix` for `.workflow.md` files).

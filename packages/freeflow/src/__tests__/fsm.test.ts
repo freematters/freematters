@@ -840,3 +840,44 @@ describe("loadFsm — markdown workflows", () => {
     expect(fsm.states.start.transitions).toEqual({ next: "done" });
   });
 });
+
+describe("loadFsm — plain .md extension", () => {
+  test("loadFsm parses a .md file as markdown workflow", () => {
+    const mdContent = [
+      "---",
+      "version: 1",
+      "initial: start",
+      "---",
+      "",
+      "## State: start",
+      "",
+      "### Instructions",
+      "",
+      "Begin here.",
+      "",
+      "### Transitions",
+      "",
+      "- next \u2192 done",
+      "",
+      "## State: done",
+      "",
+      "### Instructions",
+      "",
+      "Finished.",
+      "",
+      "### Transitions",
+      "",
+      "(none)",
+    ].join("\n");
+
+    const mdPath = join(tmp, "workflow.md");
+    writeFileSync(mdPath, mdContent, "utf-8");
+    const fsm = loadFsm(mdPath);
+
+    expect(fsm.version).toBe(1);
+    expect(fsm.initial).toBe("start");
+    expect(fsm.states.start).toBeDefined();
+    expect(fsm.states.start.transitions).toEqual({ next: "done" });
+    expect(fsm.states.done.transitions).toEqual({});
+  });
+});

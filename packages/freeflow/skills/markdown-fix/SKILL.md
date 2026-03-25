@@ -1,19 +1,19 @@
 ---
 name: markdown-fix
-description: Validate and auto-fix markdown workflow format. Use when the user asks to lint, validate, or fix a .workflow.md file.
+description: Validate and auto-fix markdown workflow format. Use when the user asks to lint, validate, or fix a .md or .workflow.md file.
 ---
 
 # Markdown Workflow Fix
 
-Validate a `.workflow.md` file against the canonical format specification and auto-fix any issues found.
+Validate a `.md` (or `.workflow.md`) file against the canonical format specification and auto-fix any issues found.
 
 ## Usage
 
-`/fflow markdown fix <file>` — where `<file>` is the path to a `.workflow.md` file.
+`/fflow markdown fix <file>` — where `<file>` is the path to a `.md` or `.workflow.md` file.
 
 ## Canonical Markdown Workflow Format
 
-A valid `.workflow.md` file has the following structure:
+A valid markdown workflow file has the following structure:
 
 ### YAML Frontmatter
 
