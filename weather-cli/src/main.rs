@@ -42,7 +42,7 @@ async fn main() {
     if args.json {
         json::display_json(&data, &loc);
     } else {
-        display::display_weather(&data, &loc);
+        display::display_weather(&data, &loc, &args.units);
     }
 }
 

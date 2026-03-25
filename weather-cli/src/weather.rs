@@ -126,31 +126,47 @@ pub async fn fetch_weather(loc: &Location, days: u8, units: &Units) -> Result<We
         time: api.current.time,
     };
 
-    let daily_len = api.daily.time.len();
-    let mut daily = Vec::with_capacity(daily_len);
-    for i in 0..daily_len {
-        daily.push(DayForecast {
-            date: api.daily.time[i].clone(),
-            temp_max: api.daily.temperature_2m_max[i],
-            temp_min: api.daily.temperature_2m_min[i],
-            weather_code: api.daily.weather_code[i],
-            precipitation_probability: api.daily.precipitation_probability_max[i],
-            sunrise: api.daily.sunrise[i].clone(),
-            sunset: api.daily.sunset[i].clone(),
-        });
-    }
+    let daily: Vec<DayForecast> = api
+        .daily
+        .time
+        .into_iter()
+        .zip(api.daily.temperature_2m_max)
+        .zip(api.daily.temperature_2m_min)
+        .zip(api.daily.weather_code)
+        .zip(api.daily.precipitation_probability_max)
+        .zip(api.daily.sunrise)
+        .zip(api.daily.sunset)
+        .map(|((((((date, temp_max), temp_min), wc), precip), sunrise), sunset)| {
+            DayForecast {
+                date,
+                temp_max,
+                temp_min,
+                weather_code: wc,
+                precipitation_probability: precip,
+                sunrise,
+                sunset,
+            }
+        })
+        .collect();
 
-    let hourly_len = api.hourly.time.len();
-    let mut hourly = Vec::with_capacity(hourly_len);
-    for i in 0..hourly_len {
-        hourly.push(HourForecast {
-            time: api.hourly.time[i].clone(),
-            temperature: api.hourly.temperature_2m[i],
-            weather_code: api.hourly.weather_code[i],
-            wind_speed: api.hourly.wind_speed_10m[i],
-            precipitation_probability: api.hourly.precipitation_probability[i],
-        });
-    }
+    let hourly: Vec<HourForecast> = api
+        .hourly
+        .time
+        .into_iter()
+        .zip(api.hourly.temperature_2m)
+        .zip(api.hourly.weather_code)
+        .zip(api.hourly.wind_speed_10m)
+        .zip(api.hourly.precipitation_probability)
+        .map(|((((time, temperature), wc), wind_speed), precip)| {
+            HourForecast {
+                time,
+                temperature,
+                weather_code: wc,
+                wind_speed,
+                precipitation_probability: precip,
+            }
+        })
+        .collect();
 
     Ok(WeatherData {
         current,

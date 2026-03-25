@@ -2,6 +2,7 @@
 
 use colored::Colorize;
 
+use crate::cli::Units;
 use crate::geocoder::Location;
 use crate::weather::WeatherData;
 
@@ -21,25 +22,50 @@ pub fn weather_code_to_emoji(code: u8) -> (&'static str, &'static str) {
     }
 }
 
-/// Colorize a temperature value based on its range.
-/// Blue for cold (<= 0), yellow for warm (1..=25), red for hot (> 25).
-pub fn colorize_temp(temp: f64) -> colored::ColoredString {
+/// Colorize a temperature value based on its range, adjusted for the unit system.
+/// Metric: blue <= 0°C, yellow 1..=25°C, red > 25°C.
+/// Imperial: blue <= 32°F, yellow 33..=77°F, red > 77°F.
+pub fn colorize_temp(temp: f64, units: &Units) -> colored::ColoredString {
     let text = format!("{:.1}", temp);
-    if temp <= 0.0 {
+    let (cold_threshold, hot_threshold) = match units {
+        Units::Metric => (0.0, 25.0),
+        Units::Imperial => (32.0, 77.0),
+    };
+    if temp <= cold_threshold {
         text.blue()
-    } else if temp <= 25.0 {
+    } else if temp <= hot_threshold {
         text.yellow()
     } else {
         text.red()
     }
 }
 
+/// Returns the temperature unit suffix for the given unit system.
+fn temp_suffix(units: &Units) -> &'static str {
+    match units {
+        Units::Metric => "\u{00b0}C",
+        Units::Imperial => "\u{00b0}F",
+    }
+}
+
+/// Returns the wind speed unit label for the given unit system.
+fn wind_label(units: &Units) -> &'static str {
+    match units {
+        Units::Metric => "km/h",
+        Units::Imperial => "mph",
+    }
+}
+
 /// Display formatted weather output to the terminal.
-pub fn display_weather(data: &WeatherData, loc: &Location) {
-    // Header
+pub fn display_weather(data: &WeatherData, loc: &Location, units: &Units) {
+    // Header with coordinates
     println!(
         "{}",
         format!("Weather for {}, {}", loc.name, loc.country).bold()
+    );
+    println!(
+        "  Coordinates: {:.4}, {:.4}",
+        loc.latitude, loc.longitude
     );
     println!();
 
@@ -48,15 +74,27 @@ pub fn display_weather(data: &WeatherData, loc: &Location) {
     println!("{} {}", "Current conditions:".bold(), data.current.time);
     println!("  {} {}", emoji, desc);
     println!(
-        "  Temperature: {}\u{00b0}  (feels like {}\u{00b0})",
-        colorize_temp(data.current.temperature),
-        colorize_temp(data.current.feels_like)
+        "  Temperature: {}{}  (feels like {}{})",
+        colorize_temp(data.current.temperature, units),
+        temp_suffix(units),
+        colorize_temp(data.current.feels_like, units),
+        temp_suffix(units),
     );
     println!("  Humidity:    {:.0}%", data.current.humidity);
     println!(
-        "  Wind:        {:.1} km/h ({:.0}\u{00b0})",
-        data.current.wind_speed, data.current.wind_direction
+        "  Wind:        {:.1} {} ({:.0}\u{00b0})",
+        data.current.wind_speed,
+        wind_label(units),
+        data.current.wind_direction
     );
+
+    // Sunrise/sunset from today's daily forecast
+    if let Some(today) = data.daily.first() {
+        println!(
+            "  Sunrise:     {}  Sunset: {}",
+            today.sunrise, today.sunset
+        );
+    }
     println!();
 
     // Daily forecast
@@ -70,10 +108,12 @@ pub fn display_weather(data: &WeatherData, loc: &Location) {
         for day in &data.daily {
             let (day_emoji, _) = weather_code_to_emoji(day.weather_code);
             println!(
-                "  {:<12} {:>6}\u{00b0} {:>6}\u{00b0}  {}  {:>5.0}%",
+                "  {:<12} {:>6}{} {:>6}{}  {}  {:>5.0}%",
                 day.date,
-                colorize_temp(day.temp_max),
-                colorize_temp(day.temp_min),
+                colorize_temp(day.temp_max, units),
+                temp_suffix(units),
+                colorize_temp(day.temp_min, units),
+                temp_suffix(units),
                 day_emoji,
                 day.precipitation_probability
             );
@@ -81,22 +121,25 @@ pub fn display_weather(data: &WeatherData, loc: &Location) {
         println!();
     }
 
-    // Hourly forecast
+    // Hourly forecast (first 24 entries only — current day)
     if !data.hourly.is_empty() {
+        let hours: Vec<_> = data.hourly.iter().take(24).collect();
         println!("{}", "Hourly Forecast:".bold());
         println!(
             "  {:<18} {:>6}  {:<4} {:>8} {:>8}",
             "Time", "Temp", "", "Wind", "Precip"
         );
         println!("  {}", "-".repeat(52));
-        for hour in &data.hourly {
+        for hour in &hours {
             let (hr_emoji, _) = weather_code_to_emoji(hour.weather_code);
             println!(
-                "  {:<18} {:>6}\u{00b0}  {}  {:>5.1}km/h {:>5.0}%",
+                "  {:<18} {:>6}{}  {}  {:>5.1}{} {:>5.0}%",
                 hour.time,
-                colorize_temp(hour.temperature),
+                colorize_temp(hour.temperature, units),
+                temp_suffix(units),
                 hr_emoji,
                 hour.wind_speed,
+                wind_label(units),
                 hour.precipitation_probability
             );
         }
@@ -200,7 +243,7 @@ mod tests {
 
     #[test]
     fn test_temp_color_cold() {
-        let colored = colorize_temp(-5.0);
+        let colored = colorize_temp(-5.0, &Units::Metric);
         let s = format!("{}", colored);
         assert!(s.contains("-5.0"));
         assert_eq!(colored.fgcolor(), Some(colored::Color::Blue));
@@ -208,25 +251,46 @@ mod tests {
 
     #[test]
     fn test_temp_color_cold_zero() {
-        let colored = colorize_temp(0.0);
+        let colored = colorize_temp(0.0, &Units::Metric);
         assert_eq!(colored.fgcolor(), Some(colored::Color::Blue));
     }
 
     #[test]
     fn test_temp_color_warm() {
-        let colored = colorize_temp(15.0);
+        let colored = colorize_temp(15.0, &Units::Metric);
         assert_eq!(colored.fgcolor(), Some(colored::Color::Yellow));
     }
 
     #[test]
     fn test_temp_color_warm_boundary() {
-        let colored = colorize_temp(25.0);
+        let colored = colorize_temp(25.0, &Units::Metric);
         assert_eq!(colored.fgcolor(), Some(colored::Color::Yellow));
     }
 
     #[test]
     fn test_temp_color_hot() {
-        let colored = colorize_temp(35.0);
+        let colored = colorize_temp(35.0, &Units::Metric);
+        assert_eq!(colored.fgcolor(), Some(colored::Color::Red));
+    }
+
+    #[test]
+    fn test_temp_color_imperial_cold() {
+        // 30°F is below freezing — should be blue
+        let colored = colorize_temp(30.0, &Units::Imperial);
+        assert_eq!(colored.fgcolor(), Some(colored::Color::Blue));
+    }
+
+    #[test]
+    fn test_temp_color_imperial_warm() {
+        // 70°F is warm — should be yellow
+        let colored = colorize_temp(70.0, &Units::Imperial);
+        assert_eq!(colored.fgcolor(), Some(colored::Color::Yellow));
+    }
+
+    #[test]
+    fn test_temp_color_imperial_hot() {
+        // 90°F is hot — should be red
+        let colored = colorize_temp(90.0, &Units::Imperial);
         assert_eq!(colored.fgcolor(), Some(colored::Color::Red));
     }
 
@@ -269,6 +333,6 @@ mod tests {
             longitude: -0.1,
         };
         // Should not panic
-        display_weather(&data, &loc);
+        display_weather(&data, &loc, &Units::Metric);
     }
 }

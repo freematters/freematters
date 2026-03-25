@@ -26,12 +26,14 @@ struct GeoResult {
 }
 
 pub async fn geocode(city: &str) -> Result<Location> {
-    let url = format!(
-        "https://geocoding-api.open-meteo.com/v1/search?name={}&count=1&language=en",
-        city
-    );
-
-    let resp: GeoResponse = reqwest::get(&url).await?.json().await?;
+    let client = reqwest::Client::new();
+    let resp: GeoResponse = client
+        .get("https://geocoding-api.open-meteo.com/v1/search")
+        .query(&[("name", city), ("count", "1"), ("language", "en")])
+        .send()
+        .await?
+        .json()
+        .await?;
 
     match resp.results.into_iter().next() {
         Some(r) => Ok(Location {
