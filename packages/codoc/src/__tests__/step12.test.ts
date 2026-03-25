@@ -64,16 +64,10 @@ function httpPost(
 }
 
 describe("hooks.json format", () => {
-  it("should contain SessionStart hook with 'codoc server' command", () => {
+  it("should not contain SessionStart hook", () => {
     const hooksPath = path.join(projectRoot, "hooks/hooks.json");
     const content = JSON.parse(fs.readFileSync(hooksPath, "utf-8"));
-    expect(content.hooks.SessionStart).toBeInstanceOf(Array);
-    expect(content.hooks.SessionStart.length).toBeGreaterThan(0);
-    const hook = content.hooks.SessionStart[0];
-    expect(hook.hooks).toBeInstanceOf(Array);
-    expect(hook.hooks[0].type).toBe("command");
-    expect(hook.hooks[0].command).toMatch(/server$/);
-    expect(hook.hooks[0].timeout).toBe(30);
+    expect(content.hooks.SessionStart).toBeUndefined();
   });
 
   it("should contain SessionEnd hook with 'codoc stop' command", () => {
