@@ -17,3 +17,9 @@
 - **What was built**: Current/DayForecast/HourForecast/WeatherData structs, fetch_weather() function hitting Open-Meteo forecast API
 - **Tests**: 1 integration test added (all passing) — verifies structure from real API call
 - **Notes**: Internal API response structs for nested JSON deserialization, unit conversion via API params
+
+## Step 4: Terminal Formatter
+- **Files changed**: weather-cli/src/display.rs
+- **What was built**: weather_code_to_emoji(), colorize_temp(), display_weather() with emoji icons and colored output
+- **Tests**: 16 unit tests added (all passing) — emoji mapping, temperature coloring, display doesn't panic
+- **Notes**: Merge required conflict resolution (Clone derives added to data structs)
