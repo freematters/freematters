@@ -6,3 +6,5 @@ dist/
 .worktrees/
 docs/plans/
 specs/build-a-weather-app/
+target/
+Cargo.lock
