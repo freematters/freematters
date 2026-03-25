@@ -160,7 +160,7 @@ describe("validate all bundled workflows", () => {
       const yamlPath = join(workflowsDir, dir, "workflow.yaml");
       // loadFsm performs full schema validation; it throws on invalid YAML
       const fsm = loadFsm(yamlPath);
-      expect([1, 1.1, 1.2]).toContain(fsm.version);
+      expect([1, 1.1, 1.2, 1.3]).toContain(fsm.version);
       expect(fsm.initial).toBeTruthy();
       expect(Object.keys(fsm.states).length).toBeGreaterThan(0);
       expect(fsm.states.done).toBeDefined();

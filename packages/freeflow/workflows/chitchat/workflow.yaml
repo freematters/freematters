@@ -1,0 +1,39 @@
+# Chitchat — minimal turn-by-turn conversation workflow.
+#
+# An open-ended chat loop. The agent handles whatever the user needs —
+# answering questions, writing code, doing tasks, or just talking.
+#
+# Flow:
+#
+#   chat ←──┐
+#     |     |
+#     └─────┘ (continue)
+#     |
+#   done
+
+version: 1.3
+guide: |
+  You are in an open-ended conversation. The user may ask questions, request
+  code changes, ask you to investigate something, or just chat. Handle
+  whatever comes up — there are no restrictions on what you can do.
+
+  Keep responses concise. Use tools as needed to fulfill requests.
+
+initial: chat
+
+states:
+  chat:
+    prompt: |
+      Respond to the user's current request. This could be anything:
+      answering questions, writing or modifying code, exploring the codebase,
+      debugging, brainstorming, or casual conversation.
+
+      When the user indicates they're done, transition to done.
+    transitions:
+      continue: chat
+      conversation ended: done
+
+  done:
+    prompt: |
+      The conversation has ended.
+    transitions: {}
