@@ -14,6 +14,7 @@ import { history } from "./commands/history.js";
 import { install } from "./commands/install.js";
 import { list } from "./commands/list.js";
 import { convert } from "./commands/markdown/convert.js";
+import { render } from "./commands/render.js";
 import { start } from "./commands/start.js";
 import { validate } from "./commands/validate.js";
 import { main as postToolUseMain } from "./hooks/post-tool-use.js";
@@ -193,6 +194,27 @@ program
       fsmPath: resolve(_fsmPath),
       json: json ?? false,
     });
+  });
+
+program
+  .command("render")
+  .description("resolve a YAML workflow and render as standalone markdown")
+  .argument("<fsm_path>", "workflow name or path to YAML file")
+  .option("-o, --output <path>", "write rendered markdown to specified path")
+  .option("--save", "write rendered markdown alongside the YAML file")
+  .action((_fsmPath: string, opts: Record<string, unknown>, cmd: Command) => {
+    const { root, json } = getGlobalOpts(cmd);
+    try {
+      render({
+        fsmPath: resolveWorkflowOrExit(_fsmPath, json ?? false),
+        output: opts.output as string | undefined,
+        save: (opts.save as boolean) ?? false,
+        json: json ?? false,
+        root: resolveRoot(root),
+      });
+    } catch (err: unknown) {
+      handleError(err, json ?? false);
+    }
   });
 
 program
