@@ -15,7 +15,7 @@ graph LR
 
 ## Checklist
 - [x] Step 1: Project scaffold & CLI parser
-- [ ] Step 2: Geocoder module
+- [x] Step 2: Geocoder module
 - [ ] Step 3: Weather fetcher module
 - [ ] Step 4: Terminal formatter
 - [ ] Step 5: Main pipeline & JSON output
