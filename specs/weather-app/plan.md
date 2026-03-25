@@ -19,7 +19,7 @@ graph LR
 - [x] Step 3: Weather fetcher module
 - [x] Step 4: Terminal formatter
 - [x] Step 5: Main pipeline & JSON output
-- [ ] Step 6: Integration tests
+- [x] Step 6: Integration tests
 
 ---
 

@@ -29,3 +29,9 @@
 - **What was built**: Full pipeline (args→geocode→fetch→display), JSON output mode, error handling with friendly messages
 - **Tests**: 6 tests added (31 total, all passing) — JSON validity, structure, field checks
 - **Notes**: Zero warnings after refactor
+
+## Step 6: Integration Tests
+- **Files changed**: weather-cli/Cargo.toml, weather-cli/Cargo.lock, weather-cli/tests/integration.rs
+- **What was built**: 3 CLI integration tests using assert_cmd (text output, JSON output, error handling)
+- **Tests**: 3 integration tests added (34 total, all passing)
+- **Notes**: Tests hit real Open-Meteo API
