@@ -13,7 +13,6 @@ import { goto } from "./commands/goto.js";
 import { history } from "./commands/history.js";
 import { install } from "./commands/install.js";
 import { list } from "./commands/list.js";
-import { convert } from "./commands/markdown/convert.js";
 import { render } from "./commands/render.js";
 import { start } from "./commands/start.js";
 import { validate } from "./commands/validate.js";
@@ -301,32 +300,6 @@ program
       maxAgents: opts.maxAgents as string | undefined,
       storeRoot: opts.storeRoot as string | undefined,
     });
-  });
-
-// Markdown subcommands
-const markdownCmd = program
-  .command("markdown")
-  .description("markdown workflow format utilities");
-
-markdownCmd
-  .command("convert")
-  .description("convert between YAML and Markdown workflow formats")
-  .argument("<file>", "path to .yaml, .yml, or .md workflow file")
-  .option(
-    "-o, --output <path>",
-    "output file path (default: same basename, swapped extension)",
-  )
-  .action((file: string, opts: Record<string, unknown>, cmd: Command) => {
-    const { json } = getGlobalOpts(cmd);
-    try {
-      convert({
-        filePath: resolve(file),
-        output: opts.output as string | undefined,
-        json: json ?? false,
-      });
-    } catch (err: unknown) {
-      handleError(err, json ?? false);
-    }
   });
 
 // Hidden hook commands (not shown in --help)
