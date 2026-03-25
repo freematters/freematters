@@ -78,12 +78,14 @@ export function formatStateCard(
     for (const [label, target] of entries) {
       lines.push(`  ${label} → ${target}`);
     }
-    lines.push("");
-    lines.push(
-      "IMPORTANT: Execute this state's instructions NOW. " +
-        "Do NOT stop or wait for user input between states. " +
-        "Only terminal states (no transitions) end the workflow.",
-    );
+    if (includeReminders) {
+      lines.push("");
+      lines.push(
+        "IMPORTANT: Execute this state's instructions NOW. " +
+          "Do NOT stop or wait for user input between states. " +
+          "Only terminal states (no transitions) end the workflow.",
+      );
+    }
   }
 
   if (includeReminders) {
