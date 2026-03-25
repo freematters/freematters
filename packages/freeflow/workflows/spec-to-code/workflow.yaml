@@ -30,6 +30,10 @@ guide: |
   GitHub: remember `owner`, `repo`, `issue_number`, `branch_name`.
   GitLab: remember `project_path`, `iid`, `branch_name`.
 
+  GitLab CLI convention: Prefer native `glab` commands (`glab issue note/update/view`).
+  Use `glab api` only for operations without native equivalents (award emoji, note
+  editing, label management).
+
 initial: setup
 
 states:
@@ -80,7 +84,7 @@ states:
 
       1. Validate the issue exists and has the `spec-ready` label:
          ```bash
-         glab api "projects/$(echo {project_path} | python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read().strip(),safe=\"\"))')/issues/{iid}" | jq '[.labels[]]'
+         glab issue view {iid} -F json | jq '[.labels[]]'
          ```
          If no `spec-ready` label, warn the user and ask if they want to proceed anyway.
 
@@ -250,13 +254,13 @@ states:
          git push -u origin {branch_name}   # first push
          git push                            # subsequent pushes
          ```
-      7. Update the issue description checklist for each completed step via:
+      7. Update the issue description checklist:
          ```bash
-         glab issue update {iid} --description "<updated body>"
+         glab issue update {iid} -d "<updated body>"
          ```
-      8. Post a `[from bot]` progress note per step via:
+      8. Post a `[from bot]` progress note:
          ```bash
-         glab issue note {iid} --message "[from bot] Step N/M complete: <step title>
+         glab issue note {iid} -m "[from bot] Step N/M complete: <step title>
          - **Commit**: {sha}
          - **Files changed**: <list of key files>
          - **Tests**: <count> added, all passing"
@@ -475,7 +479,7 @@ states:
 
       2. Post the implementation summary as a `[from bot]` note on the issue:
          ```bash
-         glab issue note {iid} --message "[from bot] ## implementation-summary.md
+         glab issue note {iid} -m "[from bot] ## implementation-summary.md
 
          {full content of implementation-summary.md}
 
@@ -487,15 +491,16 @@ states:
       3. Write `./specs/<slug>/source-issue` containing the GitLab issue reference
          (e.g., `project/path#42`) so that mr-lifecycle can link the MR to the issue.
 
-      4. Update the issue description's Summary section to reflect e2e results.
-         Re-read the current issue description via `glab api`, then update the
-         `### E2E Testing` subsection with the actual result. Update via:
+      4. Update the issue description's `### E2E Testing` subsection with the actual result:
          ```bash
-         glab issue update {iid} --description "<updated description>"
+         # Re-read current description
+         glab issue view {iid} -F json | jq -r '.description'
+         # Update with modified description
+         glab issue update {iid} -d "<updated description>"
          ```
 
-      5. Remove `doing` label and add `done` label to the issue via glab api:
+      5. Update issue labels:
          ```bash
-         glab api -X PUT "projects/{encoded_project_path}/issues/{iid}" -f "remove_labels=doing" -f "add_labels=done"
+         glab issue update {iid} -u doing -l done
          ```
     transitions: {}

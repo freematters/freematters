@@ -48,11 +48,9 @@ guide: |
 
   Set these variables at the start of each state:
   ```bash
+  ISSUE_IID="<issue_iid>"
   ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
   IDS_FILE="$HOME/.freeflow/runs/{run_id}/artifact_note_ids.json"
-  PROJECT_PATH="<project_path>"  # e.g., group/project
-  ISSUE_IID="<issue_iid>"
-  ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
   mkdir -p "$ARTIFACTS"
   [ -f "$IDS_FILE" ] || echo '{}' > "$IDS_FILE"
   ```
@@ -73,6 +71,8 @@ guide: |
      NOTE_ID=$(glab api -X POST "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes" \
        -F body=@"$ARTIFACTS/<filename>" | jq -r '.id')
      ```
+     Note: `glab api` is used here (not `glab issue note`) because `-F body=@file`
+     reads the note body from a file, which the native command doesn't support.
 
   3. Save the note ID to the tracking file:
      ```bash
@@ -143,11 +143,10 @@ guide: |
 
   ### Status Checklist Updates
 
-  The issue body (description) contains a status checklist. When completing a phase, update
-  the issue description to check off that phase. Use
-  `glab issue update $ISSUE_IID --description "$UPDATED_BODY"` to update the description.
-  You MUST re-read the current issue description before editing to avoid overwriting
-  concurrent changes.
+  The issue body (description) contains a status checklist. When completing a phase,
+  re-read the current description (`glab issue view <iid> -F json | jq -r .description`),
+  check off the phase, and update (`glab issue update <iid> -d "..."`).
+  You MUST re-read before editing to avoid overwriting concurrent changes.
 
   The status checklist items are:
   - [ ] gathering requirements
@@ -162,24 +161,43 @@ guide: |
   You MUST remember these values across states (keep them in your conversation memory):
   - `project_path` — the full project path (e.g., `freematters/testbed`)
   - `gitlab_url` — the GitLab instance URL (e.g., `https://gitlab.corp.metabit-trading.com`)
-  - `issue_iid` — the issue IID returned by `glab issue create`
+  - `issue_iid` — the issue IID returned by the create-issue API call
   - `issue_creator` — the username of the person who created the issue
 
   Artifact note IDs are persisted in `$IDS_FILE` — do NOT track them in conversation memory.
 
-  ### Authentication
+  ### GitLab CLI Rules
 
-  GitLab authentication uses the `GITLAB_TOKEN` environment variable or `glab auth login`.
-  For self-hosted instances, use `--hostname` with glab commands.
+  **Authentication**: `GITLAB_TOKEN` env var or `glab auth login`.
+
+  **Prefer native `glab` commands** — they auto-detect the project from the git remote:
+  | Operation | Command |
+  |-----------|---------|
+  | Create issue | `glab issue create -t "title" -d "body" --no-editor` |
+  | Post note | `glab issue note <iid> -m "body"` |
+  | View issue | `glab issue view <iid> -F json` |
+  | Update issue | `glab issue update <iid> -d "desc" -l label -u label` |
+  | Create MR | `glab mr create -t "title" -d "body" -s source -b target --remove-source-branch --squash-before-merge --push --yes` |
+  | View MR | `glab mr view <iid> -F json` |
+  | Update MR | `glab mr update <iid> -d "desc"` |
+
+  **Use `glab api` only** when native commands can't do the job:
+  - File-body upload: `-F body=@file` (artifact creation/update)
+  - Note editing: `PUT .../notes/<id>` (no native equivalent)
+  - Award emoji: `POST .../award_emoji`
+  - Resolve discussions: `PUT .../discussions/<id>`
+  - Label creation: `POST .../labels`
+
+  For `glab api` calls, URL-encode the project path:
+  ```bash
+  ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$(git remote get-url origin | sed \"s|.*://[^/]*/||;s|\.git$||\" | sed \"s|.*:||\")', safe=''))")
+  ```
 
   ### Error Handling
 
-  - **Rate limit exceeded (429)**: If `glab api` returns HTTP 429, read the `Retry-After`
-    header, wait until that time, then retry.
-  - **Network errors**: If a `glab api` call fails with a connection error, retry after 5 seconds.
-    If it fails 3 times in a row, report the error to the user.
-  - **Issue description update conflict**: If `glab issue update` fails, re-read the current
-    issue description, re-apply your changes, and retry.
+  - **Rate limit (429)**: Read `Retry-After` header, wait, retry.
+  - **Network errors**: Retry after 5s, fail after 3 attempts.
+  - **Description update conflict**: Re-read, re-apply, retry.
 
 initial: create-issue
 
@@ -195,52 +213,54 @@ states:
       If this fails, tell the user to run `glab auth login` and stop.
 
       Parse the user's prompt to extract:
-      1. **Project path**: The GitLab project path (e.g., `freematters/testbed`). The user provides this in their prompt.
-      2. **GitLab URL**: If the user specifies a self-hosted instance (e.g., `gitlab.corp.metabit-trading.com`), remember it for `--hostname` usage.
+      1. **Project path**: Auto-detect from git remote if not specified.
+      2. **GitLab URL**: Auto-detect from git remote.
       3. **Idea**: The description of what they want to build.
       4. **Title**: Generate a concise issue title from the idea.
 
-      Then create a GitLab issue (if this fails with 404/403, report the error and ask the user to check the project path and permissions):
+      Then:
 
-      ```bash
-      glab issue create --title "{title}" --description "{body}"
-      ```
+      1. Create the issue:
+         ```bash
+         glab issue create -t "{title}" -d "{body}" --no-editor
+         ```
+         If this fails with 404/403, report the error and ask the user to check permissions.
 
-      The issue body MUST follow this exact structure:
+         The issue body MUST follow this structure:
+         ```markdown
+         ## {title}
 
-      ```markdown
-      ## {title}
+         {rough idea from user prompt}
 
-      {rough idea from user prompt}
+         ## Status
 
-      ## Status
+         - [ ] gathering requirements
+         - [ ] research
+         - [ ] design
+         - [ ] plan
 
-      - [ ] gathering requirements
-      - [ ] research
-      - [ ] design
-      - [ ] plan
+         - [ ] spec-ready
+         ```
 
-      - [ ] spec-ready
-      ```
+      2. From the output, extract the issue URL and IID. Get the authenticated
+         username via `glab api user | jq -r .username`.
+         Remember `issue_iid`, `issue_creator`. Report the issue URL to the user.
 
-      From the `glab issue create` output, extract and remember:
-      - The **issue IID** (from the URL in the output, e.g., `https://gitlab.com/group/project/-/issues/42` -> issue IID is `42`)
-      - The **issue creator** username (run `glab api user | jq -r .username` to get the authenticated user's username, since the bot is creating the issue on behalf of the user)
+      3. Post a welcome note on the issue:
+         ```bash
+         glab issue note $ISSUE_IID -m '[bot reply] ...'
+         ```
+         Content:
+         ```
+         [bot reply] Welcome! I'll guide you through a spec generation process on this issue.
 
-      Report the issue URL to the user.
+         Where would you like to start?
 
-      Then post an initial welcome note on the issue:
+         1. **Requirements clarification** (recommended) -- refine the idea through Q&A
+         2. **Research first** -- investigate specific technical topics before refining requirements
 
-      ```bash
-      glab issue note {iid} --message "[bot reply] Welcome! I'll guide you through a spec generation process on this issue.
-
-      Where would you like to start?
-
-      1. **Requirements clarification** (recommended) -- refine the idea through Q&A
-      2. **Research first** -- investigate specific technical topics before refining requirements
-
-      Reply with your choice (1 or 2)."
-      ```
+         Reply with your choice (1 or 2).
+         ```
 
       Now poll for the user's reply using the polling pattern from the guide.
       When you receive a reply from the issue creator:
@@ -373,17 +393,12 @@ states:
       Steps:
       1. Add the `spec-ready` label to the issue:
          ```bash
-         glab issue update {iid} --label spec-ready
-         ```
-         If the label does not exist on the project yet, create it first:
-         ```bash
-         ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
+         # Create label if it doesn't exist (glab api — no native command for this)
          glab api -X POST "projects/$ENCODED_PATH/labels" \
-           -f name=spec-ready \
-           -f description="Spec is complete and ready for implementation" \
-           -f color="#0E8A16"
+           -f name=spec-ready -f color="#0E8A16" 2>/dev/null || true
+         # Add to issue
+         glab issue update $ISSUE_IID -l spec-ready
          ```
-         If creation fails because it already exists, that is fine -- proceed.
 
       2. Update the issue description status checklist: check off ALL remaining items including "spec-ready".
 

@@ -45,17 +45,21 @@ guide: |
   - `target_branch`: Target branch for the MR
   - `source_branch`: Source branch for the MR
 
-  ## `glab` CLI tips (avoid common pitfalls)
+  ## GitLab CLI convention
 
-  - **Prefer `glab mr` / `glab ci` high-level commands** over raw `glab api` calls when possible.
-  - **Project path encoding**: When using `glab api`, URL-encode the project path
-    (e.g., `group%2Fproject`) in endpoint URLs.
-  - **Self-hosted instances**: Pass `--hostname <host>` to `glab api` commands when working
-    with self-hosted GitLab (not gitlab.com). The hostname is auto-detected from git remote.
-  - **`GITLAB_TOKEN` env var**: Ensure it is set for authentication. Verify with `glab auth status`.
-  - **Award emoji for dedup**: Use award emoji (eyes, rocket) on notes instead of GitHub reactions.
-  - **`@bot` search**: When searching for `@bot` in API output, pipe through `grep '@bot'`
-    rather than embedding in jq expressions to avoid shell escaping issues.
+  **Prefer native `glab` commands** (`glab mr view/create/update`, `glab ci view`, etc.)
+  — they auto-detect host and project from the git remote.
+
+  **Use `glab api` only** when native commands can't do the job:
+  award emoji, resolve discussions, discussion thread replies, rebase API, job traces.
+  For `glab api`, URL-encode the project path:
+  ```bash
+  ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$(git remote get-url origin | sed \"s|.*://[^/]*/||;s|\.git$||\" | sed \"s|.*:||\")', safe=''))")
+  ```
+
+  **Auth**: `GITLAB_TOKEN` env var. Verify with `glab auth status`.
+  **Emoji dedup**: Use award emoji (eyes, rocket) on notes instead of GitHub reactions.
+  **`@bot` search**: Pipe through `grep '@bot'` rather than embedding in jq to avoid escaping issues.
 
 initial: create-mr
 
@@ -64,16 +68,6 @@ states:
     prompt: |
       Verify authentication: run `glab auth status`. If not logged in, prompt user to run
       `glab auth login` or set `GITLAB_TOKEN` env var.
-
-      Detect the GitLab hostname from git remote:
-      ```bash
-      git remote get-url origin | sed -n 's|.*://\([^/]*\)/.*|\1|p; s|.*@\([^:]*\):.*|\1|p'
-      ```
-
-      Detect the project path from git remote:
-      ```bash
-      git remote get-url origin | sed 's|.*://[^/]*/||;s|\.git$||' | sed 's|.*:||'
-      ```
 
       Once authenticated:
       - Run lint/format checks (refer to project CLAUDE.md for check commands). Fix any failures first.
@@ -93,10 +87,11 @@ states:
         - Check for `./specs/*/source-issue` — if it exists, read the issue reference
           (e.g., `project#42`) and add `Closes #N` to the MR description to link
           the MR to the source issue.
-        - Create via:
+        - Create:
           ```bash
-          glab mr create --source-branch <source> --target-branch <target> \
-            --title "<title>" --description "<description>"
+          glab mr create -t "<title>" -d "<description>" \
+            -s <source> -b <target> \
+            --remove-source-branch --squash-before-merge --push --yes
           ```
 
       After the MR is created (or found), post an **MR note** with:
@@ -217,7 +212,7 @@ states:
       Before rebasing, wait 2 seconds and then check if the MR was already merged:
       ```bash
       sleep 2
-      glab api "projects/<encoded_project>/merge_requests/<mr_iid>" | jq '.state'
+      glab mr view <mr_iid> -F json | jq -r '.state'
       ```
       If the state is `merged` or `closed`, skip the rebase and transition to `MR merged`.
 
@@ -358,20 +353,17 @@ states:
          ```
 
       8. **Append a push summary to the MR description** summarizing what changed in this round.
-         Read the current MR description via:
+         Read the current description:
          ```bash
-         glab mr view <mr_iid> --output json | jq -r '.description'
+         glab mr view <mr_iid> -F json | jq -r '.description'
          ```
-         Append a new section at the bottom using this format:
+         Append a new section:
          ```
          ## Push round N
          - <bullet point for each change made in this round>
          ```
-         Where N is the push round number (count existing `## Push round` headings in the
-         description and add 1). Update the description via:
-         ```bash
-         glab mr update <mr_iid> --description "<updated_description>"
-         ```
+         Where N = count of existing `## Push round` headings + 1.
+         Update: `glab mr update <mr_iid> -d "<updated_description>"`.
          If there are no meaningful changes (e.g., only an API rebase), skip this step.
     todos:
       - Commit all changes (skip if no local changes)

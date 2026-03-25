@@ -81,13 +81,12 @@ states:
 
       Parse the user's prompt to determine the input mode.
 
-      ### Detect GitLab Hostname
-
-      Auto-detect the GitLab hostname from the current git remote:
+      Auto-detect the GitLab hostname and project path from the git remote:
       ```bash
       GITLAB_HOST=$(git remote get-url origin | sed -n 's|.*://\([^/]*\)/.*|\1|p; s|.*@\([^:]*\):.*|\1|p')
+      PROJECT_PATH=$(git remote get-url origin | sed 's|.*://[^/]*/||;s|\.git$||' | sed 's|.*:||')
       ```
-      Remember `gitlab_url = "https://$GITLAB_HOST"`.
+      Remember `gitlab_url = "https://$GITLAB_HOST"` and `project_path`.
 
       ### Existing Issue (GitLab URL or `project/path#N`)
 
@@ -102,34 +101,25 @@ states:
 
       For either pattern:
 
-      1. URL-encode the project path:
+      1. Verify the issue exists:
          ```bash
-         ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
-         ```
-      2. Verify the issue exists:
-         ```bash
-         glab api "projects/$ENCODED_PATH/issues/$ISSUE_IID" --hostname "$GITLAB_HOST" | jq -r '.title'
+         glab issue view $ISSUE_IID -F json | jq -r '.title'
          ```
          If this fails, report the error and stop.
-      3. Fetch issue context:
+      2. Fetch issue context:
          ```bash
-         glab api "projects/$ENCODED_PATH/issues/$ISSUE_IID" \
-           --hostname "$GITLAB_HOST" | jq '{title: .title, description: .description, creator: .author.username, labels: .labels}'
+         glab issue view $ISSUE_IID -F json | jq '{title: .title, description: .description, creator: .author.username, labels: .labels}'
          ```
-      4. Extract and remember: `project_path`, `issue_iid`, `issue_creator` = `.creator`.
-      5. Derive `slug` from the issue title (lowercase, hyphens, no special chars).
-      6. Transition to `proceed`.
+      3. Extract and remember: `project_path`, `issue_iid`, `issue_creator` = `.author.username`.
+      4. Derive `slug` from the issue title (lowercase, hyphens, no special chars).
+      5. Transition to `proceed`.
 
       ### New Idea
 
       If the input is a rough idea with a project path (not matching the issue pattern):
 
-      1. Auto-detect the project path from git remote:
-         ```bash
-         PROJECT_PATH=$(git remote get-url origin | sed 's|.*://[^/]*/||;s|\.git$||' | sed 's|.*:||')
-         ```
-      2. Remember `project_path`.
-      3. Transition to `proceed` — the spec sub-workflow will create the issue.
+      1. Remember `project_path` (already detected from git remote).
+      2. Transition to `proceed` — the spec sub-workflow will create the issue.
     transitions:
       proceed: spec
 
@@ -142,23 +132,12 @@ states:
     prompt: |
       ## Choose Execution Mode
 
-      The spec is complete. Read the spec artifacts from the local cache to get an overview:
-      ```bash
-      ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
-      ```
-      Read `$ARTIFACTS/requirements.md` and `$ARTIFACTS/design.md` for a brief summary.
-
-      URL-encode the project path:
-      ```bash
-      ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
-      ```
+      The spec is complete. Read `$ARTIFACTS/requirements.md` and `$ARTIFACTS/design.md`
+      for a brief summary.
 
       Post a note on the issue asking the user to choose an execution mode:
-
-      ```bash
-      glab api -X POST "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes" \
-        --hostname "$GITLAB_HOST" \
-        -f body='[bot reply] ## Spec Complete!
+      ```
+      [bot reply] ## Spec Complete!
 
       The spec is ready. How would you like to proceed?
 
@@ -168,7 +147,7 @@ states:
          creating the MR for your confirmation.
       3. **Stop here** -- keep the spec artifacts and end the workflow.
 
-      Reply with your choice (1, 2, or 3).'
+      Reply with your choice (1, 2, or 3).
       ```
 
       Poll for the user's reply using the polling pattern from the guide.
@@ -188,21 +167,17 @@ states:
     prompt: |
       ## Confirm Implementation
 
-      This gate is reached in fast-forward mode. Post a confirmation request on the issue:
+      This gate is reached in fast-forward mode. Post a confirmation note on the issue:
+      ```
+      [bot reply] ## Ready to Implement
 
-      ```bash
-      ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
-      glab api -X POST "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes" \
-        --hostname "$GITLAB_HOST" \
-        -f body='[bot reply] ## Ready to Implement
-
-      The spec is complete and ready for implementation. I'\''ll:
+      The spec is complete and ready for implementation. I'll:
       - Download the spec artifacts
       - Create a feature branch
       - Implement each plan step with TDD
       - Run e2e tests and code review
 
-      Reply **go** to start implementation, or **stop** to end the workflow here.'
+      Reply **go** to start implementation, or **stop** to end the workflow here.
       ```
 
       Poll for the user's reply using the polling pattern from the guide (20s interval).
@@ -226,23 +201,15 @@ states:
       Implementation is complete. Read `./specs/{slug}/implementation-summary.md` and present
       the key results.
 
-      URL-encode the project path:
-      ```bash
-      ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
+      Post the implementation summary as a note on the issue:
       ```
-
-      Post the implementation summary on the issue:
-
-      ```bash
-      glab api -X POST "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes" \
-        --hostname "$GITLAB_HOST" \
-        -f body='[bot reply] ## Implementation Complete
+      [bot reply] ## Implementation Complete
 
       {brief summary of what was implemented}
 
       **Steps completed**: {N}/{N}
       **Tests**: {total tests added}, all passing
-      **Branch**: `{branch_name}`'
+      **Branch**: `{branch_name}`
       ```
 
       **Full auto mode** (`mode == "full-auto"`): Transition directly to `submit mr` without
@@ -272,22 +239,14 @@ states:
     prompt: |
       ## Workflow Complete
 
-      URL-encode the project path:
-      ```bash
-      ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$PROJECT_PATH', safe=''))")
-      ```
-
       Post a final summary note on the issue:
-
-      ```bash
-      glab api -X POST "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes" \
-        --hostname "$GITLAB_HOST" \
-        -f body='[bot reply] ## Issue-to-MR Complete
+      ```
+      [bot reply] ## Issue-to-MR Complete
 
       **Phases completed**: {list phases: spec / spec + implementation / spec + implementation + MR}
       **Artifacts**: {list key artifacts produced}
       **MR**: {MR URL if applicable, otherwise "N/A"}
-      **Mode**: {full-auto / fast-forward}'
+      **Mode**: {full-auto / fast-forward}
       ```
 
       If the workflow stopped early (e.g., after spec only), suggest the next manual step
