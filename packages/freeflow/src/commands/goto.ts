@@ -76,11 +76,14 @@ ${labels}`,
         );
       }
 
-      // Always track visited states
+      // Track visited states (only in lite mode)
+      const isLite = !!meta.lite;
       const visitedSet = new Set(snapshot.visited_states ?? []);
-      const alreadyVisited = visitedSet.has(args.target);
-      visitedSet.add(args.target);
-      const visitedStates = [...visitedSet];
+      const alreadyVisited = isLite && visitedSet.has(args.target);
+      if (isLite) {
+        visitedSet.add(args.target);
+      }
+      const visitedStates = isLite ? [...visitedSet] : undefined;
 
       const isDone = args.target === "done";
       const newStatus: RunStatus = isDone ? "completed" : "active";

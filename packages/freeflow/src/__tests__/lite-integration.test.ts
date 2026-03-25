@@ -140,10 +140,10 @@ describe("Full round-trip: lite mode", () => {
   });
 });
 
-// ─── Non-lite round-trip: revisits show lite cards ───────────────
+// ─── Non-lite round-trip: full cards always ───────────────
 
-describe("Non-lite round-trip: revisits show lite cards", () => {
-  test("start (no --lite) → goto B → goto A → revisit shows lite card", () => {
+describe("Non-lite round-trip: always full cards", () => {
+  test("start (no --lite) → goto B → goto A → revisit shows full card", () => {
     const root = join(tmp, "nonlite-roundtrip-root");
     const id = uniqueRunId("nonlite-rt");
 
@@ -152,32 +152,27 @@ describe("Non-lite round-trip: revisits show lite cards", () => {
     expect(startResult.exitCode).toBe(0);
     expect(startResult.stdout).toContain("You are in **start** state.");
 
-    // 2. Goto review (first visit → full card with guide and reminders)
+    // 2. Goto review (first visit → full card)
     const gotoReview = runCli(`goto review --run-id ${id} --on ready`, {
       root,
     });
     expect(gotoReview.exitCode).toBe(0);
     expect(gotoReview.stdout).toContain("You are in **review** state.");
     expect(gotoReview.stdout).toContain("Review the work.");
-    expect(gotoReview.stdout).not.toContain("Re-entering");
 
-    // 3. Goto back to start (re-visit → lite card)
+    // 3. Goto back to start (re-visit → still full card, not lite)
     const gotoBack = runCli(`goto start --run-id ${id} --on rejected`, {
       root,
     });
     expect(gotoBack.exitCode).toBe(0);
-    expect(gotoBack.stdout).toContain("Re-entering **start**");
-    expect(gotoBack.stdout).toContain("fflow current");
-    expect(gotoBack.stdout).toContain("ready → review");
-    // Lite card must NOT contain prompt or "Your instructions:"
-    expect(gotoBack.stdout).not.toContain("Your instructions:");
-    expect(gotoBack.stdout).not.toContain("Begin work.");
+    expect(gotoBack.stdout).toContain("You are in **start** state.");
+    expect(gotoBack.stdout).toContain("Your instructions:");
+    expect(gotoBack.stdout).toContain("Begin work.");
+    expect(gotoBack.stdout).not.toContain("Re-entering");
 
-    // 4. Verify snapshot tracks visited_states even without --lite
+    // 4. Verify snapshot does NOT track visited_states without --lite
     const store = new Store(root);
     const snapshot = store.readSnapshot(id);
-    expect(snapshot?.visited_states).toContain("start");
-    expect(snapshot?.visited_states).toContain("review");
-    expect(snapshot?.visited_states).toHaveLength(2);
+    expect(snapshot?.visited_states).toBeUndefined();
   });
 });
