@@ -85,14 +85,14 @@ describe("fflow render command", () => {
     expect(output).toContain("Follow this guide carefully.");
   });
 
-  test("--save writes .workflow.md alongside the YAML", () => {
+  test("--save writes .md alongside the YAML", () => {
     tmp = createTempDir("render");
     const yamlPath = join(tmp, "workflow.yaml");
     writeFileSync(yamlPath, MINIMAL_YAML);
 
     render({ fsmPath: yamlPath, save: true, json: false });
 
-    const mdPath = join(tmp, "workflow.workflow.md");
+    const mdPath = join(tmp, "workflow.md");
     expect(existsSync(mdPath)).toBe(true);
 
     const content = readFileSync(mdPath, "utf-8");
@@ -103,14 +103,14 @@ describe("fflow render command", () => {
     expect(existsSync(yamlPath)).toBe(true);
   });
 
-  test("--save with .yml extension writes .workflow.md", () => {
+  test("--save with .yml extension writes .md", () => {
     tmp = createTempDir("render");
     const ymlPath = join(tmp, "workflow.yml");
     writeFileSync(ymlPath, MINIMAL_YAML);
 
     render({ fsmPath: ymlPath, save: true, json: false });
 
-    const mdPath = join(tmp, "workflow.workflow.md");
+    const mdPath = join(tmp, "workflow.md");
     expect(existsSync(mdPath)).toBe(true);
   });
 
@@ -200,7 +200,7 @@ describe("fflow render command", () => {
     const envelope = JSON.parse(output);
     expect(envelope.ok).toBe(true);
     expect(envelope.data).toHaveProperty("output_path");
-    expect(envelope.data.output_path).toMatch(/\.workflow\.md$/);
+    expect(envelope.data.output_path).toMatch(/\.md$/);
   });
 
   test("-j flag with -o includes output_path in envelope", () => {

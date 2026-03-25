@@ -13,27 +13,20 @@ export interface RenderArgs {
 }
 
 /**
- * Derive the `.workflow.md` output path for `--save` mode.
+ * Derive the `.md` output path for `--save` mode.
  *
  * Rules:
- * - `workflow.yaml` → `workflow.workflow.md`
+ * - `workflow.yaml` → `workflow.md`
  * - `foo.workflow.yaml` → `foo.workflow.md`
- * - `bar.yml` → `bar.workflow.md`
+ * - `bar.yml` → `bar.md`
  */
 function deriveSavePath(fsmPath: string): string {
   const dir = dirname(fsmPath);
   const base = basename(fsmPath);
 
-  // Strip the YAML extension (.yaml or .yml)
-  const withoutExt = base.replace(/\.(yaml|yml)$/, "");
-
-  // If the name already ends with .workflow, replace with .workflow.md
-  if (withoutExt.endsWith(".workflow")) {
-    return join(dir, `${withoutExt}.md`);
-  }
-
-  // Otherwise append .workflow.md
-  return join(dir, `${withoutExt}.workflow.md`);
+  // Replace .yaml/.yml extension with .md
+  const mdName = base.replace(/\.(yaml|yml)$/, ".md");
+  return join(dir, mdName);
 }
 
 export function render(args: RenderArgs): void {
