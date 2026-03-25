@@ -34,26 +34,8 @@ export function stateCardFromFsm(stateName: string, fsmState: FsmState): StateCa
 const TODO_HEADER =
   "You MUST create a task for each of these items and complete them in order:";
 
-export interface StateCardOptions {
-  includeGuide?: boolean; // default true
-}
-
-export function formatStateCard(
-  card: StateCard,
-  fsmGuide?: string,
-  options?: StateCardOptions,
-): string {
+export function formatStateCard(card: StateCard): string {
   const lines: string[] = [];
-  const includeGuide = options?.includeGuide ?? true;
-
-  // State-level guide takes precedence over FSM-level guide
-  if (includeGuide) {
-    const guide = card.guide ?? fsmGuide;
-    if (guide) {
-      lines.push(guide);
-      lines.push("");
-    }
-  }
 
   lines.push(`You are in **${card.state}** state.`);
   lines.push("");
