@@ -1,6 +1,6 @@
 # Implementation Plan: Simplify FreeFlow Workflow Run
 
-## Step 1: Add `fflow render` command
+## ~~Step 1: Add `fflow render` command~~ ✓
 
 **Files:**
 - Create `src/commands/render.ts`
@@ -17,7 +17,7 @@
 
 **Acceptance:** `npm run fflow -- render spec-gen` outputs resolved markdown to stdout.
 
-## Step 2: Simplify state card output
+## ~~Step 2: Simplify state card output~~ ✓
 
 **Files:**
 - Edit `src/output.ts` — add `StateCardOptions` to `formatStateCard`
@@ -36,7 +36,7 @@
 
 **Acceptance:** `fflow start` shows guide+reminders. `fflow goto` (first visit) shows prompt only. `fflow goto` (revisit) shows lite card.
 
-## Step 3: Remove `fflow markdown convert`
+## ~~Step 3: Remove `fflow markdown convert`~~ ✓
 
 **Files:**
 - Delete `src/commands/markdown/convert.ts`
@@ -51,7 +51,7 @@
 
 **Acceptance:** `fflow markdown convert` returns "unknown command". `fflow render` works.
 
-## Step 4: Update `/fflow` skill
+## ~~Step 4: Update `/fflow` skill~~ ✓
 
 **Files:**
 - Edit `skills/fflow/SKILL.md`
@@ -67,7 +67,7 @@
 
 **Acceptance:** `/fflow spec-gen` renders and injects markdown. `/fflow --full spec-gen` uses CLI.
 
-## Step 5: Write e2e test plans
+## ~~Step 5: Write e2e test plans~~ ✓ (completed during spec phase)
 
 **Files:**
 - Create `specs/simplify-workflow-run/e2e.md`
