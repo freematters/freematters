@@ -34,14 +34,27 @@ export function stateCardFromFsm(stateName: string, fsmState: FsmState): StateCa
 const TODO_HEADER =
   "You MUST create a task for each of these items and complete them in order:";
 
-export function formatStateCard(card: StateCard, fsmGuide?: string): string {
+export interface StateCardOptions {
+  includeGuide?: boolean; // default true
+  includeReminders?: boolean; // default true
+}
+
+export function formatStateCard(
+  card: StateCard,
+  fsmGuide?: string,
+  options?: StateCardOptions,
+): string {
   const lines: string[] = [];
+  const includeGuide = options?.includeGuide ?? true;
+  const includeReminders = options?.includeReminders ?? true;
 
   // State-level guide takes precedence over FSM-level guide
-  const guide = card.guide ?? fsmGuide;
-  if (guide) {
-    lines.push(guide);
-    lines.push("");
+  if (includeGuide) {
+    const guide = card.guide ?? fsmGuide;
+    if (guide) {
+      lines.push(guide);
+      lines.push("");
+    }
   }
 
   lines.push(`You are in **${card.state}** state.`);
@@ -73,11 +86,13 @@ export function formatStateCard(card: StateCard, fsmGuide?: string): string {
     );
   }
 
-  lines.push("");
-  lines.push(
-    "IMPORTANT: You MUST NOT truncate fflow command output. " +
-      "Always read the complete output of fflow start, goto, and current commands.",
-  );
+  if (includeReminders) {
+    lines.push("");
+    lines.push(
+      "IMPORTANT: You MUST NOT truncate fflow command output. " +
+        "Always read the complete output of fflow start, goto, and current commands.",
+    );
+  }
 
   return lines.join("\n");
 }
@@ -137,7 +152,7 @@ export function formatLiteCard(card: StateCard): string {
   lines.push(
     `Re-entering **${card.state}** state. Instructions unchanged from previous visit.`,
   );
-  lines.push("Run `fflow current` or call `fsm_current` to review full instructions.");
+  lines.push("Run `fflow current` to review full instructions if you forget.");
 
   if (card.todos && card.todos.length > 0) {
     lines.push("");
