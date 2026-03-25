@@ -141,9 +141,7 @@ ${labels}`,
     } else if (result.alreadyVisited) {
       process.stdout.write(`${formatLiteCard(card)}\n`);
     } else {
-      process.stdout.write(
-        `${formatStateCard(card)}\n`,
-      );
+      process.stdout.write(`${formatStateCard(card)}\n`);
     }
   } catch (err: unknown) {
     handleError(err, args.json);
