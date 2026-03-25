@@ -41,13 +41,17 @@ fn parse_geocode_response(body: &str) -> Result<Location> {
 }
 
 /// Look up a location by name using the Open-Meteo geocoding API.
-pub async fn geocode(name: &str) -> Result<Location> {
+/// If `lang` is provided, location names are returned in that language.
+pub async fn geocode(name: &str, lang: Option<&str>) -> Result<Location> {
     let client = Client::builder()
         .timeout(Duration::from_secs(TIMEOUT_SECS))
         .build()
         .context("Failed to create HTTP client")?;
 
-    let url = format!("{GEOCODING_URL}?name={}&count=1", urlencoding(name));
+    let mut url = format!("{GEOCODING_URL}?name={}&count=1", urlencoding(name));
+    if let Some(lang) = lang {
+        url.push_str(&format!("&language={}", urlencoding(lang)));
+    }
 
     let resp = client
         .get(&url)

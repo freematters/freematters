@@ -13,6 +13,10 @@ struct Cli {
     #[arg(long, value_enum, global = true, default_value_t = UnitArg::Celsius)]
     units: UnitArg,
 
+    /// Language for location names (e.g., zh, ja, de, fr, es)
+    #[arg(long, global = true)]
+    lang: Option<String>,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -54,7 +58,9 @@ async fn main() {
     let cli = Cli::parse();
     let units: Units = cli.units.into();
 
-    if let Err(e) = run(cli.command, units).await {
+    let lang = cli.lang;
+
+    if let Err(e) = run(cli.command, units, lang.as_deref()).await {
         // Walk the anyhow error chain to find the most user-friendly message.
         // The outermost context is typically the user-facing message we attached.
         eprintln!("{e}");
@@ -62,15 +68,15 @@ async fn main() {
     }
 }
 
-async fn run(command: Command, units: Units) -> Result<()> {
+async fn run(command: Command, units: Units, lang: Option<&str>) -> Result<()> {
     match command {
         Command::Now { location } => {
-            let loc = geocode(&location).await?;
+            let loc = geocode(&location, lang).await?;
             let weather = fetch_current(&loc, units).await?;
             println!("{}", format_current(&loc, &weather, units));
         }
         Command::Forecast { location, days } => {
-            let loc = geocode(&location).await?;
+            let loc = geocode(&location, lang).await?;
             let forecast = fetch_forecast(&loc, days, units).await?;
             println!("{}", format_forecast(&loc, &forecast, units));
         }
