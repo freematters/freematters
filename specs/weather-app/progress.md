@@ -11,3 +11,9 @@
 - **What was built**: Location struct, geocode() function hitting Open-Meteo geocoding API
 - **Tests**: 2 tests added (all passing) — known city resolution, unknown city error
 - **Notes**: Tests hit real API, no mocking
+
+## Step 3: Weather Fetcher Module
+- **Files changed**: weather-cli/src/weather.rs
+- **What was built**: Current/DayForecast/HourForecast/WeatherData structs, fetch_weather() function hitting Open-Meteo forecast API
+- **Tests**: 1 integration test added (all passing) — verifies structure from real API call
+- **Notes**: Internal API response structs for nested JSON deserialization, unit conversion via API params
