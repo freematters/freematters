@@ -79,24 +79,14 @@ export function start(args: StartArgs): void {
         }),
       );
     } else {
-      const header = fsm.guide ? `FSM started. ${fsm.guide}` : "FSM started.";
+      const header = "FSM started.";
       const cardOutput = card.subagent
         ? formatSubagentDispatch(card, runId, fsm.guide)
-        : formatStateCard(card);
-      const reminders = [
-        "",
-        "IMPORTANT: Execute this state's instructions NOW. " +
-          "Do NOT stop or wait for user input between states. " +
-          "Only terminal states (no transitions) end the workflow.",
-        "",
-        "IMPORTANT: You MUST NOT truncate fflow command output. " +
-          "Always read the complete output of fflow start, goto, and current commands.",
-      ].join("\n");
+        : formatStateCard(card, fsm.guide);
       process.stdout.write(`${header}
 run_id: ${runId}
 
 ${cardOutput}
-${reminders}
 `);
     }
   } catch (err: unknown) {

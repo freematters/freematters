@@ -152,7 +152,7 @@ describe("Non-lite round-trip: revisits show lite cards", () => {
     expect(startResult.exitCode).toBe(0);
     expect(startResult.stdout).toContain("You are in **start** state.");
 
-    // 2. Goto review (first visit → full card without guide/reminders)
+    // 2. Goto review (first visit → full card with guide and reminders)
     const gotoReview = runCli(`goto review --run-id ${id} --on ready`, {
       root,
     });

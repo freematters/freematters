@@ -34,8 +34,15 @@ export function stateCardFromFsm(stateName: string, fsmState: FsmState): StateCa
 const TODO_HEADER =
   "You MUST create a task for each of these items and complete them in order:";
 
-export function formatStateCard(card: StateCard): string {
+export function formatStateCard(card: StateCard, fsmGuide?: string): string {
   const lines: string[] = [];
+
+  // State-level guide takes precedence over FSM-level guide
+  const guide = card.guide ?? fsmGuide;
+  if (guide) {
+    lines.push(guide);
+    lines.push("");
+  }
 
   lines.push(`You are in **${card.state}** state.`);
   lines.push("");
@@ -58,7 +65,19 @@ export function formatStateCard(card: StateCard): string {
     for (const [label, target] of entries) {
       lines.push(`  ${label} → ${target}`);
     }
+    lines.push("");
+    lines.push(
+      "IMPORTANT: Execute this state's instructions NOW. " +
+        "Do NOT stop or wait for user input between states. " +
+        "Only terminal states (no transitions) end the workflow.",
+    );
   }
+
+  lines.push("");
+  lines.push(
+    "IMPORTANT: You MUST NOT truncate fflow command output. " +
+      "Always read the complete output of fflow start, goto, and current commands.",
+  );
 
   return lines.join("\n");
 }

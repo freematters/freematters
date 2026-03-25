@@ -1,6 +1,6 @@
 ---
 name: fflow
-description: Start a workflow run. Default mode renders the full workflow as a prompt for self-managed execution. Use --full for CLI-tracked mode with hooks.
+description: Start a workflow run. Default uses fflow start with CLI tracking. Use --lite for lite mode, --markdown for prompt-only mode.
 ---
 
 # Start Workflow Run
@@ -9,13 +9,15 @@ Initialize a new workflow run from a workflow YAML file.
 
 ## Usage
 
-- `/fflow PATH` — lightweight mode (default). Renders workflow and injects as prompt.
-- `/fflow --full PATH` — full CLI-tracked mode with hooks and event sourcing.
+- `/fflow PATH` — normal mode (default). Uses `fflow start` with full CLI tracking.
+- `/fflow --lite PATH` — lite mode. Uses `fflow start --lite` (simplified cards on revisits).
+- `/fflow --markdown PATH` — markdown-only mode. Uses `fflow render` to inject the full workflow as a prompt. No CLI state tracking or hooks.
 
 ## Mode Detection
 
-1. If args contain `--full`: use **full mode** (see below).
-2. Otherwise: use **default lightweight mode** (see below).
+1. If args contain `--markdown`: use **markdown mode** (see below).
+2. If args contain `--lite`: use **lite mode** (see below).
+3. Otherwise: use **normal mode** (see below).
 
 Strip the mode flag from args before extracting PATH.
 
@@ -37,40 +39,9 @@ Use the format `<workflow-name>-$(date '+%Y%m%d%H%M%S')` where workflow-name is 
 
 ---
 
-## Default Lightweight Mode (`/fflow PATH`)
+## Normal Mode (`/fflow PATH`)
 
-This is the default. The agent reads the full workflow once and self-manages state transitions — no CLI calls after the initial render.
-
-### Process
-
-1. Complete the **Common Steps** above.
-2. Run:
-
-```bash
-fflow render <PATH>
-```
-
-This outputs the full resolved workflow as markdown to stdout.
-
-3. Read the **complete, untruncated** output. This is the entire workflow specification.
-
-4. You are now running a workflow. The full workflow is rendered above. Follow these rules:
-
-   - **Start at the initial state** (the first state in the document).
-   - **Read the state's instructions** and execute them fully.
-   - **Check transitions**: after completing a state's work, evaluate which transition condition is met and move to that target state.
-   - **Track your current state yourself** — there are no CLI commands to call.
-   - **Keep driving forward**: after every state transition, immediately execute the new state's instructions. Do NOT stop between states.
-   - **Terminal state**: a state with no transitions ends the workflow. Only stop when you reach a terminal state.
-   - **Guide rules**: if the workflow has a guide section, follow those rules throughout all states.
-
-5. Remember the run ID for reference, but do not use it for CLI state tracking.
-
----
-
-## Full Mode (`/fflow --full PATH`)
-
-Preserves the full CLI-tracked behavior with event sourcing and hooks.
+Full CLI-tracked mode with event sourcing and hooks.
 
 ### Process
 
@@ -101,6 +72,57 @@ The state card consists of instructions, todos and valid state transitions. Foll
 **Before ending a turn**: You MUST run `fflow current --run-id <run_id>` before ending your turn to check if there is remaining work in the current state. Only end your turn if the current state has no actionable work left or requires user input. This prevents accidentally dropping tasks mid-state.
 
 If the exit code of any CLI is not 0, the CLI will output the error message. Follow the error message on right actions to take.
+
+---
+
+## Lite Mode (`/fflow --lite PATH`)
+
+Same as normal mode but with `--lite` flag. Revisited states show simplified cards.
+
+### Process
+
+1. Complete the **Common Steps** above.
+
+2. **Run the CLI command:**
+
+```bash
+fflow start <PATH> --run-id <run-id> --lite
+```
+
+3. Follow the same **Flow CLI output** instructions as normal mode above.
+
+---
+
+## Markdown Mode (`/fflow --markdown PATH`)
+
+The agent reads the full workflow once and self-manages state transitions — no CLI calls after the initial render.
+
+### Process
+
+1. Complete the **Common Steps** above.
+2. Run:
+
+```bash
+fflow render <PATH>
+```
+
+This outputs the full resolved workflow as markdown to stdout.
+
+3. Read the **complete, untruncated** output. This is the entire workflow specification.
+
+4. You are now running a workflow. The full workflow is rendered above. Follow these rules:
+
+   - **Start at the initial state** (the first state in the document).
+   - **Read the state's instructions** and execute them fully.
+   - **Check transitions**: after completing a state's work, evaluate which transition condition is met and move to that target state.
+   - **Track your current state yourself** — there are no CLI commands to call.
+   - **Keep driving forward**: after every state transition, immediately execute the new state's instructions. Do NOT stop between states.
+   - **Terminal state**: a state with no transitions ends the workflow. Only stop when you reach a terminal state.
+   - **Guide rules**: if the workflow has a guide section, follow those rules throughout all states.
+
+5. Remember the run ID for reference, but do not use it for CLI state tracking.
+
+---
 
 ## Error Handling
 
