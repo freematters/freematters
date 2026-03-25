@@ -112,13 +112,13 @@ describe("plugin files", () => {
     expect(content.plugins[0].source).toBe("./");
   });
 
-  it("should have hooks/hooks.json with PostToolUse, SessionStart, SessionEnd", () => {
+  it("should have hooks/hooks.json with PostToolUse and SessionEnd", () => {
     const hooksPath = path.join(projectRoot, "hooks/hooks.json");
     expect(fs.existsSync(hooksPath)).toBe(true);
     const content = JSON.parse(fs.readFileSync(hooksPath, "utf-8"));
     expect(content.hooks).toBeDefined();
     expect(content.hooks.PostToolUse).toBeInstanceOf(Array);
-    expect(content.hooks.SessionStart).toBeInstanceOf(Array);
+    expect(content.hooks.SessionStart).toBeUndefined();
     expect(content.hooks.SessionEnd).toBeInstanceOf(Array);
   });
 
