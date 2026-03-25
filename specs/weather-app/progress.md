@@ -23,3 +23,9 @@
 - **What was built**: weather_code_to_emoji(), colorize_temp(), display_weather() with emoji icons and colored output
 - **Tests**: 16 unit tests added (all passing) — emoji mapping, temperature coloring, display doesn't panic
 - **Notes**: Merge required conflict resolution (Clone derives added to data structs)
+
+## Step 5: Main Pipeline & JSON Output
+- **Files changed**: weather-cli/src/main.rs, weather-cli/src/json.rs, weather-cli/src/display.rs
+- **What was built**: Full pipeline (args→geocode→fetch→display), JSON output mode, error handling with friendly messages
+- **Tests**: 6 tests added (31 total, all passing) — JSON validity, structure, field checks
+- **Notes**: Zero warnings after refactor
