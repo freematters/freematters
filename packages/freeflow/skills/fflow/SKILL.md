@@ -10,14 +10,12 @@ Initialize a new workflow run from a workflow YAML file.
 ## Usage
 
 - `/fflow PATH` — lightweight mode (default). Renders workflow and injects as prompt.
-- `/fflow --lite PATH` — same as default but with shorter framing.
 - `/fflow --full PATH` — full CLI-tracked mode with hooks and event sourcing.
 
 ## Mode Detection
 
 1. If args contain `--full`: use **full mode** (see below).
-2. If args contain `--lite`: use **lite mode** (see below).
-3. Otherwise: use **default lightweight mode** (see below).
+2. Otherwise: use **default lightweight mode** (see below).
 
 Strip the mode flag from args before extracting PATH.
 
@@ -67,27 +65,6 @@ This outputs the full resolved workflow as markdown to stdout.
    - **Guide rules**: if the workflow has a guide section, follow those rules throughout all states.
 
 5. Remember the run ID for reference, but do not use it for CLI state tracking.
-
----
-
-## Lite Mode (`/fflow --lite PATH`)
-
-Same as default lightweight mode with shorter framing.
-
-### Process
-
-1. Complete the **Common Steps** above.
-2. Run:
-
-```bash
-fflow render <PATH>
-```
-
-3. Read the complete output.
-
-4. Execute the workflow: start at the initial state, follow instructions, transition based on rules, track state yourself. Stop only at a terminal state (no transitions).
-
-5. Remember the run ID for reference.
 
 ---
 
