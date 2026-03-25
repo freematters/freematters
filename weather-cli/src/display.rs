@@ -3,7 +3,7 @@
 use colored::Colorize;
 
 use crate::geocoder::Location;
-use crate::weather::{Current, DayForecast, HourForecast, WeatherData};
+use crate::weather::WeatherData;
 
 /// Returns (emoji, description) for a WMO weather code.
 pub fn weather_code_to_emoji(code: u8) -> (&'static str, &'static str) {
@@ -106,6 +106,7 @@ pub fn display_weather(data: &WeatherData, loc: &Location) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::weather::{Current, DayForecast, HourForecast};
 
     // --- Weather code mapping tests ---
 
