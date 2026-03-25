@@ -79,10 +79,10 @@ export function start(args: StartArgs): void {
         }),
       );
     } else {
-      const header = "FSM started.";
+      const header = fsm.guide ? `FSM started. ${fsm.guide}` : "FSM started.";
       const cardOutput = card.subagent
         ? formatSubagentDispatch(card, runId, fsm.guide)
-        : formatStateCard(card, fsm.guide);
+        : formatStateCard(card);
       process.stdout.write(`${header}
 run_id: ${runId}
 
