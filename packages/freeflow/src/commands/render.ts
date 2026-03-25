@@ -3,14 +3,13 @@ import { basename, dirname, join } from "node:path";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import { serializeMarkdown } from "../markdown-serializer.js";
-import { handleError, jsonSuccess, printJson } from "../output.js";
+import { jsonSuccess, printJson } from "../output.js";
 
 export interface RenderArgs {
   fsmPath: string;
   output?: string;
   save?: boolean;
   json: boolean;
-  root: string;
 }
 
 /**
@@ -65,9 +64,11 @@ export function render(args: RenderArgs): void {
 
   if (args.save) {
     outputPath = deriveSavePath(args.fsmPath);
-    writeFileSync(outputPath, markdown, "utf-8");
   } else if (args.output) {
     outputPath = args.output;
+  }
+
+  if (outputPath) {
     writeFileSync(outputPath, markdown, "utf-8");
   }
 

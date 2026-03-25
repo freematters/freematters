@@ -209,7 +209,6 @@ program
         output: opts.output as string | undefined,
         save: (opts.save as boolean) ?? false,
         json: json ?? false,
-        root: resolveRoot(root),
       });
     } catch (err: unknown) {
       handleError(err, json ?? false);

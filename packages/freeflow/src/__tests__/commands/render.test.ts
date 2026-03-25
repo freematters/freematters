@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test } from "vitest";
 import { render } from "../../commands/render.js";
 import { CliError } from "../../errors.js";
 import { cleanupTempDir, createTempDir } from "../fixtures.js";
@@ -63,7 +63,7 @@ describe("fflow render command", () => {
     writeFileSync(yamlPath, MINIMAL_YAML);
 
     const output = captureStdout(() => {
-      render({ fsmPath: yamlPath, json: false, root: tmp });
+      render({ fsmPath: yamlPath, json: false });
     });
 
     expect(output).toContain("## State: start");
@@ -78,7 +78,7 @@ describe("fflow render command", () => {
     writeFileSync(yamlPath, YAML_WITH_GUIDE);
 
     const output = captureStdout(() => {
-      render({ fsmPath: yamlPath, json: false, root: tmp });
+      render({ fsmPath: yamlPath, json: false });
     });
 
     expect(output).toContain("## Guide");
@@ -90,7 +90,7 @@ describe("fflow render command", () => {
     const yamlPath = join(tmp, "workflow.yaml");
     writeFileSync(yamlPath, MINIMAL_YAML);
 
-    render({ fsmPath: yamlPath, save: true, json: false, root: tmp });
+    render({ fsmPath: yamlPath, save: true, json: false });
 
     const mdPath = join(tmp, "workflow.workflow.md");
     expect(existsSync(mdPath)).toBe(true);
@@ -108,7 +108,7 @@ describe("fflow render command", () => {
     const ymlPath = join(tmp, "workflow.yml");
     writeFileSync(ymlPath, MINIMAL_YAML);
 
-    render({ fsmPath: ymlPath, save: true, json: false, root: tmp });
+    render({ fsmPath: ymlPath, save: true, json: false });
 
     const mdPath = join(tmp, "workflow.workflow.md");
     expect(existsSync(mdPath)).toBe(true);
@@ -119,7 +119,7 @@ describe("fflow render command", () => {
     const yamlPath = join(tmp, "my-flow.workflow.yaml");
     writeFileSync(yamlPath, MINIMAL_YAML);
 
-    render({ fsmPath: yamlPath, save: true, json: false, root: tmp });
+    render({ fsmPath: yamlPath, save: true, json: false });
 
     const mdPath = join(tmp, "my-flow.workflow.md");
     expect(existsSync(mdPath)).toBe(true);
@@ -131,7 +131,7 @@ describe("fflow render command", () => {
     writeFileSync(yamlPath, MINIMAL_YAML);
 
     const outputPath = join(tmp, "custom-output.md");
-    render({ fsmPath: yamlPath, output: outputPath, json: false, root: tmp });
+    render({ fsmPath: yamlPath, output: outputPath, json: false });
 
     expect(existsSync(outputPath)).toBe(true);
     const content = readFileSync(outputPath, "utf-8");
@@ -143,13 +143,11 @@ describe("fflow render command", () => {
     const mdPath = join(tmp, "workflow.md");
     writeFileSync(mdPath, "# Not a YAML workflow");
 
-    expect(() => {
-      render({ fsmPath: mdPath, json: false, root: tmp });
-    }).toThrow(CliError);
-
     try {
-      render({ fsmPath: mdPath, json: false, root: tmp });
+      render({ fsmPath: mdPath, json: false });
+      expect.fail("should have thrown");
     } catch (err) {
+      expect(err).toBeInstanceOf(CliError);
       expect((err as CliError).code).toBe("ARGS_INVALID");
       expect((err as CliError).message).toMatch(/YAML input/i);
     }
@@ -160,25 +158,16 @@ describe("fflow render command", () => {
     const yamlPath = join(tmp, "workflow.yaml");
     writeFileSync(yamlPath, MINIMAL_YAML);
 
-    expect(() => {
-      render({
-        fsmPath: yamlPath,
-        output: join(tmp, "out.md"),
-        save: true,
-        json: false,
-        root: tmp,
-      });
-    }).toThrow(CliError);
-
     try {
       render({
         fsmPath: yamlPath,
         output: join(tmp, "out.md"),
         save: true,
         json: false,
-        root: tmp,
       });
+      expect.fail("should have thrown");
     } catch (err) {
+      expect(err).toBeInstanceOf(CliError);
       expect((err as CliError).code).toBe("ARGS_INVALID");
       expect((err as CliError).message).toMatch(/Cannot use both/);
     }
@@ -190,7 +179,7 @@ describe("fflow render command", () => {
     writeFileSync(yamlPath, MINIMAL_YAML);
 
     const output = captureStdout(() => {
-      render({ fsmPath: yamlPath, json: true, root: tmp });
+      render({ fsmPath: yamlPath, json: true });
     });
 
     const envelope = JSON.parse(output);
@@ -205,7 +194,7 @@ describe("fflow render command", () => {
     writeFileSync(yamlPath, MINIMAL_YAML);
 
     const output = captureStdout(() => {
-      render({ fsmPath: yamlPath, save: true, json: true, root: tmp });
+      render({ fsmPath: yamlPath, save: true, json: true });
     });
 
     const envelope = JSON.parse(output);
@@ -221,7 +210,7 @@ describe("fflow render command", () => {
 
     const outputPath = join(tmp, "custom.md");
     const output = captureStdout(() => {
-      render({ fsmPath: yamlPath, output: outputPath, json: true, root: tmp });
+      render({ fsmPath: yamlPath, output: outputPath, json: true });
     });
 
     const envelope = JSON.parse(output);
