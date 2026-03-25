@@ -26,7 +26,7 @@ npm link
 codoc install claude   # generates hooks.json with absolute paths, registers plugin
 ```
 
-Server is auto-started/stopped by SessionStart/SessionEnd hooks (ref-counted across sessions).
+Server is auto-stopped by SessionEnd hook (ref-counted across sessions). Start the server manually with `codoc server`.
 
 ## Config
 
