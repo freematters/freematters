@@ -142,7 +142,7 @@ ${labels}`,
       process.stdout.write(`${formatLiteCard(card)}\n`);
     } else {
       process.stdout.write(
-        `${formatStateCard(card, undefined, { includeGuide: false, includeReminders: false })}\n`,
+        `${formatStateCard(card, undefined, { includeGuide: false })}\n`,
       );
     }
   } catch (err: unknown) {

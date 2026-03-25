@@ -36,7 +36,6 @@ const TODO_HEADER =
 
 export interface StateCardOptions {
   includeGuide?: boolean; // default true
-  includeReminders?: boolean; // default true
 }
 
 export function formatStateCard(
@@ -46,7 +45,6 @@ export function formatStateCard(
 ): string {
   const lines: string[] = [];
   const includeGuide = options?.includeGuide ?? true;
-  const includeReminders = options?.includeReminders ?? true;
 
   // State-level guide takes precedence over FSM-level guide
   if (includeGuide) {
@@ -78,22 +76,6 @@ export function formatStateCard(
     for (const [label, target] of entries) {
       lines.push(`  ${label} → ${target}`);
     }
-    if (includeReminders) {
-      lines.push("");
-      lines.push(
-        "IMPORTANT: Execute this state's instructions NOW. " +
-          "Do NOT stop or wait for user input between states. " +
-          "Only terminal states (no transitions) end the workflow.",
-      );
-    }
-  }
-
-  if (includeReminders) {
-    lines.push("");
-    lines.push(
-      "IMPORTANT: You MUST NOT truncate fflow command output. " +
-        "Always read the complete output of fflow start, goto, and current commands.",
-    );
   }
 
   return lines.join("\n");
