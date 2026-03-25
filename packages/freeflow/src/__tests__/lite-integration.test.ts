@@ -140,6 +140,42 @@ describe("Full round-trip: lite mode", () => {
   });
 });
 
+// ─── Guide and reminders behavior ─────────────────────────
+
+describe("Guide and reminders in state cards", () => {
+  test("fflow start includes guide in header", () => {
+    const root = join(tmp, "guide-start-root");
+    const id = uniqueRunId("guide-start");
+
+    const result = runCli(`start ${fsmMulti} --run-id ${id}`, { root });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Multi-state workflow");
+    expect(result.stdout).toContain("Execute this state's instructions NOW");
+    expect(result.stdout).toContain("MUST NOT truncate");
+  });
+
+  test("fflow start --lite includes guide in header", () => {
+    const root = join(tmp, "guide-lite-root");
+    const id = uniqueRunId("guide-lite");
+
+    const result = runCli(`start ${fsmMulti} --run-id ${id} --lite`, { root });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Multi-state workflow");
+  });
+
+  test("fflow goto first visit has reminders but no guide", () => {
+    const root = join(tmp, "guide-goto-root");
+    const id = uniqueRunId("guide-goto");
+
+    runCli(`start ${fsmMulti} --run-id ${id}`, { root });
+    const gotoResult = runCli(`goto review --run-id ${id} --on ready`, { root });
+    expect(gotoResult.exitCode).toBe(0);
+    expect(gotoResult.stdout).toContain("Execute this state's instructions NOW");
+    expect(gotoResult.stdout).toContain("MUST NOT truncate");
+    expect(gotoResult.stdout).not.toContain("Multi-state workflow");
+  });
+});
+
 // ─── Non-lite round-trip: full cards always ───────────────
 
 describe("Non-lite round-trip: always full cards", () => {
