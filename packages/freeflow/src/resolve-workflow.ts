@@ -22,6 +22,7 @@ function hasWorkflowExtension(name: string): boolean {
     ".fsm.yaml",
     ".fsm.yml",
     ".workflow.md",
+    ".md",
   ].some((ext) => name.endsWith(ext));
 }
 

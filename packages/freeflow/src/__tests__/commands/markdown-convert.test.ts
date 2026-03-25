@@ -146,4 +146,59 @@ describe("markdown convert command", () => {
     expect(envelope.ok).toBe(true);
     expect(envelope.data).toHaveProperty("output_path");
   });
+
+  test("workflow.yaml outputs workflow.md (not workflow.workflow.md)", () => {
+    tmp = createTempDir("md-convert");
+    const yamlPath = join(tmp, "workflow.yaml");
+    writeFileSync(yamlPath, MINIMAL_YAML);
+
+    convert({ filePath: yamlPath, json: false });
+
+    expect(existsSync(join(tmp, "workflow.md"))).toBe(true);
+    expect(existsSync(join(tmp, "workflow.workflow.md"))).toBe(false);
+  });
+
+  test("foo.workflow.yaml outputs foo.workflow.md", () => {
+    tmp = createTempDir("md-convert");
+    const yamlPath = join(tmp, "foo.workflow.yaml");
+    writeFileSync(yamlPath, MINIMAL_YAML);
+
+    convert({ filePath: yamlPath, json: false });
+
+    expect(existsSync(join(tmp, "foo.workflow.md"))).toBe(true);
+  });
+
+  test("workflow.md outputs workflow.yaml", () => {
+    tmp = createTempDir("md-convert");
+    const mdPath = join(tmp, "workflow.md");
+    writeFileSync(mdPath, MINIMAL_MD);
+
+    convert({ filePath: mdPath, json: false });
+
+    expect(existsSync(join(tmp, "workflow.yaml"))).toBe(true);
+  });
+
+  test("bar.workflow.md outputs bar.workflow.yaml", () => {
+    tmp = createTempDir("md-convert");
+    const mdPath = join(tmp, "bar.workflow.md");
+    writeFileSync(mdPath, MINIMAL_MD);
+
+    convert({ filePath: mdPath, json: false });
+
+    expect(existsSync(join(tmp, "bar.workflow.yaml"))).toBe(true);
+  });
+
+  test(".md file is accepted as MD-to-YAML input", () => {
+    tmp = createTempDir("md-convert");
+    const mdPath = join(tmp, "myflow.md");
+    writeFileSync(mdPath, MINIMAL_MD);
+
+    convert({ filePath: mdPath, json: false });
+
+    expect(existsSync(join(tmp, "myflow.yaml"))).toBe(true);
+
+    const content = readFileSync(join(tmp, "myflow.yaml"), "utf-8");
+    expect(content).toContain("version: 1");
+    expect(content).toContain("initial: start");
+  });
 });
