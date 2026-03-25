@@ -14,7 +14,7 @@ graph LR
 ```
 
 ## Checklist
-- [ ] Step 1: Project scaffold & CLI parser
+- [x] Step 1: Project scaffold & CLI parser
 - [ ] Step 2: Geocoder module
 - [ ] Step 3: Weather fetcher module
 - [ ] Step 4: Terminal formatter
