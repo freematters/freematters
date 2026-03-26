@@ -12,6 +12,11 @@ guide: |
   - Respond to user rebuttals on bot-authored threads
   - Detect and reply to pending user notes on bot threads
 
+  ## GitHub CLI
+
+  Read `$SCRIPT_DIR/../references/github-cli.md` for CLI conventions, auth, GraphQL tips,
+  thread resolution, review submission, and error handling.
+
 
 initial: init
 states:
@@ -23,77 +28,30 @@ states:
 
       ## 1. Verify authentication
 
-      ```bash
-      gh auth status
-      ```
-
-      If not authenticated, stop and ask the user to run `gh auth login`.
+      Verify GitHub authentication (see reference). If not authenticated, stop.
 
       ## 2. Identify the repo and PR
 
-      ```bash
-      gh repo view --json owner,name -q '"\(.owner.login)/\(.name)"'
-      gh pr view --json number,baseRefName,headRefName,headRefOid,url
-      ```
-
-      Record owner, repo, PR number, base branch, head commit SHA, and URL for subsequent states.
+      Get the repo owner/name and PR metadata (number, base branch, head branch, head SHA, URL).
+      Record these for subsequent states.
 
       ## 3. Fetch diff + API data (parallel)
 
-      Run these commands **in parallel** (all are independent):
+      Run these **in parallel** (all independent):
 
-      **a) Save the full diff and changed files list to temp files:**
-      ```bash
-      gh pr diff > /tmp/pr_diff.txt
-      ```
-      ```bash
-      gh pr diff --name-only > /tmp/pr_changed_files.txt
-      ```
+      **a)** Save the full diff to `/tmp/pr_diff.txt` and changed files list to `/tmp/pr_changed_files.txt`.
 
-      **b) Fetch existing review threads** via GraphQL:
-      ```bash
-      gh api graphql -f query='
-        query($owner: String!, $repo: String!, $pr: Int!) {
-          repository(owner: $owner, name: $repo) {
-            pullRequest(number: $pr) {
-              reviewThreads(first: 100) {
-                nodes {
-                  id
-                  isResolved
-                  comments(first: 20) {
-                    nodes {
-                      id
-                      databaseId
-                      body
-                      createdAt
-                      author { login __typename }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      ' -f owner={owner} -f repo={repo} -F pr={pr_number}
-      ```
-
-      **c) Fetch existing summary comment:**
-      ```bash
-      gh api repos/{owner}/{repo}/issues/{pr_number}/comments
-      ```
-
-      For each thread, record:
-      - `id` (node ID, e.g. `PRT_kwDOxxxx`) — needed for resolveReviewThread mutation
+      **b)** Fetch existing review threads via GraphQL (see reference for query conventions).
+      Query the PR's `reviewThreads` (first 100, paginate if needed). For each thread, record:
+      - `id` (node ID, e.g. `PRT_kwDOxxxx`) — needed for thread resolution
       - `isResolved` — skip resolved threads in later phases
       - `comments` — full conversation history
 
       Bot-authored threads: `comments.nodes[0].author.__typename == "Bot"`
       (covers `claude[bot]`, `github-actions[bot]`, and any other GitHub App).
 
-      > Note: `first: 100` may not cover all threads on large PRs with many review rounds.
-      > If the response indicates more pages exist, paginate using the `after` cursor.
-
-      Look for a comment whose body starts with `<!-- code-review -->`. Record its `id` if found.
+      **c)** Fetch existing PR issue comments. Look for one whose body starts with
+      `<!-- code-review -->`. Record its `id` if found.
 
       ## Error handling
       - If any API call fails, skip and continue to the next step
@@ -120,9 +78,8 @@ states:
       ## Derive SCRIPT_DIR
 
       The review agent prompts reference `$SCRIPT_DIR` for agent instruction files.
-      Derive it from the workflow YAML path:
       ```bash
-      SCRIPT_DIR="$(dirname "$(readlink -f "$(fflow current --run-id <run_id> -j | jq -r '.data.fsm_path')")")"
+      SCRIPT_DIR=$(fflow resolve code-review --wf-dir)
       ```
 
       ## Concurrent subagent review
@@ -190,12 +147,7 @@ states:
          - **User asks for clarification**: Reply with reasoning and impact.
          - **User asks for suggestion**: Reply with concrete fix and code example.
 
-      ```bash
-      gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
-        -f body="[reply content]"
-      ```
-
-      Record response statistics for the summary.
+      Reply to the thread (see reference for reply API). Record response statistics for the summary.
 
       ## 2. Auto-resolve fixed threads
 
@@ -204,22 +156,8 @@ states:
       2. Read the current version of the relevant file
       3. Determine if the flagged issue has been fixed (not just "file changed" —
          verify the specific problem is resolved)
-      4. If confirmed fixed, reply then resolve via GraphQL:
-
-      ```bash
-      gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
-        -f body="Verified fixed and resolved - [short description of what was fixed]"
-      ```
-
-      ```bash
-      gh api graphql -f query='
-        mutation($threadId: ID!) {
-          resolveReviewThread(input: {threadId: $threadId}) {
-            thread { isResolved }
-          }
-        }
-      ' -f threadId="{thread_node_id}"
-      ```
+      4. If confirmed fixed, reply with a description of what was fixed, then resolve the
+         thread (see reference for thread resolution).
 
       Only resolve bot-authored threads (`__typename == "Bot"`), never human-posted ones.
       Record auto-resolve count.
@@ -236,28 +174,8 @@ states:
       > received existing threads). This pass catches duplicates across agents and
       > issues that survived the first pass.
 
-      Submit all new comments as a single review:
-
-      ```bash
-      gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
-        --input /tmp/review_payload.json
-      ```
-
-      Payload:
-      ```json
-      {
-        "commit_id": "<head commit SHA from init step 2>",
-        "event": "COMMENT",
-        "comments": [
-          {
-            "path": "path/to/file",
-            "line": 42,
-            "side": "RIGHT",
-            "body": "**blocker**: [description]\n\n[detail and suggestion]"
-          }
-        ]
-      }
-      ```
+      Submit all new comments as a single PR review (see reference for review submission API).
+      Use the head commit SHA from init, event `COMMENT`, and include path/line/body for each.
 
       Rules:
       - Lead with severity: **blocker** / **major**
@@ -304,17 +222,8 @@ states:
       - `file/path:line` — [description]
       ```
 
-      If a summary comment was found in init (by `<!-- code-review -->` marker), update it:
-      ```bash
-      gh api repos/{owner}/{repo}/issues/comments/{comment_id} \
-        -X PATCH -f body="$(cat /tmp/summary.md)"
-      ```
-
-      Otherwise, create a new one:
-      ```bash
-      gh api repos/{owner}/{repo}/issues/{pr_number}/comments \
-        -f body="$(cat /tmp/summary.md)"
-      ```
+      If a summary comment was found in init (by `<!-- code-review -->` marker), update it
+      in-place. Otherwise, create a new issue comment with the summary.
 
       ## Error handling
       - If any API call fails, skip and continue to the next one

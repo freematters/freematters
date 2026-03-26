@@ -54,3 +54,24 @@ Use `gh pr checks <N>` instead of raw `/commits/{sha}/check-runs` API.
 
 All bot-authored comments MUST start with `[from bot]` to distinguish agent-generated
 comments from human-authored ones.
+
+## PR Review Submission
+
+Submit a review with comments:
+```bash
+gh api repos/{owner}/{repo}/pulls/{pr_number}/reviews \
+  -f event=COMMENT -f body="..." -f 'comments[]=...'
+```
+
+## Reply to Review Thread
+
+```bash
+gh api repos/{owner}/{repo}/pulls/{pr_number}/comments/{comment_id}/replies \
+  -f body="[from bot] ..."
+```
+
+## Error Handling
+
+- **Rate limit (429)**: Read `X-RateLimit-Reset` header, wait until reset, retry.
+- **Network errors**: Retry after 5s, fail after 3 attempts.
+- **Issue body update conflict**: Re-read the current body, re-apply changes, retry.

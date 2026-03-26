@@ -63,10 +63,7 @@ states:
 
       **Issue mode (GitHub)**:
 
-      1. Validate the issue exists and has the `spec-ready` label:
-         ```bash
-         gh api 'repos/{owner}/{repo}/issues/{issue_number}' --jq '.labels[].name'
-         ```
+      1. Check if the issue has the `spec-ready` label.
          If no `spec-ready` label, warn the user and ask if they want to proceed anyway.
 
       2. Download spec artifacts:
@@ -82,10 +79,7 @@ states:
 
       **Issue mode (GitLab)**:
 
-      1. Validate the issue exists and has the `spec-ready` label:
-         ```bash
-         glab issue view {iid} -F json | jq '[.labels[]]'
-         ```
+      1. Check if the issue has the `spec-ready` label.
          If no `spec-ready` label, warn the user and ask if they want to proceed anyway.
 
       2. Download spec artifacts from GitLab issue notes:
@@ -257,16 +251,13 @@ states:
          git push -u origin {branch_name}   # first push
          git push                            # subsequent pushes
          ```
-      7. Update the issue description checklist:
-         ```bash
-         glab issue update {iid} -d "<updated body>"
+      7. Update the issue description checklist.
+      8. Post a `[from bot]` progress note on the issue with step completion details:
          ```
-      8. Post a `[from bot]` progress note:
-         ```bash
-         glab issue note {iid} -m "[from bot] Step N/M complete: <step title>
+         [from bot] Step N/M complete: <step title>
          - **Commit**: {sha}
          - **Files changed**: <list of key files>
-         - **Tests**: <count> added, all passing"
+         - **Tests**: <count> added, all passing
          ```
 
       Then proceed to the next wave. Repeat until all steps are complete.
@@ -501,12 +492,7 @@ states:
          Re-read the current issue body, then update the `### E2E Testing` subsection with
          the actual result (pass/fail, attempt count). If the section doesn't exist, add it.
 
-      5. Remove `doing` label and add `done` label to the issue:
-         ```bash
-         gh issue edit {issue_number} --repo {owner}/{repo} --remove-label doing
-         gh label create done --repo {owner}/{repo} --description "Implementation complete" --color 0E8A16 2>/dev/null || true
-         gh issue edit {issue_number} --repo {owner}/{repo} --add-label done
-         ```
+      5. Remove the `doing` label and add the `done` label to the issue (create the label first if it doesn't exist).
 
       ### Issue mode additional steps (GitLab)
 
@@ -517,30 +503,21 @@ states:
          git push
          ```
 
-      2. Post the implementation summary as a `[from bot]` note on the issue:
-         ```bash
-         glab issue note {iid} -m "[from bot] ## implementation-summary.md
+      2. Post the implementation summary as a `[from bot]` note on the issue, including the branch name and MR instructions:
+         ```
+         [from bot] ## implementation-summary.md
 
          {full content of implementation-summary.md}
 
          ---
-         **Branch**: \`{branch_name}\`
-         Ready for MR — run \`/mr\` to create a merge request."
+         **Branch**: `{branch_name}`
+         Ready for MR — run `/mr` to create a merge request.
          ```
 
       3. Write `./specs/<slug>/source-issue` containing the GitLab issue reference
          (e.g., `project/path#42`) so that mr-lifecycle can link the MR to the issue.
 
-      4. Update the issue description's `### E2E Testing` subsection with the actual result:
-         ```bash
-         # Re-read current description
-         glab issue view {iid} -F json | jq -r '.description'
-         # Update with modified description
-         glab issue update {iid} -d "<updated description>"
-         ```
+      4. Update the issue description's `### E2E Testing` subsection with actual results.
 
-      5. Update issue labels:
-         ```bash
-         glab issue update {iid} -u doing -l done
-         ```
+      5. Update issue labels: remove `doing`, add `done`.
     transitions: {}

@@ -81,12 +81,8 @@ states:
 
       Parse the user's prompt to determine the input mode.
 
-      Auto-detect the GitLab hostname and project path from the git remote:
-      ```bash
-      GITLAB_HOST=$(git remote get-url origin | sed -n 's|.*://\([^/]*\)/.*|\1|p; s|.*@\([^:]*\):.*|\1|p')
-      PROJECT_PATH=$(git remote get-url origin | sed 's|.*://[^/]*/||;s|\.git$||' | sed 's|.*:||')
-      ```
-      Remember `gitlab_url = "https://$GITLAB_HOST"` and `project_path`.
+      Auto-detect the GitLab hostname and project path from the git remote.
+      Remember `gitlab_url` and `project_path`.
 
       ### Existing Issue (GitLab URL or `project/path#N`)
 
@@ -101,16 +97,9 @@ states:
 
       For either pattern:
 
-      1. Verify the issue exists:
-         ```bash
-         glab issue view $ISSUE_IID -F json | jq -r '.title'
-         ```
-         If this fails, report the error and stop.
-      2. Fetch issue context:
-         ```bash
-         glab issue view $ISSUE_IID -F json | jq '{title: .title, description: .description, creator: .author.username, labels: .labels}'
-         ```
-      3. Extract and remember: `project_path`, `issue_iid`, `issue_creator` = `.creator`.
+      1. Verify the issue exists and fetch its context (title, description, creator, labels).
+         If the issue doesn't exist, report the error and stop.
+      2. Extract and remember: `project_path`, `issue_iid`, `issue_creator`.
       4. Derive `slug` from the issue title (lowercase, hyphens, no special chars).
       5. Transition to `proceed`.
 

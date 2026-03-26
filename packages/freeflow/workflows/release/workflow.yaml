@@ -3,6 +3,10 @@ guide: |
   General release workflow for GitHub projects.
   Opens a release PR, merges after CI, tags and publishes.
 
+  ## GitHub CLI
+
+  Read `$SCRIPT_DIR/../references/github-cli.md` for CLI conventions and auth.
+
   ## Configuration (set these before starting)
 
   The workflow prompts reference these variables. Before entering the `bump` state,
@@ -91,14 +95,8 @@ states:
 
       ## 5. Open PR
 
-      Use the release notes as the PR body:
-
-      ```bash
-      gh pr create --title "release: ${TAG_PREFIX}${VERSION}" \
-        --body-file "$WF_DIR/RELEASE_NOTES.md"
-      ```
-
-      Record the PR number and VERSION for the next state.
+      Create a PR with title `release: ${TAG_PREFIX}${VERSION}` using the release notes
+      as the body. Record the PR number and VERSION for the next state.
     transitions:
       pr opened: ci
 
@@ -106,32 +104,14 @@ states:
     prompt: |
       # Phase: Wait for CI
 
-      Poll the PR checks until all pass:
+      Watch the PR checks until all pass.
 
-      ```bash
-      gh pr checks <pr_number> --watch
-      ```
-
-      - If all checks pass, merge the PR.
-      - If a **lint** or **format** check fails and FORMAT_CMD is configured, auto-fix locally and push:
-        ```bash
-        cd ${PKG_DIR}
-        ${FORMAT_CMD}
-        cd <repo_root>
-        git add -u && git commit -m "fix: auto-fix lint" && git push
-        ```
-        Then re-poll.
+      - If all checks pass, merge the PR (squash, delete branch).
+      - If a **lint** or **format** check fails and FORMAT_CMD is configured, auto-fix locally
+        (`${FORMAT_CMD}`), commit, push, then re-poll.
       - If any other check fails, show the failure and stop — ask the user how to proceed.
 
-      ```bash
-      gh pr merge <pr_number> --squash --delete-branch
-      ```
-
-      Pull the merged main:
-      ```bash
-      git checkout main
-      git pull --ff-only
-      ```
+      After merge, checkout main and pull.
     transitions:
       merged: tag
 
@@ -158,37 +138,20 @@ states:
 
       ## 1. Find the release workflow run
 
-      If RELEASE_WORKFLOW is configured:
-      ```bash
-      gh run list --workflow=${RELEASE_WORKFLOW} --limit=1 --json databaseId,status,conclusion
-      ```
-
+      If RELEASE_WORKFLOW is configured, find the latest run for the workflow.
       If no release workflow is configured, skip to step 3 (verify).
 
       ## 2. Watch until completion
 
-      ```bash
-      gh run watch <run_id>
-      ```
+      Watch the workflow run until it completes.
 
       ## 3. Verify
 
       Once the run completes (or if no workflow):
 
-      - If **success** (or no workflow): create/update the release with generated notes and show the URL.
-        ```bash
-        if gh release view "${TAG_PREFIX}${VERSION}" &>/dev/null; then
-          gh release edit "${TAG_PREFIX}${VERSION}" --notes-file "$WF_DIR/RELEASE_NOTES.md"
-        else
-          gh release create "${TAG_PREFIX}${VERSION}" --title "${TAG_PREFIX}${VERSION}" \
-            --notes-file "$WF_DIR/RELEASE_NOTES.md"
-        fi
-        gh release view "${TAG_PREFIX}${VERSION}" --json url -q '.url'
-        ```
-      - If **failure**: show the error.
-        ```bash
-        gh run view <run_id> --log-failed | tail -30
-        ```
+      - If **success** (or no workflow): create or update the GitHub release with the
+        generated notes file, then show the release URL.
+      - If **failure**: show the failed job logs.
     transitions:
       release succeeded: done
       release failed: done

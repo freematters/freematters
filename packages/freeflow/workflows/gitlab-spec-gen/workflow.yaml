@@ -66,19 +66,12 @@ guide: |
      <design content here>
      ```
 
-  2. Post the local file as an issue note and capture the note ID:
-     ```bash
-     NOTE_ID=$(glab api -X POST "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes" \
-       -F body=@"$ARTIFACTS/<filename>" | jq -r '.id')
-     ```
+  2. Post the local file as an issue note using file-body upload (`glab api`, see reference)
+     and capture the note ID.
      Note: `glab api` is used here (not `glab issue note`) because `-F body=@file`
      reads the note body from a file, which the native command doesn't support.
 
-  3. Save the note ID to the tracking file:
-     ```bash
-     jq --arg k "<filename>" --argjson v "$NOTE_ID" '. + {($k): $v}' \
-       "$IDS_FILE" > "$IDS_FILE.tmp" && mv "$IDS_FILE.tmp" "$IDS_FILE"
-     ```
+  3. Save the note ID to the tracking file (`$IDS_FILE`) keyed by filename.
 
   #### Updating an Artifact (In-Place Edit)
 
@@ -87,12 +80,8 @@ guide: |
   1. Edit the local cache file using the **Edit tool**. This sends only the diff
      through the LLM session, avoiding full content round-trips.
 
-  2. Push the updated file to GitLab by patching the existing note in-place:
-     ```bash
-     NOTE_ID=$(jq -r '.["<filename>"]' "$IDS_FILE")
-     glab api -X PUT "projects/$ENCODED_PATH/issues/$ISSUE_IID/notes/$NOTE_ID" \
-       -F body=@"$ARTIFACTS/<filename>"
-     ```
+  2. Look up the note ID from `$IDS_FILE` and update the existing note in-place
+     with the updated file content (glab api PUT, see reference).
 
   Do NOT create new notes — always edit in place.
 
@@ -144,9 +133,8 @@ guide: |
   ### Status Checklist Updates
 
   The issue body (description) contains a status checklist. When completing a phase,
-  re-read the current description (`glab issue view <iid> -F json | jq -r .description`),
-  check off the phase, and update (`glab issue update <iid> -d "..."`).
-  You MUST re-read before editing to avoid overwriting concurrent changes.
+  re-read the current issue description, check off the completed phase, and update the
+  description. You MUST re-read before editing to avoid overwriting concurrent changes.
 
   The status checklist items are:
   - [ ] gathering requirements
@@ -178,11 +166,8 @@ states:
     prompt: |
       ## Create Issue
 
-      Before anything else, verify GitLab CLI authentication:
-      ```bash
-      glab auth status
-      ```
-      If this fails, tell the user to run `glab auth login` and stop.
+      Before anything else, verify GitLab authentication (see reference).
+      If this fails, tell the user to authenticate and stop.
 
       Parse the user's prompt to extract:
       1. **Project path**: Auto-detect from git remote if not specified.
@@ -192,10 +177,7 @@ states:
 
       Then:
 
-      1. Create the issue:
-         ```bash
-         glab issue create -t "{title}" -d "{body}" --no-editor
-         ```
+      1. Create a GitLab issue with the title and body.
          If this fails with 404/403, report the error and ask the user to check permissions.
 
          The issue body MUST follow this structure:
@@ -215,14 +197,10 @@ states:
          ```
 
       2. From the output, extract the issue URL and IID. Get the authenticated
-         username via `glab api user | jq -r .username`.
+         user's username (see reference).
          Remember `issue_iid`, `issue_creator`. Report the issue URL to the user.
 
-      3. Post a welcome note on the issue:
-         ```bash
-         glab issue note $ISSUE_IID -m '[bot reply] ...'
-         ```
-         Content:
+      3. Post a welcome note on the issue with the following content:
          ```
          [bot reply] Welcome! I'll guide you through a spec generation process on this issue.
 
@@ -363,22 +341,12 @@ states:
       Finalize the issue by adding the label, completing the status checklist, and posting a summary.
 
       Steps:
-      1. Add the `spec-ready` label to the issue:
-         ```bash
-         # Create label if it doesn't exist (glab api — no native command for this)
-         glab api -X POST "projects/$ENCODED_PATH/labels" \
-           -f name=spec-ready -f color="#0E8A16" 2>/dev/null || true
-         # Add to issue
-         glab issue update $ISSUE_IID -l spec-ready
-         ```
+      1. Create the `spec-ready` label via API if it doesn't already exist (see reference),
+         then add the `spec-ready` label to the issue.
 
       2. Update the issue description status checklist: check off ALL remaining items including "spec-ready".
 
-      3. Compile a list of all artifact notes from the ID tracking file:
-         ```bash
-         IDS_FILE="$HOME/.freeflow/runs/{run_id}/artifact_note_ids.json"
-         cat "$IDS_FILE"
-         ```
+      3. Compile a list of all artifact notes from the ID tracking file (`$IDS_FILE`).
          For each artifact, include its filename and a link to the note (using the issue
          note URL format: `{gitlab_url}/{project_path}/-/issues/{iid}#note_{note_id}`).
 

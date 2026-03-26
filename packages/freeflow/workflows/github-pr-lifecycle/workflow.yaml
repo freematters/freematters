@@ -46,16 +46,15 @@ initial: create-pr
 states:
   create-pr:
     prompt: |
-      Verify authentication: run `gh auth status`. If not logged in, prompt user to run `gh auth login`.
+      Verify GitHub authentication (see reference). If not logged in, prompt user to authenticate.
 
       Once authenticated:
       - Run lint/format checks (refer to project CLAUDE.md for check commands). Fix any failures first.
       - **Exclude spec directory**: If a `./specs/<feature>/` directory exists for this feature,
-        ensure it is NOT included in the PR. Add it to `.gitignore` or `git reset HEAD specs/`
+        ensure it is NOT included in the PR. Add it to `.gitignore` or unstage it
         before committing. Spec artifacts are working documents and should not ship with the PR.
       - Commit all local changes.
-      - Check if the current branch already has an open PR:
-        `gh pr list --head <branch> --json number,url`
+      - Check if the current branch already has an open PR.
         If one exists, push the branch, record the URL and number, and check if the description needs updating.
       - If none exists, create a new PR:
         - Target branch: Use user-specified branch if provided, otherwise use the repo's default branch.
@@ -64,7 +63,6 @@ states:
         - Check for `./specs/*/source-issue` — if it exists, read the issue reference
           (e.g., `owner/repo#42`) and add `Closes #N` or `Resolves owner/repo#N` to the
           PR description to link the PR to the source issue.
-        - Create via `gh pr create`
 
       After the PR is created (or found), post a **PR comment** with:
       1. **Implementation summary**: A concise overview of what was implemented and key design decisions.
@@ -143,10 +141,7 @@ states:
       ## Steps
 
       1. Read `WF_DIR/pr_status.json` — check `ci.checks` for failed checks.
-      2. Read the failed job logs to understand the failures:
-         ```bash
-         gh run view <run_id> --log-failed
-         ```
+      2. Read the failed job logs to understand the failures (see reference for viewing run logs).
       3. Fix the code to resolve the CI failures.
       4. Run lint/format/unit tests locally to confirm the fix doesn't introduce new issues
          (refer to project CLAUDE.md for check commands).
@@ -169,23 +164,13 @@ states:
       ## Pre-check: verify PR is still open
 
       The target branch may have been updated because THIS PR was just merged.
-      Before rebasing, wait 2 seconds and then check if the PR was already merged:
-      ```bash
-      sleep 2
-      gh pr view <pr_number> --json state --jq '.state'
-      ```
+      Before rebasing, wait 2 seconds and then check if the PR is still open.
       If the state is `MERGED` or `CLOSED`, skip the rebase and transition to `PR merged`.
 
       ## Steps
 
-      1. Fetch the latest target branch:
-         ```bash
-         git fetch origin <target_branch>
-         ```
-      2. Rebase onto the target:
-         ```bash
-         git rebase origin/<target_branch>
-         ```
+      1. Fetch the latest target branch.
+      2. Rebase onto the target branch.
       3. If there are conflicts, resolve them autonomously. Read the conflicting files,
          understand the intent of both changes, and merge them correctly.
       4. Run lint/format/unit tests locally to confirm the rebase doesn't break anything
@@ -273,14 +258,7 @@ states:
       4. **For bot review blockers that were fixed**: Reply in the thread explaining what
          was fixed. The reply body MUST start with `[from bot]` (e.g.,
          `[from bot] Fixed by adding null check in foo.ts:42`).
-         Then resolve the thread:
-         ```bash
-         gh api graphql -f query='
-           mutation { resolveReviewThread(input: {threadId: "<thread_id>"}) {
-             thread { isResolved }
-           } }
-         '
-         ```
+         Then resolve the thread (see reference for the GraphQL mutation).
 
       5. **For `@bot` code change requests that were fixed**: Reply in the same thread
          (inline) or as a new comment (issue-level) with body starting with `[from bot]`,
@@ -293,14 +271,13 @@ states:
          dedup signal that the request has been handled.
 
       8. **Append a push summary to the PR description** summarizing what changed in this round.
-         Read the current PR description via `gh pr view <N> --json body --jq .body`.
-         Append a new section at the bottom using this format:
+         Read the current PR description, then append a new section at the bottom using this format:
          ```
          ## Push round N
          - <bullet point for each change made in this round>
          ```
          Where N is the push round number (count existing `## Push round` headings in the
-         description and add 1). Update the description via `gh pr edit <N> --body "..."`.
+         description and add 1). Update the PR description with the appended section.
          If there are no meaningful changes (e.g., only a rebase with no conflicts), skip this step.
     todos:
       - Commit all changes (skip if no local changes)
