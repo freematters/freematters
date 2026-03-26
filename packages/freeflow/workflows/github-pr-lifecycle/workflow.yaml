@@ -36,15 +36,10 @@ guide: |
   via `resolveReviewThread`. Both pr-lifecycle and the code-review pipeline can resolve
   threads — whichever gets there first.
 
-  ## GitHub CLI tips (avoid common pitfalls)
+  ## GitHub CLI
 
-  - **Prefer `gh pr` / `gh run` high-level commands** over raw `gh api` calls when possible.
-  - **GraphQL queries**: Always inline owner/repo/PR values directly into the query string.
-    Do NOT use `-f owner=... -f repo=...` variable binding — shell escaping breaks it.
-    Example: `query { repository(owner: "myorg", name: "myrepo") { ... } }`
-  - **jq and `@bot`**: When searching for `@bot` in API output, pipe through `grep '@bot'`
-    rather than embedding in jq expressions to avoid shell escaping issues.
-  - **Check runs**: Use `gh pr checks <N>` instead of raw `/commits/{sha}/check-runs` API.
+  Read `$SCRIPT_DIR/../references/github-cli.md` for CLI conventions, auth, GraphQL tips,
+  thread resolution, and `@bot` handling rules.
 
 initial: create-pr
 

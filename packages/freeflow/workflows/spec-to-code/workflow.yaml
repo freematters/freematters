@@ -30,9 +30,9 @@ guide: |
   GitHub: remember `owner`, `repo`, `issue_number`, `branch_name`.
   GitLab: remember `project_path`, `iid`, `branch_name`.
 
-  GitLab CLI convention: Prefer native `glab` commands (`glab issue note/update/view`).
-  Use `glab api` only for operations without native equivalents (award emoji, note
-  editing, label management).
+  Platform CLI references (read when entering issue mode):
+  - GitHub: `$SCRIPT_DIR/../references/github-cli.md`
+  - GitLab: `$SCRIPT_DIR/../references/gitlab-cli.md`
 
 initial: setup
 

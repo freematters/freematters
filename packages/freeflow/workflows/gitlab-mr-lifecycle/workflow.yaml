@@ -33,8 +33,7 @@ guide: |
   ## Thread resolution
 
   After fixing issues, the `push` state replies with `[from bot]` and resolves the
-  discussion thread via `glab api -X PUT projects/:id/merge_requests/:iid/discussions/:discussion_id -f resolved=true`.
-  This is simpler than GitHub's GraphQL — a single REST PUT call.
+  discussion thread. See GitLab CLI reference for the API call.
 
   ## Agent memory
 
@@ -45,22 +44,10 @@ guide: |
   - `target_branch`: Target branch for the MR
   - `source_branch`: Source branch for the MR
 
-  ## GitLab CLI convention
+  ## GitLab CLI
 
-  **Prefer native `glab` commands** (`glab mr view/create/update`, `glab ci view`, etc.)
-  — they auto-detect host and project from the git remote.
-
-  **Use `glab api` only** when native commands can't do the job:
-  award emoji, resolve discussions, discussion thread replies, rebase API, job traces.
-  For `glab api`, URL-encode the project path:
-  ```bash
-  PROJECT_PATH=$(git remote get-url origin | sed 's|.*://[^/]*/||;s|\.git$||' | sed 's|.*:||')
-  ENCODED_PATH=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))" <<< "$PROJECT_PATH")
-  ```
-
-  **Auth**: `GITLAB_TOKEN` env var. Verify with `glab auth status`.
-  **Emoji dedup**: Use award emoji (eyes, rocket) on notes instead of GitHub reactions.
-  **`@bot` search**: Pipe through `grep '@bot'` rather than embedding in jq to avoid escaping issues.
+  Read `$SCRIPT_DIR/../references/gitlab-cli.md` for CLI conventions, auth, ENCODED_PATH,
+  thread resolution, emoji dedup, and `@bot` handling rules.
 
 initial: create-mr
 

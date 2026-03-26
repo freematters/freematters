@@ -166,39 +166,10 @@ guide: |
 
   Artifact note IDs are persisted in `$IDS_FILE` — do NOT track them in conversation memory.
 
-  ### GitLab CLI Rules
+  ### GitLab CLI
 
-  **Authentication**: `GITLAB_TOKEN` env var or `glab auth login`.
-
-  **Prefer native `glab` commands** — they auto-detect the project from the git remote:
-  | Operation | Command |
-  |-----------|---------|
-  | Create issue | `glab issue create -t "title" -d "body" --no-editor` |
-  | Post note | `glab issue note <iid> -m "body"` |
-  | View issue | `glab issue view <iid> -F json` |
-  | Update issue | `glab issue update <iid> -d "desc" -l label -u label` |
-  | Create MR | `glab mr create -t "title" -d "body" -s source -b target --remove-source-branch --squash-before-merge --push --yes` |
-  | View MR | `glab mr view <iid> -F json` |
-  | Update MR | `glab mr update <iid> -d "desc"` |
-
-  **Use `glab api` only** when native commands can't do the job:
-  - File-body upload: `-F body=@file` (artifact creation/update)
-  - Note editing: `PUT .../notes/<id>` (no native equivalent)
-  - Award emoji: `POST .../award_emoji`
-  - Resolve discussions: `PUT .../discussions/<id>`
-  - Label creation: `POST .../labels`
-
-  For `glab api` calls, URL-encode the project path:
-  ```bash
-  PROJECT_PATH=$(git remote get-url origin | sed 's|.*://[^/]*/||;s|\.git$||' | sed 's|.*:||')
-  ENCODED_PATH=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))" <<< "$PROJECT_PATH")
-  ```
-
-  ### Error Handling
-
-  - **Rate limit (429)**: Read `Retry-After` header, wait, retry.
-  - **Network errors**: Retry after 5s, fail after 3 attempts.
-  - **Description update conflict**: Re-read, re-apply, retry.
+  Read `$SCRIPT_DIR/../references/gitlab-cli.md` for CLI conventions, auth, ENCODED_PATH,
+  command reference table, error handling, and `@bot` rules.
 
 initial: create-issue
 
