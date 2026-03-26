@@ -190,7 +190,8 @@ guide: |
 
   For `glab api` calls, URL-encode the project path:
   ```bash
-  ENCODED_PATH=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$(git remote get-url origin | sed \"s|.*://[^/]*/||;s|\.git$||\" | sed \"s|.*:||\")', safe=''))")
+  PROJECT_PATH=$(git remote get-url origin | sed 's|.*://[^/]*/||;s|\.git$||' | sed 's|.*:||')
+  ENCODED_PATH=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.stdin.read().strip(), safe=''))" <<< "$PROJECT_PATH")
   ```
 
   ### Error Handling

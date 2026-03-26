@@ -110,7 +110,7 @@ states:
          ```bash
          glab issue view $ISSUE_IID -F json | jq '{title: .title, description: .description, creator: .author.username, labels: .labels}'
          ```
-      3. Extract and remember: `project_path`, `issue_iid`, `issue_creator` = `.author.username`.
+      3. Extract and remember: `project_path`, `issue_iid`, `issue_creator` = `.creator`.
       4. Derive `slug` from the issue title (lowercase, hyphens, no special chars).
       5. Transition to `proceed`.
 
@@ -132,7 +132,7 @@ states:
     prompt: |
       ## Choose Execution Mode
 
-      The spec is complete. Read `$ARTIFACTS/requirements.md` and `$ARTIFACTS/design.md`
+      The spec is complete. Read `./specs/{slug}/requirements.md` and `./specs/{slug}/design.md`
       for a brief summary.
 
       Post a note on the issue asking the user to choose an execution mode:
