@@ -65,11 +65,7 @@ guide: |
      <design content here>
      ```
 
-  2. Post the local file as an issue comment and capture the comment ID:
-     ```bash
-     COMMENT_ID=$(gh api "repos/{owner}/{repo}/issues/{n}/comments" \
-       -F body=@"$ARTIFACTS/<filename>" --jq '.id')
-     ```
+  2. Post the local file as an issue comment and capture the comment ID.
 
   3. Save the comment ID to the tracking file:
      ```bash
@@ -84,12 +80,8 @@ guide: |
   1. Edit the local cache file using the **Edit tool**. This sends only the diff
      through the LLM session, avoiding full content round-trips.
 
-  2. Push the updated file to GitHub by patching the existing comment in-place:
-     ```bash
-     COMMENT_ID=$(jq -r '.["<filename>"]' "$IDS_FILE")
-     gh api "repos/{owner}/{repo}/issues/comments/$COMMENT_ID" \
-       -X PATCH -F body=@"$ARTIFACTS/<filename>"
-     ```
+  2. Look up the comment ID from `$IDS_FILE` and update the existing comment
+     in-place by patching it with the updated file content.
 
   Do NOT minimize old comments or create new ones — always edit in place.
 
@@ -139,9 +131,8 @@ guide: |
   ### Status Checklist Updates
 
   The issue body contains a status checklist. When completing a phase, update the issue body
-  to check off that phase. Use `gh issue edit {n} --repo {repo} --body {updated_body}` to
-  update the body. You MUST re-read the current issue body before editing to avoid overwriting
-  concurrent changes.
+  to check off that phase. You MUST re-read the current issue body before editing to avoid
+  overwriting concurrent changes.
 
   The status checklist items are:
   - [ ] gathering requirements
@@ -154,19 +145,14 @@ guide: |
 
   You MUST remember these values across states (keep them in your conversation memory):
   - `repo` — the owner/repo string (e.g., `freematters/testbed`)
-  - `issue_number` — the issue number returned by `gh issue create`
+  - `issue_number` — the issue number returned after creating the issue
   - `issue_creator` — the username of the person who created the issue
 
   Artifact comment IDs are persisted in `$IDS_FILE` — do NOT track them in conversation memory.
 
-  ### Error Handling
+  ### GitHub CLI
 
-  - **Rate limit exceeded (429)**: If `gh api` returns HTTP 429, read the `X-RateLimit-Reset`
-    header, wait until that time, then retry.
-  - **Network errors**: If a `gh api` call fails with a connection error, retry after 5 seconds.
-    If it fails 3 times in a row, report the error to the user.
-  - **Issue body update conflict**: If `gh issue edit` fails, re-read the current issue body,
-    re-apply your changes, and retry.
+  Read `$SCRIPT_DIR/../references/github-cli.md` for CLI conventions, auth, and error handling.
 
 initial: create-issue
 
@@ -175,22 +161,16 @@ states:
     prompt: |
       ## Create Issue
 
-      Before anything else, verify GitHub CLI authentication:
-      ```bash
-      gh auth status
-      ```
-      If this fails, tell the user to run `gh auth login` and stop.
+      Before anything else, verify GitHub authentication (see reference).
+      If authentication fails, tell the user and stop.
 
       Parse the user's prompt to extract:
       1. **Repository**: The `owner/repo` string (e.g., `freematters/testbed`). The user provides this in their prompt — there is no `--repo` flag.
       2. **Idea**: The description of what they want to build.
       3. **Title**: Generate a concise issue title from the idea.
 
-      Then create a GitHub issue (if this fails with 404/403, report the error and ask the user to check the repo name and permissions):
-
-      ```bash
-      gh issue create --repo {repo} --title "{title}" --body "{body}"
-      ```
+      Then create a GitHub issue with the title and body (if this fails with 404/403,
+      report the error and ask the user to check the repo name and permissions).
 
       The issue body MUST follow this exact structure:
 
@@ -209,24 +189,22 @@ states:
       - [ ] spec-ready
       ```
 
-      From the `gh issue create` output, extract and remember:
+      From the issue creation output, extract and remember:
       - The **issue number** (from the URL in the output, e.g., `https://github.com/owner/repo/issues/42` → issue number is `42`)
-      - The **issue creator** username (run `gh api user --jq .login` to get the authenticated user's login, since the bot is creating the issue on behalf of the user)
+      - The **issue creator** username (get the authenticated user's login, since the bot is creating the issue on behalf of the user)
 
       Report the issue URL to the user.
 
-      Then post an initial welcome comment on the issue:
+      Then post an initial welcome comment on the issue with this content:
 
-      ```bash
-      gh issue comment {n} --repo {repo} --body "👋 Welcome! I'll guide you through a spec generation process on this issue.
-
-      Where would you like to start?
-
-      1. **Requirements clarification** (recommended) — refine the idea through Q&A
-      2. **Research first** — investigate specific technical topics before refining requirements
-
-      Reply with your choice (1 or 2)."
-      ```
+      > Welcome! I'll guide you through a spec generation process on this issue.
+      >
+      > Where would you like to start?
+      >
+      > 1. **Requirements clarification** (recommended) — refine the idea through Q&A
+      > 2. **Research first** — investigate specific technical topics before refining requirements
+      >
+      > Reply with your choice (1 or 2).
 
       Now poll for the user's reply using the polling pattern from the guide.
       When you receive a reply from the issue creator:
@@ -355,23 +333,13 @@ states:
       Finalize the issue by adding the label, completing the status checklist, and posting a summary.
 
       Steps:
-      1. Add the `spec-ready` label to the issue:
-         ```bash
-         gh issue edit {n} --repo {repo} --add-label spec-ready
-         ```
-         If the label does not exist on the repo yet, create it first:
-         ```bash
-         gh label create spec-ready --repo {repo} --description "Spec is complete and ready for implementation" --color 0E8A16
-         ```
+      1. Add the `spec-ready` label to the issue. If the label does not exist on the
+         repo yet, create it first (description: "Spec is complete and ready for implementation").
          If creation fails because it already exists, that is fine — proceed.
 
       2. Update the issue body status checklist: check off ALL remaining items including "spec-ready".
 
-      3. Compile a list of all artifact comments from the ID tracking file:
-         ```bash
-         IDS_FILE="$HOME/.freeflow/runs/{run_id}/artifact_comment_ids.json"
-         cat "$IDS_FILE"
-         ```
+      3. Compile a list of all artifact comments from the ID tracking file (`$IDS_FILE`).
          For each artifact, include its filename and a link to the comment (using the issue
          comment URL format: `https://github.com/{owner}/{repo}/issues/{n}#issuecomment-{comment_id}`).
 

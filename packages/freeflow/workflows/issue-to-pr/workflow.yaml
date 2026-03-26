@@ -85,17 +85,9 @@ states:
       If the input matches `owner/repo#N` (regex: `[\w.-]+/[\w.-]+#\d+`):
 
       1. Parse `owner`, `repo`, and `issue_number` from the reference.
-      2. Verify the issue exists:
-         ```bash
-         gh api "repos/{owner}/{repo}/issues/{issue_number}" --jq '.title'
-         ```
-         If this fails (404), report the error and stop.
-      3. Fetch issue context:
-         ```bash
-         gh api "repos/{owner}/{repo}/issues/{issue_number}" \
-           --jq '{title: .title, body: .body, creator: .user.login, labels: [.labels[].name]}'
-         ```
-      4. Extract and remember: `repo` = `{owner}/{repo}`, `issue_number`, `issue_creator` = `.creator`.
+      2. Verify the issue exists and fetch its context (title, body, creator, labels).
+         If the issue doesn't exist (404), report the error and stop.
+      3. Extract and remember: `repo` = `{owner}/{repo}`, `issue_number`, `issue_creator`.
       5. Derive `slug` from the issue title (lowercase, hyphens, no special chars).
       6. Transition to `proceed`.
 

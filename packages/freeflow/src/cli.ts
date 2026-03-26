@@ -2,7 +2,7 @@
 
 import { createRequire } from "node:module";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
@@ -17,7 +17,7 @@ import { render } from "./commands/render.js";
 import { start } from "./commands/start.js";
 import { validate } from "./commands/validate.js";
 import { main as postToolUseMain } from "./hooks/post-tool-use.js";
-import { handleError } from "./output.js";
+import { handleError, jsonSuccess, printJson } from "./output.js";
 import { resolveWorkflow } from "./resolve-workflow.js";
 
 function resolveRoot(flagRoot?: string): string {
@@ -210,6 +210,28 @@ program
         save: (opts.save as boolean) ?? false,
         json: json ?? false,
       });
+    } catch (err: unknown) {
+      handleError(err, json ?? false);
+    }
+  });
+
+program
+  .command("resolve")
+  .description("resolve a workflow name to its absolute path or directory")
+  .argument("<workflow>", "workflow name or path")
+  .option("--wf-dir", "print the workflow directory instead of the file path")
+  .action((_workflow: string, opts: Record<string, unknown>, cmd: Command) => {
+    const { json } = getGlobalOpts(cmd);
+    try {
+      const resolved = resolve(resolveWorkflow(_workflow));
+      const result = opts.wfDir ? dirname(resolved) : resolved;
+      if (json) {
+        printJson(
+          jsonSuccess("Workflow resolved", { path: result, fsm_path: resolved }),
+        );
+      } else {
+        process.stdout.write(`${result}\n`);
+      }
     } catch (err: unknown) {
       handleError(err, json ?? false);
     }

@@ -33,8 +33,7 @@ guide: |
   ## Thread resolution
 
   After fixing issues, the `push` state replies with `[from bot]` and resolves the
-  discussion thread via `glab api -X PUT projects/:id/merge_requests/:iid/discussions/:discussion_id -f resolved=true`.
-  This is simpler than GitHub's GraphQL — a single REST PUT call.
+  discussion thread. See GitLab CLI reference for the API call.
 
   ## Agent memory
 
@@ -45,35 +44,17 @@ guide: |
   - `target_branch`: Target branch for the MR
   - `source_branch`: Source branch for the MR
 
-  ## `glab` CLI tips (avoid common pitfalls)
+  ## GitLab CLI
 
-  - **Prefer `glab mr` / `glab ci` high-level commands** over raw `glab api` calls when possible.
-  - **Project path encoding**: When using `glab api`, URL-encode the project path
-    (e.g., `group%2Fproject`) in endpoint URLs.
-  - **Self-hosted instances**: Pass `--hostname <host>` to `glab api` commands when working
-    with self-hosted GitLab (not gitlab.com). The hostname is auto-detected from git remote.
-  - **`GITLAB_TOKEN` env var**: Ensure it is set for authentication. Verify with `glab auth status`.
-  - **Award emoji for dedup**: Use award emoji (eyes, rocket) on notes instead of GitHub reactions.
-  - **`@bot` search**: When searching for `@bot` in API output, pipe through `grep '@bot'`
-    rather than embedding in jq expressions to avoid shell escaping issues.
+  Read `$SCRIPT_DIR/../references/gitlab-cli.md` for CLI conventions, auth, ENCODED_PATH,
+  thread resolution, emoji dedup, and `@bot` handling rules.
 
 initial: create-mr
 
 states:
   create-mr:
     prompt: |
-      Verify authentication: run `glab auth status`. If not logged in, prompt user to run
-      `glab auth login` or set `GITLAB_TOKEN` env var.
-
-      Detect the GitLab hostname from git remote:
-      ```bash
-      git remote get-url origin | sed -n 's|.*://\([^/]*\)/.*|\1|p; s|.*@\([^:]*\):.*|\1|p'
-      ```
-
-      Detect the project path from git remote:
-      ```bash
-      git remote get-url origin | sed 's|.*://[^/]*/||;s|\.git$||' | sed 's|.*:||'
-      ```
+      Verify GitLab authentication (see reference). If not logged in, prompt user to configure auth.
 
       Once authenticated:
       - Run lint/format checks (refer to project CLAUDE.md for check commands). Fix any failures first.
@@ -81,10 +62,7 @@ states:
         ensure it is NOT included in the MR. Add it to `.gitignore` or `git reset HEAD specs/`
         before committing. Spec artifacts are working documents and should not ship with the MR.
       - Commit all local changes.
-      - Check if the current branch already has an open MR:
-        ```bash
-        glab mr list --source-branch <branch>
-        ```
+      - Check if the current branch already has an open MR (list MRs by source branch).
         If one exists, push the branch, record the URL and iid, and check if the description needs updating.
       - If none exists, create a new MR:
         - Target branch: Use user-specified branch if provided, otherwise use the repo's default branch.
@@ -93,11 +71,7 @@ states:
         - Check for `./specs/*/source-issue` — if it exists, read the issue reference
           (e.g., `project#42`) and add `Closes #N` to the MR description to link
           the MR to the source issue.
-        - Create via:
-          ```bash
-          glab mr create --source-branch <source> --target-branch <target> \
-            --title "<title>" --description "<description>"
-          ```
+        - Create the MR with `--remove-source-branch --squash-before-merge --push --yes` flags.
 
       After the MR is created (or found), post an **MR note** with:
       1. **Implementation summary**: A concise overview of what was implemented and key design decisions.
@@ -178,20 +152,7 @@ states:
       ## Steps
 
       1. Read `WF_DIR/mr_status.json` -- check `pipeline_status` for failure.
-      2. Read the failed job logs to understand the failures:
-         ```bash
-         # List failed jobs
-         glab ci view
-         ```
-         Or use the API to get detailed job logs:
-         ```bash
-         # Get pipeline jobs
-         glab api "projects/<encoded_project>/merge_requests/<mr_iid>" | jq '.head_pipeline.id'
-         # Then get failed jobs
-         glab api "projects/<encoded_project>/pipelines/<pipeline_id>/jobs" | jq '.[] | select(.status=="failed")'
-         # Get job log
-         glab api "projects/<encoded_project>/jobs/<job_id>/trace"
-         ```
+      2. Fetch failed pipeline jobs and their logs (see reference for CI job APIs).
       3. Fix the code to resolve the CI failures.
       4. Run lint/format/unit tests locally to confirm the fix doesn't introduce new issues
          (refer to project CLAUDE.md for check commands).
@@ -214,30 +175,17 @@ states:
       ## Pre-check: verify MR is still open
 
       The target branch may have been updated because THIS MR was just merged.
-      Before rebasing, wait 2 seconds and then check if the MR was already merged:
-      ```bash
-      sleep 2
-      glab api "projects/<encoded_project>/merge_requests/<mr_iid>" | jq '.state'
-      ```
+      Before rebasing, wait 2 seconds and then check the MR state.
       If the state is `merged` or `closed`, skip the rebase and transition to `MR merged`.
 
       ## Steps
 
-      1. **Try GitLab native rebase API first** (preferred -- no local git operations needed):
-         ```bash
-         glab api -X PUT "projects/<encoded_project>/merge_requests/<mr_iid>/rebase"
-         ```
-         Wait a few seconds and check if rebase succeeded:
-         ```bash
-         glab api "projects/<encoded_project>/merge_requests/<mr_iid>" | jq '.rebase_in_progress,.merge_error'
-         ```
-         If `rebase_in_progress` is false and no `merge_error`, the rebase succeeded.
+      1. **Try GitLab native rebase API first** (preferred -- no local git operations needed).
+         Trigger a rebase via the GitLab API (see reference), wait a few seconds, and verify
+         it succeeded (no `rebase_in_progress` and no `merge_error`).
 
       2. **Fallback to local rebase** if the API rebase fails (e.g., conflicts):
-         ```bash
-         git fetch origin <target_branch>
-         git rebase origin/<target_branch>
-         ```
+         Fetch and rebase onto the latest target branch locally.
          If there are conflicts, resolve them autonomously. Read the conflicting files,
          understand the intent of both changes, and merge them correctly.
 
@@ -262,11 +210,7 @@ states:
       ## What to address (priority order)
 
       1. **`@bot` mentions** (highest priority -- user requests):
-         - React with eyes award emoji on each `@bot` note immediately to acknowledge receipt:
-           ```bash
-           glab api -X POST "projects/<encoded_project>/merge_requests/<mr_iid>/notes/<note_id>/award_emoji" \
-             -f name=eyes
-           ```
+         - React with eyes emoji on each `@bot` note to acknowledge receipt (see reference for emoji API).
          - Read the mention details from `mr_status.json` (`bot_mentions` array)
          - For code change requests: make the requested modifications
          - For questions: prepare an answer (will be posted in push state)
@@ -329,49 +273,29 @@ states:
          review feedback or `@bot` requests.
 
       4. **For review discussion blockers that were fixed**: Reply in the discussion thread
-         explaining what was fixed. The reply body MUST start with `[from bot]` (e.g.,
+         explaining what was fixed, with body starting with `[from bot]` (e.g.,
          `[from bot] Fixed by adding null check in foo.ts:42`).
-         Post the reply via:
-         ```bash
-         glab api -X POST "projects/<encoded_project>/merge_requests/<mr_iid>/discussions/<discussion_id>/notes" \
-           -f body="[from bot] <explanation>"
-         ```
-         Then resolve the thread:
-         ```bash
-         glab api -X PUT "projects/<encoded_project>/merge_requests/<mr_iid>/discussions/<discussion_id>" \
-           -f resolved=true
-         ```
+         Then resolve the discussion thread (see reference for thread resolution and note APIs).
 
       5. **For `@bot` code change requests that were fixed**: Reply in the same discussion
          thread (for inline threads) or as a new MR note (for standalone notes) with body
          starting with `[from bot]`, explaining what was changed. Then resolve the thread
-         (for discussion threads).
+         (for discussion threads). See reference for note and thread resolution APIs.
 
       6. **For `@bot` questions**: Reply with body starting with `[from bot]` answering
          the question. Do NOT resolve the thread -- the user may want to follow up.
 
-      7. **React to processed `@bot` standalone notes**: Add rocket award emoji as the
-         dedup signal that the request has been handled:
-         ```bash
-         glab api -X POST "projects/<encoded_project>/merge_requests/<mr_iid>/notes/<note_id>/award_emoji" \
-           -f name=rocket
-         ```
+      7. **React to processed `@bot` standalone notes**: Add rocket emoji as the
+         dedup signal that the request has been handled (see reference for emoji API).
 
       8. **Append a push summary to the MR description** summarizing what changed in this round.
-         Read the current MR description via:
-         ```bash
-         glab mr view <mr_iid> --output json | jq -r '.description'
-         ```
-         Append a new section at the bottom using this format:
+         Read the current MR description, then append a new section:
          ```
          ## Push round N
          - <bullet point for each change made in this round>
          ```
-         Where N is the push round number (count existing `## Push round` headings in the
-         description and add 1). Update the description via:
-         ```bash
-         glab mr update <mr_iid> --description "<updated_description>"
-         ```
+         Where N = count of existing `## Push round` headings + 1.
+         Update the MR description with the appended content.
          If there are no meaningful changes (e.g., only an API rebase), skip this step.
     todos:
       - Commit all changes (skip if no local changes)

@@ -6,12 +6,12 @@
 #               |
 #         pass → review (self-fixing loop)
 #               |
-#         user approves → checkpoint → done
+#         user approves → checkpoint → simplify → done
 #                              |
 #                         re-run e2e
 #
 # Fast forward mode (chosen at setup):
-#   setup → implement → e2e-test → review → done  (skips checkpoint)
+#   setup → implement → e2e-test → review → simplify → done  (skips checkpoint)
 #
 # Picks up where spec-gen left off — reads ./specs/<slug>/ artifacts and implements them.
 
@@ -29,6 +29,10 @@ guide: |
   prefix comments with `[from bot]`, push after each commit, update issue checklist.
   GitHub: remember `owner`, `repo`, `issue_number`, `branch_name`.
   GitLab: remember `project_path`, `iid`, `branch_name`.
+
+  Platform CLI references (read when entering issue mode):
+  - GitHub: `$SCRIPT_DIR/../references/github-cli.md`
+  - GitLab: `$SCRIPT_DIR/../references/gitlab-cli.md`
 
 initial: setup
 
@@ -59,10 +63,7 @@ states:
 
       **Issue mode (GitHub)**:
 
-      1. Validate the issue exists and has the `spec-ready` label:
-         ```bash
-         gh api 'repos/{owner}/{repo}/issues/{issue_number}' --jq '.labels[].name'
-         ```
+      1. Check if the issue has the `spec-ready` label.
          If no `spec-ready` label, warn the user and ask if they want to proceed anyway.
 
       2. Download spec artifacts:
@@ -78,10 +79,7 @@ states:
 
       **Issue mode (GitLab)**:
 
-      1. Validate the issue exists and has the `spec-ready` label:
-         ```bash
-         glab api "projects/$(echo {project_path} | python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.stdin.read().strip(),safe=\"\"))')/issues/{iid}" | jq '[.labels[]]'
-         ```
+      1. Check if the issue has the `spec-ready` label.
          If no `spec-ready` label, warn the user and ask if they want to proceed anyway.
 
       2. Download spec artifacts from GitLab issue notes:
@@ -183,23 +181,26 @@ states:
 
          > You are implementing Step N of ./specs/<slug>/plan.md.
          > Your working directory is: <worktree-path>
-         > Use strict TDD (RED → GREEN → REFACTOR).
+         > Use strict TDD (RED → GREEN → REFACTOR) when the step has Test Requirements.
          > Read ./specs/<slug>/design.md for component interfaces and data models.
          >
          > 1. Read this step's **Related Files** from plan.md — these are files
          >    to modify or useful for your understanding of the codebase.
-         > 2. Read this step's **Test Requirements** from plan.md — these are the
-         >    specific test cases assigned to this step. Write failing tests for them (RED).
-         >    You MAY add extra tests beyond the listed requirements if you discover
-         >    edge cases or complex logic that warrants coverage.
-         >    General rules: use real dependencies; only mock true external boundaries
-         >    (network, third-party APIs); unit tests for complex single-module logic.
-         > 3. Write minimum implementation to pass (GREEN)
+         > 2. Read this step's **Test Requirements** from plan.md.
+         >    - If the step has Test Requirements: write failing tests for ONLY the
+         >      listed requirements (RED). Do NOT add extra tests beyond what is listed.
+         >      General rules: use real dependencies; only mock true external boundaries
+         >      (network, third-party APIs); unit tests for complex single-module logic.
+         >    - If the step has no Test Requirements: skip to step 3.
+         > 3. Write implementation code (GREEN — make the tests pass, or implement directly
+         >    if no tests were written).
          > 4. Refactor — clean up, run linter/formatter
          > 5. Commit your work in the worktree: `feat(scope): step N - <step title>`
          > 6. Report: tests passed/failed, lint issues, any spec deviations
          >
          > Do NOT modify plan.md or progress.md — the orchestrator handles those.
+         > Do NOT add tests beyond what is listed in Test Requirements — no extra
+         > edge-case tests, no "bonus" coverage. Only write what the plan specifies.
 
       2. When any sub-agent completes, immediately:
          - Merge its worktree branch into the feature branch.
@@ -250,16 +251,13 @@ states:
          git push -u origin {branch_name}   # first push
          git push                            # subsequent pushes
          ```
-      7. Update the issue description checklist for each completed step via:
-         ```bash
-         glab issue update {iid} --description "<updated body>"
+      7. Update the issue description checklist.
+      8. Post a `[from bot]` progress note on the issue with step completion details:
          ```
-      8. Post a `[from bot]` progress note per step via:
-         ```bash
-         glab issue note {iid} --message "[from bot] Step N/M complete: <step title>
+         [from bot] Step N/M complete: <step title>
          - **Commit**: {sha}
          - **Files changed**: <list of key files>
-         - **Tests**: <count> added, all passing"
+         - **Tests**: <count> added, all passing
          ```
 
       Then proceed to the next wave. Repeat until all steps are complete.
@@ -270,6 +268,8 @@ states:
       - Each sub-agent runs in its own worktree branched from the feature branch.
       - You MUST NOT skip sub-agent dispatch, even for simple steps.
       - Sub-agents MUST NOT modify plan.md or progress.md.
+      - Sub-agents MUST only write tests listed in their step's **Test Requirements**.
+        No extra tests, no bonus edge-case coverage, no tests beyond what the plan specifies.
     transitions:
       more steps remain: implement
       all steps complete: e2e-test
@@ -282,8 +282,9 @@ states:
 
       Read `./specs/<slug>/e2e.md`. If it does not exist, skip directly to review.
 
-      **IMPORTANT**: If `./specs/<slug>/e2e.md` exists, you MUST run the e2e test. Never skip it.
-      Only use the "no e2e plan" transition when e2e.md genuinely does not exist.
+      **IMPORTANT**: If `./specs/<slug>/e2e.md` exists, you MUST run the e2e test. Never skip it —
+      not in fast-forward mode, not in auto mode, not for any reason. E2E is mandatory when the
+      plan exists. Only use the "no e2e plan" transition when e2e.md genuinely does not exist.
 
       ### Run the test
 
@@ -385,10 +386,10 @@ states:
 
       Update `./specs/<slug>/progress.md` with review summary.
 
-      **Fast forward mode**: Skip presenting to user. Transition directly to done.
+      **Fast forward mode**: Skip presenting to user. Transition directly to simplify.
     transitions:
       user approves: checkpoint
-      fast forward: done
+      fast forward: simplify
 
   checkpoint:
     prompt: |
@@ -405,8 +406,42 @@ states:
       > 1. Looks good — finalize
       > 2. Re-run E2E tests
     transitions:
-      finalize: done
+      finalize: simplify
       re-run e2e: e2e-test
+
+  simplify:
+    prompt: |
+      ## Simplify & Refactor
+
+      Run `/simplify` on the diff between the current branch and the default branch
+      to review for reuse, quality, and efficiency improvements.
+
+      ### 1. Get the diff
+
+      Determine the default branch:
+      ```bash
+      git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'
+      ```
+
+      ### 2. Run /simplify
+
+      Invoke `/simplify` to review all changes on this branch relative to the default branch.
+      It will identify and fix issues related to code reuse, quality, and efficiency.
+
+      ### 3. Commit fixes
+
+      If `/simplify` made changes, commit them:
+      ```
+      refactor: simplify implementation
+      ```
+
+      If `source_mode == "issue"`, push to remote.
+
+      ### 4. Transition
+
+      Proceed to done.
+    transitions:
+      done: done
 
   done:
     prompt: |
@@ -457,12 +492,7 @@ states:
          Re-read the current issue body, then update the `### E2E Testing` subsection with
          the actual result (pass/fail, attempt count). If the section doesn't exist, add it.
 
-      5. Remove `doing` label and add `done` label to the issue:
-         ```bash
-         gh issue edit {issue_number} --repo {owner}/{repo} --remove-label doing
-         gh label create done --repo {owner}/{repo} --description "Implementation complete" --color 0E8A16 2>/dev/null || true
-         gh issue edit {issue_number} --repo {owner}/{repo} --add-label done
-         ```
+      5. Remove the `doing` label and add the `done` label to the issue (create the label first if it doesn't exist).
 
       ### Issue mode additional steps (GitLab)
 
@@ -473,29 +503,21 @@ states:
          git push
          ```
 
-      2. Post the implementation summary as a `[from bot]` note on the issue:
-         ```bash
-         glab issue note {iid} --message "[from bot] ## implementation-summary.md
+      2. Post the implementation summary as a `[from bot]` note on the issue, including the branch name and MR instructions:
+         ```
+         [from bot] ## implementation-summary.md
 
          {full content of implementation-summary.md}
 
          ---
-         **Branch**: \`{branch_name}\`
-         Ready for MR — run \`/mr\` to create a merge request."
+         **Branch**: `{branch_name}`
+         Ready for MR — run `/mr` to create a merge request.
          ```
 
       3. Write `./specs/<slug>/source-issue` containing the GitLab issue reference
          (e.g., `project/path#42`) so that mr-lifecycle can link the MR to the issue.
 
-      4. Update the issue description's Summary section to reflect e2e results.
-         Re-read the current issue description via `glab api`, then update the
-         `### E2E Testing` subsection with the actual result. Update via:
-         ```bash
-         glab issue update {iid} --description "<updated description>"
-         ```
+      4. Update the issue description's `### E2E Testing` subsection with actual results.
 
-      5. Remove `doing` label and add `done` label to the issue via glab api:
-         ```bash
-         glab api -X PUT "projects/{encoded_project_path}/issues/{iid}" -f "remove_labels=doing" -f "add_labels=done"
-         ```
+      5. Update issue labels: remove `doing`, add `done`.
     transitions: {}

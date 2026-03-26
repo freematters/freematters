@@ -124,6 +124,28 @@ This outputs the full resolved workflow as markdown to stdout.
 
 ---
 
+## `$SCRIPT_DIR` Resolution
+
+Workflow guides and state prompts may reference files via `$SCRIPT_DIR` (e.g.,
+`$SCRIPT_DIR/../references/github-cli.md`). This is the directory containing the
+workflow YAML file. Resolve it once at the start and reuse throughout:
+
+```bash
+SCRIPT_DIR=$(fflow resolve <workflow-name-or-path> --wf-dir)
+```
+
+Examples:
+```bash
+fflow resolve github-pr-lifecycle --wf-dir   # → /path/to/workflows/github-pr-lifecycle
+fflow resolve spec-to-code --wf-dir          # → /path/to/workflows/spec-to-code
+```
+
+When a workflow instructs you to read `$SCRIPT_DIR/...`, substitute the resolved
+directory and read the file. These reference files contain shared conventions
+(CLI usage, auth patterns, etc.) that apply across the workflow.
+
+---
+
 ## Error Handling
 
 - **`RUN_EXISTS`** — The generated run_id is already taken. Generate a different slug and retry.
