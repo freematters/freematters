@@ -1,0 +1,571 @@
+# Issue-to-Spec — Platform-agnostic issue-driven spec-gen workflow
+#
+# Unified workflow supporting both GitHub and GitLab, with optional --lite mode.
+# Reuses spec-gen's guide (process rules, Q&A cycle, research structure) and
+# state definitions (requirements, research, design, plan, e2e-gen) via
+# extends_guide + from:.
+#
+# Platform detection:
+#   - GitHub: argument contains "/" (owner/repo format) or git remote is github.com
+#   - GitLab: argument contains no "/" or git remote is a non-github host
+#
+# Lite mode:
+#   - design.md: 4 sections (Overview, Goal & Constraints, Architecture & Components, E2E Testing)
+#   - plan.md: exactly 1 step (all implementation in a single step)
+#
+# Flow:
+#
+#   create-issue
+#       |           \
+#   requirements <--> research
+#       |        <---/
+#     design <--> requirements (gaps)
+#       |
+#      plan <--> design (revision)
+#       |
+#     e2e-gen
+#       |
+#     done
+#
+#   Fast forward: requirements -> design -> plan -> e2e-gen -> done (no intermediate approvals)
+
+version: 1.1
+extends_guide: ../spec-gen/workflow.yaml
+guide: |
+  {{base}}
+
+  ### Platform Detection
+
+  Detect the platform from the user's argument format and git remote:
+
+  1. **Argument format**:
+     - If the argument looks like `owner/repo` (GitHub-style), set platform = **GitHub**.
+     - If no argument or ambiguous, fall back to git remote detection.
+  2. **Git remote detection**:
+     ```bash
+     git remote get-url origin
+     ```
+     - If the URL contains `github.com`, set platform = **GitHub**.
+     - Otherwise (e.g., `gitlab.corp.metabit-trading.com`), set platform = **GitLab**.
+
+  Remember the detected `platform` value (`github` or `gitlab`) across all states.
+
+  ### Lite Mode
+
+  This workflow supports `--lite` mode, which produces simplified artifacts:
+  - **design.md**: 4 sections (Overview, Goal & Constraints, Architecture & Components, E2E Testing)
+    instead of the full 8-section design. Skip the "Design approaches" step.
+  - **plan.md**: Exactly 1 step covering all implementation, instead of N steps per component.
+
+  If the user started with `--lite`, remember this flag and apply lite conditionals in the
+  design and plan states.
+
+  ### Artifact Output — Issue Override
+
+  IMPORTANT: This overrides the "Artifact Output" section above.
+  All artifacts are posted as issue comments (GitHub) or issue notes (GitLab) AND cached locally as files.
+
+  **Local artifact cache** (source of truth for content):
+  ```
+  $HOME/.freeflow/runs/{run_id}/artifacts/
+    requirements.md
+    research/<topic-name>.md
+    design.md
+    plan.md
+    e2e.md
+  ```
+
+  **ID tracking**:
+  - **GitHub**: `$HOME/.freeflow/runs/{run_id}/artifact_comment_ids.json`
+    Maps artifact filenames to their GitHub REST API numeric comment IDs.
+  - **GitLab**: `$HOME/.freeflow/runs/{run_id}/artifact_note_ids.json`
+    Maps artifact filenames to their GitLab note IDs.
+
+  Set these variables at the start of each state:
+  ```bash
+  ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
+  mkdir -p "$ARTIFACTS"
+  ```
+
+  **GitHub**:
+  ```bash
+  IDS_FILE="$HOME/.freeflow/runs/{run_id}/artifact_comment_ids.json"
+  [ -f "$IDS_FILE" ] || echo '{}' > "$IDS_FILE"
+  ```
+
+  **GitLab**:
+  ```bash
+  ISSUE_IID="<issue_iid>"
+  IDS_FILE="$HOME/.freeflow/runs/{run_id}/artifact_note_ids.json"
+  [ -f "$IDS_FILE" ] || echo '{}' > "$IDS_FILE"
+  ```
+
+  #### Creating an Artifact
+
+  1. Write the full artifact content to a local cache file using the Write tool.
+     The file content MUST start with `## <filename>` as the first line, followed by
+     the markdown content. Example for `design.md`:
+     ```
+     ## design.md
+
+     <design content here>
+     ```
+
+  2. Post the local file as an issue comment or note and capture the ID.
+     - **GitHub**: Post as an issue comment and capture the comment ID.
+     - **GitLab**: Post as an issue note using file-body upload (`glab api`, see reference)
+       and capture the note ID.
+       Note: `glab api` is used here (not `glab issue note`) because `-F body=@file`
+       reads the note body from a file, which the native command doesn't support.
+
+  3. Save the ID to the tracking file:
+     ```bash
+     jq --arg k "<filename>" --argjson v "$ID" '. + {($k): $v}' \
+       "$IDS_FILE" > "$IDS_FILE.tmp" && mv "$IDS_FILE.tmp" "$IDS_FILE"
+     ```
+
+  #### Updating an Artifact (In-Place Edit)
+
+  When an artifact needs revision (e.g., design changes after feedback):
+
+  1. Edit the local cache file using the **Edit tool**. This sends only the diff
+     through the LLM session, avoiding full content round-trips.
+
+  2. Look up the ID from `$IDS_FILE` and update the existing comment/note in-place
+     with the updated file content.
+     - **GitHub**: Patch the existing comment with the updated file content.
+     - **GitLab**: Update the existing note in-place with `glab api PUT` (see reference).
+
+  Do NOT minimize old comments/notes or create new ones -- always edit in place.
+
+  #### Reading Artifacts
+
+  Read artifacts from the local cache files instead of fetching all issue comments/notes.
+  Use the Read tool on `$ARTIFACTS/<filename>`. This avoids pulling the entire
+  comment/note history through the LLM context.
+
+  ### Comment Polling
+
+  Whenever you need to wait for a user reply on the issue, run the bundled polling script
+  as a **background bash job** so the conversation is not blocked.
+
+  Find the script directory via:
+  ```bash
+  SCRIPT_DIR="$(dirname "$(readlink -f "$(fflow current --run-id {run_id} -j | jq -r '.data.fsm_path')")")"
+  ```
+
+  **GitHub**:
+  ```bash
+  python3 "$SCRIPT_DIR/scripts/poll_issue.py" {owner} {repo} {n} {issue_creator} \
+    --run-id {run_id}
+  ```
+
+  **GitLab**:
+  ```bash
+  python3 "$SCRIPT_DIR/scripts/poll_issue_gl.py" {project_path} {issue_iid} {issue_creator} \
+    --run-id {run_id}
+  ```
+  If using a self-hosted GitLab instance, add `--hostname {gitlab_hostname}`.
+
+  The script:
+  - Polls the issue's comment/note count every second
+  - When new comments/notes arrive, fetches ALL new ones (no drops)
+  - **GitHub**: Reacts with eyes emoji to every new comment
+  - **GitLab**: Reacts with eyes emoji to every new note
+  - Filters for comments/notes from `{issue_creator}` only
+  - Prints `NEW_COMMENT: <body>` for each matching comment/note
+  - Persists the count in `~/.freeflow/runs/{run_id}/comment_count`
+
+  Run the script in the background. When it completes, read the output for the comment.
+
+  ### Reply Prefix
+
+  Every issue comment/note you post MUST be prefixed with `[bot reply]` so users can easily
+  distinguish bot replies from human comments.
+
+  ### Creator-Only Filtering
+
+  Only process comments/notes where the author matches the issue creator (the user who started
+  the workflow). Ignore all other comments/notes silently and continue polling.
+  - **GitHub**: Match `author.login`
+  - **GitLab**: Match `author.username`
+
+  ### Status Checklist Updates
+
+  The issue body (GitHub) or description (GitLab) contains a status checklist. When completing
+  a phase, update the issue body/description to check off that phase. You MUST re-read the
+  current issue body/description before editing to avoid overwriting concurrent changes.
+
+  The status checklist items are:
+  - [ ] gathering requirements
+  - [ ] research
+  - [ ] design
+  - [ ] plan
+
+  - [ ] spec-ready
+
+  ### Agent Memory
+
+  You MUST remember these values across states (keep them in your conversation memory):
+  - `platform` -- `github` or `gitlab`
+  - `lite_mode` -- whether `--lite` was specified
+
+  **GitHub-specific memory**:
+  - `repo` -- the owner/repo string (e.g., `freematters/testbed`)
+  - `issue_number` -- the issue number returned after creating the issue
+  - `issue_creator` -- the username of the person who created the issue
+
+  **GitLab-specific memory**:
+  - `project_path` -- the full project path (e.g., `freematters/testbed`)
+  - `gitlab_url` -- the GitLab instance URL (e.g., `https://gitlab.corp.metabit-trading.com`)
+  - `issue_iid` -- the issue IID returned by the create-issue API call
+  - `issue_creator` -- the username of the person who created the issue
+
+  Artifact comment/note IDs are persisted in `$IDS_FILE` -- do NOT track them in conversation memory.
+
+  ### Reference Docs
+
+  Find the script directory via:
+  ```bash
+  SCRIPT_DIR="$(dirname "$(readlink -f "$(fflow current --run-id {run_id} -j | jq -r '.data.fsm_path')")")"
+  ```
+
+  - **GitHub**: Read `$SCRIPT_DIR/../references/github-cli.md` for CLI conventions, auth, and error handling.
+  - **GitLab**: Read `$SCRIPT_DIR/../references/gitlab-cli.md` for CLI conventions, auth, ENCODED_PATH,
+    command reference table, error handling, and `@bot` rules.
+
+initial: create-issue
+
+states:
+  create-issue:
+    prompt: |
+      ## Create Issue
+
+      ### Platform Detection
+
+      Detect the platform from the user's argument and git remote (see guide).
+      Remember the `platform` value for all subsequent states.
+
+      ### Authentication
+
+      - **GitHub**: Verify GitHub authentication (see reference). If authentication fails, tell the user and stop.
+      - **GitLab**: Verify GitLab authentication (see reference). If this fails, tell the user to authenticate and stop.
+
+      ### Parse Input
+
+      Parse the user's prompt to extract:
+
+      **GitHub**:
+      1. **Repository**: The `owner/repo` string (e.g., `freematters/testbed`). The user provides this in their prompt -- there is no `--repo` flag.
+      2. **Idea**: The description of what they want to build.
+      3. **Title**: Generate a concise issue title from the idea.
+
+      **GitLab**:
+      1. **Project path**: Auto-detect from git remote if not specified.
+      2. **GitLab URL**: Auto-detect from git remote.
+      3. **Idea**: The description of what they want to build.
+      4. **Title**: Generate a concise issue title from the idea.
+
+      ### Create the Issue
+
+      Create the issue with the title and body. If this fails with 404/403, report the error and ask the user to check the repo name and permissions.
+
+      - **GitHub**: `gh issue create`
+      - **GitLab**: Create via `glab api`
+
+      The issue body MUST follow this exact structure:
+
+      ```markdown
+      ## {title}
+
+      {rough idea from user prompt}
+
+      ## Status
+
+      - [ ] gathering requirements
+      - [ ] research
+      - [ ] design
+      - [ ] plan
+
+      - [ ] spec-ready
+      ```
+
+      ### Extract Identifiers
+
+      **GitHub**:
+      From the issue creation output, extract and remember:
+      - The **issue number** (from the URL in the output, e.g., `https://github.com/owner/repo/issues/42` -> issue number is `42`)
+      - The **issue creator** username (get the authenticated user's login, since the bot is creating the issue on behalf of the user)
+
+      Report the issue URL to the user.
+
+      **GitLab**:
+      From the output, extract the issue URL and IID. Get the authenticated user's username (see reference).
+      Remember `issue_iid`, `issue_creator`. Report the issue URL to the user.
+
+      ### Welcome Comment
+
+      Post an initial welcome comment/note on the issue with this content:
+
+      > [bot reply] Welcome! I'll guide you through a spec generation process on this issue.
+      >
+      > Where would you like to start?
+      >
+      > 1. **Requirements clarification** (recommended) -- refine the idea through Q&A
+      > 2. **Research first** -- investigate specific technical topics before refining requirements
+      >
+      > Reply with your choice (1 or 2).
+
+      Now poll for the user's reply using the polling pattern from the guide.
+      When you receive a reply from the issue creator:
+      - If they choose requirements (1), transition to `start with requirements`
+      - If they choose research (2), transition to `start with research`
+
+      You MUST NOT proceed without the user's explicit choice via an issue comment/note.
+    transitions:
+      start with requirements: requirements
+      start with research: research
+
+  requirements:
+    from: "../spec-gen/workflow.yaml#requirements"
+    prompt: |
+      {{base}}
+
+      ### Issue Platform Adaptation
+
+      All interaction happens via issue comments (GitHub) or issue notes (GitLab).
+      Read the issue body/description first to understand the rough idea (instead of rough-idea.md).
+      Post each question as an issue comment/note. Poll for replies using the polling pattern.
+
+      You MUST ask ONE question at a time. Post a single question as an issue comment/note,
+      poll for the reply, record the Q&A pair, then ask the next question.
+      Do NOT batch multiple questions into one comment/note.
+
+      When compiling requirements:
+      1. Post the structured requirements as a `## requirements.md` artifact comment/note.
+      2. Update the issue body/description status checklist: check off "gathering requirements".
+      3. Post transition options as an issue comment/note:
+         - "Revise requirements"
+         - "Research first"
+         - "Proceed to design"
+         - "Fast forward" (skip to design, no intermediate approvals)
+      4. Poll for the user's choice via comment/note reply.
+
+  research:
+    from: "../spec-gen/workflow.yaml#research"
+    prompt: |
+      {{base}}
+
+      ### Issue Platform Adaptation
+
+      All interaction and output happens via issue comments (GitHub) or issue notes (GitLab)
+      -- do NOT write local files.
+      Post research findings as `## research/<topic-name>.md` artifact comments/notes,
+      following the Research Structure from the guide.
+
+      After completing research:
+      1. Update the issue body/description status checklist: check off "research".
+      2. Post transition options as an issue comment/note:
+         - "Back to requirements" -- clarify requirements with research findings
+      3. Poll for the user's choice via comment/note reply.
+    transitions:
+      back to requirements: requirements
+
+  design:
+    from: "../spec-gen/workflow.yaml#design"
+    prompt: |
+      {{base}}
+
+      ### Lite Mode Conditional
+
+      **If lite mode is active**, replace the full design format with the simplified 4-section format:
+
+      Required sections (exactly 4):
+      1. **Overview** -- one-paragraph summary of what we're building and why
+      2. **Goal & Constraints** -- derived from requirements and codebase exploration.
+         Goal: list of feature requirements (what the implementation must deliver).
+         Constraints: list of MUST NOTs (boundaries the implementation must not violate).
+      3. **Architecture & Components** -- merged section covering:
+         - High-level architecture with a Mermaid diagram
+         - Component responsibilities, API surface, and how components interact
+         - Key data structures, schemas, state, and their relationships
+         - Integration test cases verifying module boundaries. Format each test case as:
+           - **Given**: preconditions and setup
+           - **When**: the action or interaction under test
+           - **Then**: expected outcome
+      4. **E2E Testing** -- describe key end-to-end scenarios as user journeys. Read
+         `@packages/freeflow/docs/e2e-testing-design.md` for the verifier-executor model.
+         Format each as a named scenario with numbered steps mixing user actions,
+         system responses, and verification points:
+         ```
+         **Scenario: <name>**
+         1. User does X
+         2. System shows Y
+         3. User does Z
+         4. **Verify:** expected side effect
+         ```
+         **CRITICAL**: If e2e testing was required in requirements, every command, process,
+         or API referenced in the e2e scenarios MUST be covered by a component in the design.
+
+      Do NOT include an "Error Handling" section -- keep to exactly 4 sections.
+
+      Skip the "Design approaches" step (Step 1) -- proceed directly to the full design.
+
+      **If normal mode (not lite)**, use the full design format from the base spec-gen workflow
+      (all 8 sections including Architecture Overview, Components & Interfaces, Data Models,
+      Integration Testing, E2E Testing, Error Handling).
+
+      ### Issue Platform Adaptation
+
+      Skip the "Design approaches" step (Step 1) -- proceed directly to the full design.
+
+      **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT poll
+      for approval. Complete the design, post it as an artifact comment/note, update the status
+      checklist, and immediately transition to plan.
+
+      Before writing, read requirements and research from the local artifact cache:
+      ```bash
+      ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
+      ```
+      Use the Read tool on `$ARTIFACTS/requirements.md` and any files in `$ARTIFACTS/research/`.
+
+      Write the design to the local cache and post it per the artifact creation guide.
+      Ask for feedback via comment/note (approve / request changes / requirements gaps). Poll for reply.
+      Use in-place edit for revisions per the guide.
+
+      On approval, update the issue body/description status checklist: check off "design".
+    todos:
+      - Post design as issue comment/note (skip design approaches step)
+      - Get user approval via issue comment/note (skip in fast-forward mode)
+
+  plan:
+    from: "../spec-gen/workflow.yaml#plan"
+    prompt: |
+      {{base}}
+
+      ### Lite Mode Conditional
+
+      **If lite mode is active**, produce exactly 1 step covering ALL implementation instead
+      of N steps per component.
+
+      Required format for lite mode:
+      ```markdown
+      # Implementation Plan: <Feature Name>
+
+      ## Checklist
+      - [ ] Step 1: Implement the feature
+
+      ---
+
+      ## Step 1: Implement the feature
+
+      **Depends on**: none
+
+      **Objective**: Implement all components described in design.md.
+
+      **Sub-items**:
+      - <bullet referencing design component 1>
+      - <bullet referencing design component 2>
+      - ...
+
+      **Related Files**: <all files from design>
+
+      **Test Requirements**: <integration tests from design>
+      ```
+
+      Step 1 sub-items MUST reference the specific components from design.md's
+      Architecture & Components section. Each bullet should describe what to implement
+      for that component.
+
+      **CRITICAL: E2E completeness check.** If design.md has an E2E Testing section,
+      verify that EVERY command, server process, or setup step referenced in the e2e
+      scenarios has a corresponding sub-item in Step 1.
+
+      Constraints for lite mode:
+      - Exactly 1 step. Do NOT add more steps. No separate e2e step in the plan --
+        spec-to-code handles e2e testing automatically when e2e.md exists.
+      - You MUST NOT duplicate design details -- reference design.md sections instead.
+      - You MUST present the plan to the user and iterate on feedback until approved.
+
+      **If normal mode (not lite)**, use the full multi-step plan format from the base
+      spec-gen workflow (N steps per component, dependency graph, integration test step).
+
+      ### Issue Platform Adaptation
+
+      **Fast forward mode**: If the user chose "fast forward" at requirements, do NOT poll
+      for approval. Complete the plan, post it as an artifact comment/note, update the status
+      checklist and plan task list in the issue body/description, and immediately transition to e2e-gen.
+
+      Read the design from the local artifact cache:
+      ```bash
+      ARTIFACTS="$HOME/.freeflow/runs/{run_id}/artifacts"
+      ```
+      Use the Read tool on `$ARTIFACTS/design.md`.
+
+      Write the plan to the local cache and post it per the artifact creation guide.
+      Also update the issue body/description to add the plan steps as a `## Plan` task checklist.
+      Update the issue body/description status checklist: check off "plan".
+
+      Ask for feedback via comment/note (approve / request changes / design revision). Poll for reply.
+      Use in-place edit for revisions per the guide. Also update the issue body/description plan
+      checklist when revising.
+    todos:
+      - Post plan as issue comment/note with plan checklist in issue body/description
+      - Get user approval via issue comment/note (skip in fast-forward mode)
+
+  e2e-gen:
+    from: "../spec-gen/workflow.yaml#e2e-gen"
+    prompt: |
+      {{base}}
+
+      ### Issue Platform Adaptation
+
+      Read `$HOME/.freeflow/runs/{run_id}/artifacts/design.md` for the design artifact.
+      If generating e2e.md, write it to the local cache and post per the artifact creation guide.
+      Update the issue body/description: append an `### E2E Testing` section and add `- [ ] e2e`
+      to the Status checklist.
+
+  done:
+    prompt: |
+      ## Done -- Finalize Spec Issue
+
+      Finalize the issue by adding the label, completing the status checklist, and posting a summary.
+
+      Steps:
+      1. Add the `spec-ready` label to the issue.
+         - **GitHub**: If the label does not exist on the repo yet, create it first
+           (description: "Spec is complete and ready for implementation").
+           If creation fails because it already exists, that is fine -- proceed.
+         - **GitLab**: Create the `spec-ready` label via API if it doesn't already exist
+           (see reference), then add the label to the issue.
+
+      2. Update the issue body/description status checklist: check off ALL remaining items including "spec-ready".
+
+      3. Compile a list of all artifact comments/notes from the ID tracking file (`$IDS_FILE`).
+         For each artifact, include its filename and a link:
+         - **GitHub**: Use the issue comment URL format:
+           `https://github.com/{owner}/{repo}/issues/{n}#issuecomment-{comment_id}`
+         - **GitLab**: Use the issue note URL format:
+           `{gitlab_url}/{project_path}/-/issues/{iid}#note_{note_id}`
+
+      4. Update the issue body/description to append a summary section after the Status section:
+         ```markdown
+         ## Summary
+
+         ### Design
+         {2-3 sentence high-level description of the architecture from design.md}
+
+         ### E2E Testing
+         {If e2e.md was generated: describe how to run e2e tests (`fflow verify e2e.md`),
+         what scenarios are covered, and note that e2e has not been executed yet --
+         it runs during spec-to-code.
+         If no e2e: state that e2e testing was not included in this spec.}
+         ```
+
+      5. Post a summary comment/note with an artifacts table and next steps.
+
+      6. Report completion to the user: display the issue URL and confirm the spec is ready.
+
+      The issue is left **open** -- it serves as the living spec for implementation.
+      This is the terminal state. The workflow ends here.
+    transitions: {}
