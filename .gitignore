@@ -5,3 +5,4 @@ dist/
 .fc-worktrees/
 .worktrees/
 docs/plans/
+specs/

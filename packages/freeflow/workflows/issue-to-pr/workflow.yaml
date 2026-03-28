@@ -1,8 +1,11 @@
-# Issue-to-PR — end-to-end pipeline from GitHub issue to merged pull request.
+# Issue-to-PR — end-to-end pipeline from issue to merged pull request / merge request.
+#
+# Platform-agnostic: supports both GitHub and GitLab, detected from argument
+# format and git remote URL. Supports --lite mode for simplified specs.
 #
 # Flow:
 #
-#   start ──→ spec (github-spec-gen)
+#   start ──→ spec (issue-to-spec)
 #                  |
 #               decide
 #              /   |   \
@@ -22,22 +25,31 @@
 #           done
 
 version: 1.2
-extends_guide: ../github-spec-gen/workflow.yaml
+extends_guide: ../issue-to-spec/workflow.yaml
 guide: |
   {{base}}
 
   ### Issue-to-PR — Composition Guide
 
-  This workflow composes `github-spec-gen`, `spec-to-code`, and `pr-lifecycle` into a
-  single end-to-end pipeline driven entirely through a GitHub issue.
+  This workflow composes `issue-to-spec`, `spec-to-code`, and `pr-lifecycle` into a
+  single end-to-end pipeline driven entirely through an issue (GitHub or GitLab).
+
+  #### Platform Detection
+
+  Platform detection is handled by the `issue-to-spec` sub-workflow in its `create-issue` state.
+  The detected `platform` value (`github` or `gitlab`) is propagated through agent memory.
+  In states that need to post comments/notes (decide, confirm-implement, confirm-pr, done),
+  use the polling pattern from the `issue-to-spec` guide based on the remembered platform.
 
   #### Input Modes
 
   The workflow accepts two input modes:
-  - **New idea**: The user provides a repo name and a rough idea description.
+  - **New idea**: The user provides a repo/project name and a rough idea description.
     The `spec` sub-workflow will create a new issue and run the full spec-gen process.
-  - **Existing issue**: The user provides `owner/repo#N`. The `start` state fetches
+  - **Existing issue**: The user provides an issue reference. The `start` state fetches
     the issue context and attaches to it, then hands off to `spec`.
+    - **GitHub**: `owner/repo#N`
+    - **GitLab**: GitLab issue URL or `project/path#N`
 
   #### Execution Modes
 
@@ -45,28 +57,52 @@ guide: |
   - **Full auto**: All gates are skipped. `spec-to-code` runs in fast-forward mode
     (no intermediate approvals at setup). `confirm-pr` transitions directly to `submit-pr`.
   - **Fast forward**: Gates pause for confirmation. The agent polls the issue for the
-    user's go-ahead before implementation and before PR submission.
+    user's go-ahead before implementation and before PR/MR submission.
   - **Stop here**: The workflow ends after the spec is generated.
+
+  #### Lite Mode
+
+  This workflow supports `--lite` mode, which produces simplified spec artifacts.
+  Lite mode is detected from:
+  - The user's arguments (e.g., `--lite` flag)
+  - A parent workflow propagating the flag
+
+  When lite mode is active, it is propagated to the `issue-to-spec` sub-workflow, which
+  produces simplified design (4 sections) and plan (1 step) artifacts.
 
   #### Agent Memory
 
   You MUST remember these values across states (keep them in your conversation memory):
-  - `repo` — the `owner/repo` string (e.g., `freematters/testbed`)
+
+  **Common (both platforms)**:
+  - `platform` — `github` or `gitlab`
+  - `slug` — spec directory slug (derived from issue title)
+  - `mode` — `full-auto` or `fast-forward` (set in `decide` state)
+  - `lite` — whether `--lite` was specified
+
+  **GitHub-specific**:
+  - `owner` — repository owner
+  - `repo` — repository name (the `owner/repo` string)
   - `issue_number` — the GitHub issue number
   - `issue_creator` — the username of the issue creator
-  - `mode` — `full-auto` or `fast-forward` (set in `decide` state)
-  - `slug` — spec directory slug (derived from issue title)
+
+  **GitLab-specific**:
+  - `project_path` — the full GitLab project path (e.g., `group/subgroup/project`)
+  - `gitlab_url` — the GitLab instance URL (e.g., `https://gitlab.corp.metabit-trading.com`)
+  - `hostname` — the GitLab hostname (e.g., `gitlab.corp.metabit-trading.com`)
+  - `issue_iid` — the GitLab issue IID (project-scoped)
+  - `issue_creator` — the username of the issue creator
 
   #### Fast-Forward Propagation
 
   When the user chose **fast-forward** mode:
-  - `github-spec-gen` runs in fast-forward mode (user chose "fast forward" at requirements)
+  - `issue-to-spec` runs in fast-forward mode (user chose "fast forward" at requirements)
   - Gate states (`confirm-implement`, `confirm-pr`) poll the issue for confirmation at 20s intervals
 
   #### Full-Auto Propagation
 
   When the user chose **full auto** mode:
-  - `github-spec-gen` runs in fast-forward mode
+  - `issue-to-spec` runs in fast-forward mode
   - Gate states are skipped entirely (no polling)
   - In `spec-to-code`'s setup state, select "fast forward" when prompted
   - `confirm-pr` transitions directly to `submit-pr` without asking
@@ -76,33 +112,32 @@ initial: start
 states:
   start:
     prompt: |
-      ## Detect Input Mode
+      ## Parse Input and Detect Lite Mode
 
-      Parse the user's prompt to determine the input mode:
+      Parse the user's prompt to extract the issue reference or idea description.
+      Platform detection is handled by the `issue-to-spec` sub-workflow — you do NOT
+      need to detect GitHub vs GitLab here.
 
-      ### Existing Issue (`owner/repo#N`)
+      ### Lite Mode Detection
 
-      If the input matches `owner/repo#N` (regex: `[\w.-]+/[\w.-]+#\d+`):
+      Check if the user specified `--lite` in their arguments or if a parent workflow
+      propagated the lite flag. Remember `lite = true` or `lite = false`.
 
-      1. Parse `owner`, `repo`, and `issue_number` from the reference.
-      2. Verify the issue exists and fetch its context (title, body, creator, labels).
-         If the issue doesn't exist (404), report the error and stop.
-      3. Extract and remember: `repo` = `{owner}/{repo}`, `issue_number`, `issue_creator`.
-      5. Derive `slug` from the issue title (lowercase, hyphens, no special chars).
-      6. Transition to `proceed`.
+      ### Input Parsing
 
-      ### New Idea
+      Extract whatever the user provided:
+      - An issue reference (e.g., `owner/repo#N`, a GitLab URL, `project/path#N`)
+      - A repo/project name + rough idea description
 
-      If the input is a rough idea with a repo name (not matching the issue pattern):
+      Pass the parsed input through to the `spec` sub-workflow, which will handle
+      platform detection, issue creation, and spec generation.
 
-      1. Extract the repo name from the user's prompt.
-      2. Remember `repo`.
-      3. Transition to `proceed` — the spec sub-workflow will create the issue.
+      Transition to `proceed`.
     transitions:
       proceed: spec
 
   spec:
-    workflow: ../github-spec-gen/workflow.yaml
+    workflow: ../issue-to-spec/workflow.yaml
     transitions:
       completed: decide
 
@@ -116,17 +151,18 @@ states:
       ```
       Read `$ARTIFACTS/requirements.md` and `$ARTIFACTS/design.md` for a brief summary.
 
-      Post a comment on the issue asking the user to choose an execution mode:
+      Post a comment/note on the issue asking the user to choose an execution mode.
+      Use "PR" for GitHub, "MR" for GitLab:
 
       ```
       [bot reply] ## Spec Complete!
 
       The spec is ready. How would you like to proceed?
 
-      1. **Full auto** -- implement the spec and submit a PR without any human approvals.
-         Spec-to-code runs in fast-forward mode and PR submission starts automatically.
+      1. **Full auto** -- implement the spec and submit a PR/MR without any human approvals.
+         Spec-to-code runs in fast-forward mode and submission starts automatically.
       2. **Fast forward** -- proceed to implementation, but pause before starting and before
-         creating the PR for your confirmation.
+         creating the PR/MR for your confirmation.
       3. **Stop here** -- keep the spec artifacts and end the workflow.
 
       Reply with your choice (1, 2, or 3).
@@ -139,7 +175,7 @@ states:
       - If they choose 2 (fast forward): remember `mode = "fast-forward"`, transition to `fast forward`
       - If they choose 3 (stop here): transition to `stop here`
 
-      You MUST NOT proceed without the user's explicit choice via an issue comment.
+      You MUST NOT proceed without the user's explicit choice via an issue comment/note.
     transitions:
       full auto: implement
       fast forward: confirm-implement
@@ -179,7 +215,7 @@ states:
 
   confirm-pr:
     prompt: |
-      ## Confirm PR Submission
+      ## Confirm PR/MR Submission
 
       Implementation is complete. Read `./specs/{slug}/implementation-summary.md` and present
       the key results.
@@ -199,10 +235,11 @@ states:
       **Full auto mode** (`mode == "full-auto"`): Transition directly to `submit pr` without
       asking the user. Do NOT poll.
 
-      **Fast forward mode** (`mode == "fast-forward"`): Add to the comment:
+      **Fast forward mode** (`mode == "fast-forward"`): Add to the comment/note
+      (use "pull request" for GitHub, "merge request" for GitLab):
 
       ```
-      Ready to create a pull request. Reply **submit** to proceed, or **stop** to end here.
+      Ready to create a pull/merge request. Reply **submit** to proceed, or **stop** to end here.
       ```
 
       Poll for the user's reply using the polling pattern from the guide.
@@ -215,7 +252,7 @@ states:
       stop here: done
 
   submit-pr:
-    workflow: ../github-pr-lifecycle/workflow.yaml
+    workflow: ../pr-lifecycle/workflow.yaml
     transitions:
       completed: done
 
@@ -223,19 +260,19 @@ states:
     prompt: |
       ## Workflow Complete
 
-      Post a final summary comment on the issue:
+      Post a final summary comment/note on the issue (use "PR" for GitHub, "MR" for GitLab):
 
       ```
-      [bot reply] ## Issue-to-PR Complete
+      [bot reply] ## Workflow Complete
 
-      **Phases completed**: {list phases: spec / spec + implementation / spec + implementation + PR}
+      **Phases completed**: {list phases: spec / spec + implementation / spec + implementation + PR/MR}
       **Artifacts**: {list key artifacts produced}
-      **PR**: {PR URL if applicable, otherwise "N/A"}
+      **PR/MR**: {URL if applicable, otherwise "N/A"}
       **Mode**: {full-auto / fast-forward}
       ```
 
-      If the workflow stopped early (e.g., after spec only), suggest the next manual step
-      the user can take (e.g., "run `/spec-to-code` with `owner/repo#N` to implement").
+      If the workflow stopped early (e.g., after spec only), suggest running
+      `/spec-to-code` with the issue reference to continue implementation.
 
       Present the final summary to the user.
     transitions: {}

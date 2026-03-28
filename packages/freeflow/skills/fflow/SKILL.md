@@ -136,7 +136,7 @@ SCRIPT_DIR=$(fflow resolve <workflow-name-or-path> --wf-dir)
 
 Examples:
 ```bash
-fflow resolve github-pr-lifecycle --wf-dir   # → /path/to/workflows/github-pr-lifecycle
+fflow resolve pr-lifecycle --wf-dir           # → /path/to/workflows/pr-lifecycle
 fflow resolve spec-to-code --wf-dir          # → /path/to/workflows/spec-to-code
 ```
 

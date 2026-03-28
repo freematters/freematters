@@ -99,7 +99,7 @@ states:
       **Local mode**: The argument is the spec directory path (e.g., `./specs/my-feature/`).
 
       If `./specs/<slug>/plan.md` or `./specs/<slug>/design.md` does not exist, inform the user and suggest
-      running the spec-gen workflow first (`/fflow spec-gen`) or the github-spec-gen workflow for issue-driven specs.
+      running the spec-gen workflow first (`/fflow spec-gen`) or the issue-to-spec workflow for issue-driven specs.
 
       ### 3. Prepare feature branch
 
@@ -154,6 +154,9 @@ states:
       Parse the **Depends on** field of each unchecked step to build a dependency graph.
       Identify all steps whose dependencies are already satisfied (checked or "none") —
       these are immediately ready to dispatch.
+
+      Create a todo item for each unchecked step (using the step title).
+      Mark each todo as completed when the step is merged.
 
       ### 2. Dispatch & schedule
 
@@ -488,7 +491,7 @@ states:
       3. Write `./specs/<slug>/source-issue` containing the issue reference
          (e.g., `owner/repo#42`) so that pr-lifecycle can link the PR to the issue.
 
-      4. Update the issue body's Summary section (added by github-spec-gen) to reflect e2e results.
+      4. Update the issue body's Summary section (added by issue-to-spec) to reflect e2e results.
          Re-read the current issue body, then update the `### E2E Testing` subsection with
          the actual result (pass/fail, attempt count). If the section doesn't exist, add it.
 

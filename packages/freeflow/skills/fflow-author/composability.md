@@ -61,7 +61,7 @@ Embed a child workflow as a single state. Child states are namespaced (`parent/c
 version: 1.2
 states:
   spec:
-    workflow: ../github-spec-gen/workflow.yaml
+    workflow: ../issue-to-spec/workflow.yaml
     transitions:
       completed: implement
   implement:
