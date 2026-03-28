@@ -155,6 +155,9 @@ states:
       Identify all steps whose dependencies are already satisfied (checked or "none") —
       these are immediately ready to dispatch.
 
+      Create a todo item for each unchecked step (using the step title).
+      Mark each todo as completed when the step is merged.
+
       ### 2. Dispatch & schedule
 
       Run a scheduling loop:
