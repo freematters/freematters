@@ -11,3 +11,9 @@
 - **What was built**: Unified pr-lifecycle workflow with platform-conditional branches in each state. Scripts copied to `scripts/` subdirectory.
 - **Tests**: No automated tests (manual verification per plan)
 - **Notes**: Platform-neutral transition labels (ready, merged, closed). All detail from both workflows preserved.
+
+## Step 3: Unify issue-to-spec
+- **Files changed**: `packages/freeflow/workflows/issue-to-spec/workflow.yaml`, `scripts/poll_issue.py`, `scripts/poll_issue_gl.py`
+- **What was built**: Unified issue-to-spec workflow merging github-spec-gen, gitlab-spec-gen, and github-spec-gen-lite. Platform conditionals + lite mode support.
+- **Tests**: No automated tests (manual verification per plan)
+- **Notes**: Artifact management pattern shared in guide, platform-specific API details in each state.
