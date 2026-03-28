@@ -1,0 +1,444 @@
+# Flow:
+#
+#   create-pr -> poll <-----------+
+#                / | \  \         |
+#          rebase fix address done
+#             |    |     |
+#            push push  push
+#             |    |     |
+#             +----+-----+-------+
+#
+
+version: 1
+guide: |
+  Monitor a PR/MR until it is merged or closed.
+  Automatically fix CI failures, rebase when needed, and address review blockers
+  and `@bot` mentions.
+
+  ## Platform detection
+
+  Detect the hosting platform from the git remote URL:
+  ```bash
+  git remote get-url origin
+  ```
+  - URL contains "github" -> **GitHub**
+  - URL contains "gitlab" -> **GitLab**
+  - Otherwise -> ask the user which platform they are using.
+
+  Remember the detected `platform` ("github" or "gitlab") and use it throughout
+  all states to select the correct CLI tools, APIs, and status files.
+
+  ## Reference docs
+
+  Resolve the workflow script directory:
+  ```bash
+  SCRIPT_DIR="$(dirname "$(readlink -f "$(fflow current --run-id <run_id> -j | jq -r '.data.fsm_path')")")"
+  ```
+
+  Read the appropriate reference doc for CLI conventions, auth, and API patterns:
+  - **GitHub**: `$SCRIPT_DIR/../references/github-cli.md`
+  - **GitLab**: `$SCRIPT_DIR/../references/gitlab-cli.md`
+
+  ## Workflow directory
+
+  `WF_DIR = ~/.freeflow/runs/<run_id>/`
+
+  This is the workflow's working directory. The poll script writes a status file here,
+  and other states read it for PR/MR status, CI results, review threads, and `@bot` mentions.
+  - **GitHub**: `pr_status.json`
+  - **GitLab**: `mr_status.json`
+
+  ## Agent memory
+
+  Track these values across states:
+  - `platform`: "github" or "gitlab"
+  - `target_branch`: Target branch for the PR/MR
+  - `source_branch`: Source branch for the PR/MR
+  - **GitHub**: `owner`, `repo`, `pr_number`, `pr_url`
+  - **GitLab**: `project_path`, `gitlab_url`, `mr_iid`, `hostname`
+
+  ## Interaction model
+
+  All user-initiated interaction goes through `@bot` mentions in inline review threads
+  or PR/MR-level comments/notes. All @bot mentions exit poll to the `address` state for handling.
+
+  All pr-lifecycle replies MUST be prefixed with `[from bot]` to distinguish agent-generated
+  comments/notes from human-authored ones.
+
+  ## Thread resolution
+
+  After fixing issues, the `push` state replies with `[from bot]` and resolves the thread.
+  - **GitHub**: `resolveReviewThread` GraphQL mutation. Both pr-lifecycle and the code-review
+    pipeline can resolve threads -- whichever gets there first.
+  - **GitLab**: PUT `.../discussions/{id}` with `resolved=true`. See GitLab CLI reference
+    for the API call.
+
+  ## `@bot` dedup rules
+
+  - **GitHub inline threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
+  - **GitHub issue comments**: a `@bot` mention is handled if it has a rocket reaction
+  - **GitLab discussion threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
+  - **GitLab standalone notes**: a `@bot` mention is handled if it has a rocket award emoji
+
+initial: create-pr
+
+states:
+  create-pr:
+    prompt: |
+      ## Platform detection
+
+      Detect the hosting platform:
+      ```bash
+      REMOTE_URL=$(git remote get-url origin)
+      ```
+      - If `$REMOTE_URL` contains "github" -> platform is **GitHub**
+      - If `$REMOTE_URL` contains "gitlab" -> platform is **GitLab**
+      - Otherwise -> ask the user which platform they are using.
+
+      Remember the `platform` value for all subsequent states.
+      Read the appropriate reference doc (see guide).
+
+      ## Authentication
+
+      Verify authentication for the detected platform (see reference).
+      - **GitHub**: Verify GitHub authentication. If not logged in, prompt user to authenticate.
+      - **GitLab**: Verify GitLab authentication. If not logged in, prompt user to configure auth.
+
+      ## Shared steps
+
+      Once authenticated:
+      - Run lint/format checks (refer to project CLAUDE.md for check commands). Fix any failures first.
+      - **Exclude spec directory**: If a `./specs/<feature>/` directory exists for this feature,
+        ensure it is NOT included in the PR/MR. Add it to `.gitignore` or unstage it
+        before committing. Spec artifacts are working documents and should not ship with the PR/MR.
+      - Commit all local changes.
+      - Check if the current branch already has an open PR/MR.
+        If one exists, push the branch, record the URL and identifiers, and check if the description needs updating.
+      - If none exists, create a new PR/MR:
+        - Target branch: Use user-specified branch if provided, otherwise use the repo's default branch.
+        - Compare against target branch and summarize changes as the description.
+        - Use conventional commit format for the title.
+        - Check for `./specs/*/source-issue` -- if it exists, read the issue reference and link
+          the PR/MR to the source issue.
+
+      ## Platform-specific creation
+
+      **GitHub**:
+      - Create PR with `gh pr create`.
+      - Link source issue with `Closes owner/repo#N` or `Resolves owner/repo#N` in the description.
+      - Remember `owner`, `repo`, `pr_number`, `pr_url`.
+
+      **GitLab**:
+      - Create MR with `glab mr create --remove-source-branch --squash-before-merge --push --yes`.
+      - Link source issue with `Closes #N` in the description.
+      - Remember `project_path`, `gitlab_url`, `mr_iid`, `hostname`, `source_branch`, `target_branch`.
+
+      ## Post-creation comment
+
+      After the PR/MR is created (or found), post a comment/note with:
+      1. **Implementation summary**: A concise overview of what was implemented and key design decisions.
+      2. **Integration test results**: Run integration tests (if any) and include the output.
+      3. **E2E test results**: If `e2e.md` exists in the spec directory (`./specs/<feature>/e2e.md`)
+         or in the project, run the e2e tests and include the output.
+
+      **GitHub** format:
+      ```
+      ## Implementation Summary
+      <summary>
+
+      ## Integration Test Results
+      <test output or "N/A -- no integration tests">
+
+      ## E2E Test Results
+      <test output or "N/A -- no e2e tests">
+      ```
+
+      **GitLab** format (note the `[from bot]` prefix):
+      ```
+      [from bot]
+      ## Implementation Summary
+      <summary>
+
+      ## Integration Test Results
+      <test output or "N/A -- no integration tests">
+
+      ## E2E Test Results
+      <test output or "N/A -- no e2e tests">
+      ```
+
+      Record all platform-specific identifiers -- subsequent states will need them.
+    transitions:
+      ready: poll
+
+  poll:
+    prompt: |
+      Run the bundled polling script as a **background bash job** so the conversation is not blocked.
+
+      Resolve the script directory:
+      ```bash
+      SCRIPT_DIR="$(dirname "$(readlink -f "$(fflow current --run-id <run_id> -j | jq -r '.data.fsm_path')")")"
+      ```
+
+      ## Running the script
+
+      **GitHub**:
+      ```bash
+      python3 "$SCRIPT_DIR/scripts/poll_pr.py" <owner> <repo> <pr_number> \
+        --target <target_branch> --interval 20 --wf-dir "$WF_DIR"
+      ```
+      The script writes `pr_status.json` to `WF_DIR` on every cycle with the latest PR state,
+      CI results, bot review threads, and `@bot` mentions. Other states read this file directly.
+
+      **GitLab**:
+      ```bash
+      python3 "$SCRIPT_DIR/scripts/poll_mr_gl.py" <project_path> <mr_iid> \
+        --target <target_branch> --interval 20 --wf-dir "$WF_DIR" \
+        --hostname <hostname>
+      ```
+      The script writes `mr_status.json` to `WF_DIR` on every cycle with the latest MR state,
+      pipeline results, unresolved discussions, and `@bot` mentions. Other states read this file directly.
+
+      ## What the script monitors (every cycle)
+
+      - **PR/MR state**: merged or closed -> exits
+      - **Target branch**: new commits ahead of HEAD -> exits with `needs rebase`
+        - **GitLab additional**: `detailed_merge_status == need_rebase` -> exits with `needs rebase`
+      - **CI status**:
+        - **GitHub**: all checks finished with failures -> exits with `needs fix`
+        - **GitLab**: pipeline finished with failure -> exits with `needs fix`
+      - **Review threads / @bot mentions**: blocker-severity reviews or unhandled @bot -> exits with `needs address`
+
+      ## `@bot` dedup rules (implemented in the scripts)
+
+      - **GitHub inline threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
+      - **GitHub issue comments**: a `@bot` mention is handled if it has a rocket reaction
+      - **GitLab discussion threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
+      - **GitLab standalone notes**: a `@bot` mention is handled if it has a rocket award emoji
+
+      ## Exit RESULT lines
+
+      The script prints one of these and exits:
+      - **GitHub**: `RESULT: PR merged` / `RESULT: PR closed` -> transition to done
+      - **GitLab**: `RESULT: MR merged` / `RESULT: MR closed` -> transition to done
+      - `RESULT: needs rebase` -> transition to rebase
+      - `RESULT: needs fix` -> transition to fix
+      - `RESULT: needs address` -> transition to address (script prints @bot context)
+
+      When running the script in the background, do NOT redirect stdout/stderr to a file --
+      let output go to the terminal so the user can observe progress in real time.
+      When the job completes, read its output from the task output and transition based on the RESULT line.
+    transitions:
+      needs fix: fix
+      needs rebase: rebase
+      needs address: address
+      merged: done
+      closed: done
+
+  fix:
+    prompt: |
+      Fix CI failures.
+
+      ## Steps
+
+      1. Read the status file for failed checks/pipeline:
+         - **GitHub**: Read `WF_DIR/pr_status.json` -- check `ci.checks` for failed checks.
+         - **GitLab**: Read `WF_DIR/mr_status.json` -- check `pipeline_status` for failure.
+      2. Read the failed job logs to understand the failures:
+         - **GitHub**: See reference for viewing run logs.
+         - **GitLab**: Fetch failed pipeline jobs and their logs (see reference for CI job APIs).
+      3. Fix the code to resolve the CI failures.
+      4. Run lint/format/unit tests locally to confirm the fix doesn't introduce new issues
+         (refer to project CLAUDE.md for check commands).
+
+      If upon inspection there is nothing to fix (e.g., flaky test that passed on re-read),
+      transition back to polling.
+    todos:
+      - Read status file for failed CI checks / pipeline status
+      - Read failed job logs
+      - Fix the code
+      - Run lint/format/unit tests to verify
+    transitions:
+      fixed: push
+      nothing to fix: poll
+
+  rebase:
+    prompt: |
+      Rebase onto the latest target branch.
+
+      ## Pre-check: verify PR/MR is still open
+
+      The target branch may have been updated because THIS PR/MR was just merged.
+      Before rebasing, wait 2 seconds and then check if the PR/MR is still open.
+      If the state is `MERGED`/`merged` or `CLOSED`/`closed`, skip the rebase and transition to `merged`.
+
+      ## Steps
+
+      **GitLab** (try API rebase first):
+      1. **Try GitLab native rebase API first** (preferred -- no local git operations needed).
+         Trigger a rebase via the GitLab API (see reference), wait a few seconds, and verify
+         it succeeded (no `rebase_in_progress` and no `merge_error`).
+      2. **Fallback to local rebase** if the API rebase fails (e.g., conflicts):
+         Fetch and rebase onto the latest target branch locally.
+         If there are conflicts, resolve them autonomously. Read the conflicting files,
+         understand the intent of both changes, and merge them correctly.
+
+      **GitHub** (local rebase):
+      1. Fetch the latest target branch.
+      2. Rebase onto the target branch.
+      3. If there are conflicts, resolve them autonomously. Read the conflicting files,
+         understand the intent of both changes, and merge them correctly.
+
+      ## Verify
+
+      Run lint/format/unit tests locally to confirm the rebase doesn't break anything
+      (refer to project CLAUDE.md for check commands).
+    todos:
+      - Check if PR/MR was merged before rebasing
+      - "GitLab: Try GitLab native rebase API"
+      - Fallback to local git rebase if needed
+      - Resolve any conflicts
+      - Run lint/format/unit tests to verify
+    transitions:
+      rebased: push
+      merged: done
+
+  address:
+    prompt: |
+      Address review blockers and/or `@bot` mentions.
+
+      Read the status file for the current state:
+      - **GitHub**: `WF_DIR/pr_status.json`
+      - **GitLab**: `WF_DIR/mr_status.json`
+
+      ## What to address (priority order)
+
+      1. **`@bot` mentions** (highest priority -- user requests):
+         - React with eyes emoji on each `@bot` comment/note immediately to acknowledge receipt.
+           - **GitHub**: React with eyes on the comment.
+           - **GitLab**: Add eyes award emoji on the note (see reference for emoji API).
+         - Read the mention details from the status file:
+           - **GitHub**: `mentions` array in `pr_status.json`
+           - **GitLab**: `bot_mentions` array in `mr_status.json`
+         - For code change requests: make the requested modifications
+         - For questions: prepare an answer (will be posted in push state)
+
+      2. **Review blockers**:
+         - **GitHub**: Read `bot_review_threads` from `pr_status.json`
+         - **GitLab**: Read `discussions` from `mr_status.json`
+         - Fix threads with `severity: "blocker"` only
+         - Skip major/minor severity -- leave for the user to address
+
+      **Scope rule**: Only act on items that match the criteria above. Do NOT fix
+      review threads that are major/minor severity without an `@bot` mention,
+      even if the suggestion looks reasonable. If a review thread also has an
+      `@bot` mention, address the `@bot` request -- not the review suggestion.
+
+      **User priority rule**: If a `@bot` instruction contradicts a review blocker,
+      follow the user's `@bot` instruction and skip that blocker. The code-review
+      pipeline will re-evaluate in its next run.
+
+      ## After fixing
+
+      Run lint/format/unit tests locally to confirm fixes don't introduce new issues
+      (refer to project CLAUDE.md for check commands).
+
+      ## Before transitioning to push
+
+      Run the poll script with `--once` to re-check for new `@bot` mentions:
+
+      **GitHub**:
+      ```bash
+      python3 "$SCRIPT_DIR/scripts/poll_pr.py" <owner> <repo> <pr_number> \
+        --target <target_branch> --wf-dir "$WF_DIR" --once
+      ```
+
+      **GitLab**:
+      ```bash
+      python3 "$SCRIPT_DIR/scripts/poll_mr_gl.py" <project_path> <mr_iid> \
+        --target <target_branch> --wf-dir "$WF_DIR" --hostname <hostname> --once
+      ```
+
+      Read the updated status file -- if new mentions appeared, loop back
+      and address them before proceeding to push.
+
+      If upon inspection there is nothing to address, transition back to polling.
+    todos:
+      - Read status file for mentions and review threads
+      - React with eyes emoji on each @bot comment/note to acknowledge receipt
+      - Handle @bot mentions (code changes or prepare answers)
+      - Fix blocker-severity review threads
+      - Run lint/format/unit tests to verify
+      - Re-check for new @bot mentions before transitioning
+    transitions:
+      addressed: push
+      new mentions: address
+      nothing to address: poll
+
+  push:
+    prompt: |
+      Commit and push the changes.
+
+      ## Actions
+
+      1. **Check for local changes**: If there are no local changes (e.g., only a rebase
+         with no conflicts, or only an API rebase), skip the commit step.
+
+      2. **Commit and push** to the remote branch. Use force push (`--force-with-lease`)
+         if the current state was entered from `rebase`.
+
+      3. **Update PR/MR description** if the implementation approach changed while addressing
+         review feedback or `@bot` requests.
+
+      4. **For review blockers that were fixed**: Reply in the thread explaining what
+         was fixed. The reply body MUST start with `[from bot]` (e.g.,
+         `[from bot] Fixed by adding null check in foo.ts:42`).
+         Then resolve the thread:
+         - **GitHub**: Use the `resolveReviewThread` GraphQL mutation (see reference).
+         - **GitLab**: PUT `.../discussions/{id}` with `resolved=true` (see reference for
+           thread resolution and note APIs).
+
+      5. **For `@bot` code change requests that were fixed**: Reply in the same thread
+         (inline) or as a new comment/note (issue-level/standalone) with body starting
+         with `[from bot]`, explaining what was changed. Then resolve the thread
+         (for inline/discussion threads):
+         - **GitHub**: `resolveReviewThread` GraphQL mutation for inline threads.
+         - **GitLab**: PUT `.../discussions/{id}` with `resolved=true` for discussion threads.
+           See reference for note and thread resolution APIs.
+
+      6. **For `@bot` questions**: Reply with body starting with `[from bot]` answering
+         the question. Do NOT resolve the thread -- the user may want to follow up.
+
+      7. **React to processed `@bot` comments/notes**: Add rocket reaction/emoji as the
+         dedup signal that the request has been handled.
+         - **GitHub**: Add rocket reaction on the issue comment.
+         - **GitLab**: Add rocket award emoji on the standalone note (see reference for emoji API).
+
+      8. **Append a push summary to the PR/MR description** summarizing what changed in this round.
+         Read the current description, then append a new section at the bottom using this format:
+         ```
+         ## Push round N
+         - <bullet point for each change made in this round>
+         ```
+         Where N is the push round number (count existing `## Push round` headings in the
+         description and add 1). Update the description with the appended section.
+         If there are no meaningful changes (e.g., only a rebase with no conflicts), skip this step.
+    todos:
+      - Commit all changes (skip if no local changes)
+      - Push to remote (force push if rebased)
+      - Reply on addressed review threads with [from bot] prefix + resolve thread
+      - Reply on addressed @bot inline/discussion threads with [from bot] prefix + resolve (code changes only)
+      - Reply on addressed @bot issue comments/standalone notes with [from bot] prefix (code changes only)
+      - React to processed @bot comments/notes with rocket reaction/emoji
+      - Update PR/MR description summary if implementation approach changed
+      - Append push summary to PR/MR description
+    transitions:
+      pushed: poll
+
+  done:
+    prompt: |
+      The PR/MR has been merged or closed. Output a final summary:
+      - PR/MR URL
+      - Final status (merged or closed)
+      - Total `@bot` interactions handled
+      - Brief overview of main fixes applied
+    transitions: {}
