@@ -17,3 +17,25 @@
 - **What was built**: Unified issue-to-spec workflow merging github-spec-gen, gitlab-spec-gen, and github-spec-gen-lite. Platform conditionals + lite mode support.
 - **Tests**: No automated tests (manual verification per plan)
 - **Notes**: Artifact management pattern shared in guide, platform-specific API details in each state.
+
+## Step 4: Unify issue-to-pr
+- **Files changed**: `packages/freeflow/workflows/issue-to-pr/workflow.yaml`
+- **What was built**: Unified issue-to-pr workflow supporting both GitHub and GitLab with --lite mode. References unified sub-workflows.
+- **Tests**: No automated tests
+- **Notes**: Platform detection in start state, conditional gates for both platforms.
+
+## Step 5: Delete old workflows
+- **Files changed**: Deleted 8 workflow directories (github-spec-gen, github-spec-gen-lite, gitlab-spec-gen, github-pr-lifecycle, gitlab-mr-lifecycle, gitlab-issue-to-mr, issue-to-pr-lite, spec-gen-lite, idea-to-pr-lite)
+- **What was built**: N/A (deletion)
+- **Tests**: Verified old workflow names fail to resolve via `fflow render`
+
+## Step 6: Update references and commands
+- **Files changed**: AGENTS.md, .claude/commands/pr.md, .claude/commands/quick.md, skills/fflow/SKILL.md, skills/fflow-author/composability.md, spec-to-code/workflow.yaml, idea-to-pr/workflow.yaml
+- **What was built**: Updated all references from old workflow names to new unified names
+- **Tests**: Grepped codebase for old names, verified no dangling references in active code
+
+## Review
+- All 5 new/modified workflows render successfully via `fflow render`
+- Build passes, all 224 tests pass
+- Consistency review: all platform branches present, script paths correct, no stale references
+- Sub-workflow composition verified: fflow runtime replaces child `done` transitions with parent-declared transitions (fsm.ts:339-341)

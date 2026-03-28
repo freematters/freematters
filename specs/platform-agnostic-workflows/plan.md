@@ -17,7 +17,7 @@ graph LR
 - [x] Step 3: Unify issue-to-spec
 - [x] Step 4: Unify issue-to-pr
 - [x] Step 5: Delete old workflows
-- [ ] Step 6: Update references and commands
+- [x] Step 6: Update references and commands
 
 ---
 
