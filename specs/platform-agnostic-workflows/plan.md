@@ -13,7 +13,7 @@ graph LR
 
 ## Checklist
 - [x] Step 1: Add --lite mode to spec-gen
-- [ ] Step 2: Unify pr-lifecycle
+- [x] Step 2: Unify pr-lifecycle
 - [ ] Step 3: Unify issue-to-spec
 - [ ] Step 4: Unify issue-to-pr
 - [ ] Step 5: Delete old workflows
