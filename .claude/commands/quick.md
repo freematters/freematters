@@ -1,5 +1,5 @@
 ---
-description: Start idea-to-pr-lite workflow
+description: Start idea-to-pr workflow (lite mode)
 ---
 
-/fflow idea-to-pr-lite
+/fflow idea-to-pr --lite

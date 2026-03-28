@@ -33,8 +33,5 @@ Then detect the platform and start the appropriate workflow:
 REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
 ```
 
-If `REMOTE_URL` contains `gitlab`:
-  /fflow gitlab-mr-lifecycle
-
-Otherwise (GitHub or unknown):
-  /fflow github-pr-lifecycle
+Run the unified pr-lifecycle workflow:
+  /fflow pr-lifecycle
