@@ -27,11 +27,5 @@ To clean up the worktree, run:
 ```
 Do NOT execute the cleanup yourself — removing the worktree from within it breaks the session.
 
-Then detect the platform and start the appropriate workflow:
-
-```bash
-REMOTE_URL=$(git remote get-url origin 2>/dev/null || echo "")
-```
-
-Run the unified pr-lifecycle workflow:
+Start the unified pr-lifecycle workflow:
   /fflow pr-lifecycle

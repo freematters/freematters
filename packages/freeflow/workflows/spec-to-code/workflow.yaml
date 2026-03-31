@@ -18,21 +18,7 @@
 version: 1
 guide: |
   Spec-to-Code. Implements a spec into working code, one plan.md step at a time.
-
-  Input: `./specs/<slug>/` directory (local) or `owner/repo#N` issue reference.
   design.md is the source of truth. Each step → sub-agent → commit.
-
-  Testing: integration-first (system boundaries, real dependencies). Unit tests only
-  for complex single-module logic. No mocking internal modules.
-
-  Issue mode (`owner/repo#N` for GitHub, GitLab issue URL or `project/path#N` for GitLab):
-  prefix comments with `[from bot]`, push after each commit, update issue checklist.
-  GitHub: remember `owner`, `repo`, `issue_number`, `branch_name`.
-  GitLab: remember `project_path`, `iid`, `branch_name`.
-
-  Platform CLI references (read when entering issue mode):
-  - GitHub: `$SCRIPT_DIR/../references/github-cli.md`
-  - GitLab: `$SCRIPT_DIR/../references/gitlab-cli.md`
 
 initial: setup
 
@@ -58,6 +44,10 @@ states:
         check the git remote to disambiguate: `git remote get-url origin`. If it contains `gitlab`,
         treat as GitLab issue mode. Otherwise treat as GitHub issue mode.
       - **Local mode**: Neither of the above. Remember `source_mode = "local"`. The argument is the spec directory path.
+
+      When entering issue mode, read the platform CLI reference:
+      - GitHub: `$SCRIPT_DIR/../references/github-cli.md`
+      - GitLab: `$SCRIPT_DIR/../references/gitlab-cli.md`
 
       ### 2. Load spec
 

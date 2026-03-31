@@ -15,19 +15,6 @@ guide: |
   Automatically fix CI failures, rebase when needed, and address review blockers
   and `@bot` mentions.
 
-  ## Platform detection
-
-  Detect the hosting platform from the git remote URL:
-  ```bash
-  git remote get-url origin
-  ```
-  - URL contains "github" -> **GitHub**
-  - URL contains "gitlab" -> **GitLab**
-  - Otherwise -> ask the user which platform they are using.
-
-  Remember the detected `platform` ("github" or "gitlab") and use it throughout
-  all states to select the correct CLI tools, APIs, and status files.
-
   ## Reference docs
 
   Resolve the workflow script directory:
@@ -43,64 +30,25 @@ guide: |
 
   `WF_DIR = ~/.freeflow/runs/<run_id>/`
 
-  This is the workflow's working directory. The poll script writes a status file here,
-  and other states read it for PR/MR status, CI results, review threads, and `@bot` mentions.
+  The poll script writes a status file here; other states read it.
   - **GitHub**: `pr_status.json`
   - **GitLab**: `mr_status.json`
 
-  ## Agent memory
+  ## Conventions
 
-  Track these values across states:
-  - `platform`: "github" or "gitlab"
-  - `target_branch`: Target branch for the PR/MR
-  - `source_branch`: Source branch for the PR/MR
-  - **GitHub**: `owner`, `repo`, `pr_number`, `pr_url`
-  - **GitLab**: `project_path`, `gitlab_url`, `mr_iid`, `hostname`
-
-  ## Interaction model
-
-  All user-initiated interaction goes through `@bot` mentions in inline review threads
-  or PR/MR-level comments/notes. All @bot mentions exit poll to the `address` state for handling.
-
-  All pr-lifecycle replies MUST be prefixed with `[from bot]` to distinguish agent-generated
-  comments/notes from human-authored ones.
-
-  ## Thread resolution
-
-  After fixing issues, the `push` state replies with `[from bot]` and resolves the thread.
-  - **GitHub**: `resolveReviewThread` GraphQL mutation. Both pr-lifecycle and the code-review
-    pipeline can resolve threads -- whichever gets there first.
-  - **GitLab**: PUT `.../discussions/{id}` with `resolved=true`. See GitLab CLI reference
-    for the API call.
-
-  ## `@bot` dedup rules
-
-  - **GitHub inline threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
-  - **GitHub issue comments**: a `@bot` mention is handled if it has a rocket reaction
-  - **GitLab discussion threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
-  - **GitLab standalone notes**: a `@bot` mention is handled if it has a rocket award emoji
+  - All pr-lifecycle replies MUST be prefixed with `[from bot]`.
+  - All user interaction goes through `@bot` mentions in review threads or PR/MR comments/notes.
 
 initial: create-pr
 
 states:
   create-pr:
     prompt: |
-      ## Platform detection
-
-      Detect the hosting platform:
-      ```bash
-      REMOTE_URL=$(git remote get-url origin)
-      ```
-      - If `$REMOTE_URL` contains "github" -> platform is **GitHub**
-      - If `$REMOTE_URL` contains "gitlab" -> platform is **GitLab**
-      - Otherwise -> ask the user which platform they are using.
-
-      Remember the `platform` value for all subsequent states.
       Read the appropriate reference doc (see guide).
 
       ## Authentication
 
-      Verify authentication for the detected platform (see reference).
+      Verify authentication for this repository's hosting provider (see reference).
       - **GitHub**: Verify GitHub authentication. If not logged in, prompt user to authenticate.
       - **GitLab**: Verify GitLab authentication. If not logged in, prompt user to configure auth.
 
@@ -174,11 +122,6 @@ states:
     prompt: |
       Run the bundled polling script as a **background bash job** so the conversation is not blocked.
 
-      Resolve the script directory:
-      ```bash
-      SCRIPT_DIR="$(dirname "$(readlink -f "$(fflow current --run-id <run_id> -j | jq -r '.data.fsm_path')")")"
-      ```
-
       ## Running the script
 
       **GitHub**:
@@ -186,8 +129,6 @@ states:
       python3 "$SCRIPT_DIR/scripts/poll_pr.py" <owner> <repo> <pr_number> \
         --target <target_branch> --interval 20 --wf-dir "$WF_DIR"
       ```
-      The script writes `pr_status.json` to `WF_DIR` on every cycle with the latest PR state,
-      CI results, bot review threads, and `@bot` mentions. Other states read this file directly.
 
       **GitLab**:
       ```bash
@@ -195,29 +136,11 @@ states:
         --target <target_branch> --interval 20 --wf-dir "$WF_DIR" \
         --hostname <hostname>
       ```
-      The script writes `mr_status.json` to `WF_DIR` on every cycle with the latest MR state,
-      pipeline results, unresolved discussions, and `@bot` mentions. Other states read this file directly.
-
-      ## What the script monitors (every cycle)
-
-      - **PR/MR state**: merged or closed -> exits
-      - **Target branch**: new commits ahead of HEAD -> exits with `needs rebase`
-        - **GitLab additional**: `detailed_merge_status == need_rebase` -> exits with `needs rebase`
-      - **CI status**:
-        - **GitHub**: all checks finished with failures -> exits with `needs fix`
-        - **GitLab**: pipeline finished with failure -> exits with `needs fix`
-      - **Review threads / @bot mentions**: blocker-severity reviews or unhandled @bot -> exits with `needs address`
-
-      ## `@bot` dedup rules (implemented in the scripts)
-
-      - **GitHub inline threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
-      - **GitHub issue comments**: a `@bot` mention is handled if it has a rocket reaction
-      - **GitLab discussion threads**: a `@bot` mention is handled if a subsequent note starts with `[from bot]`
-      - **GitLab standalone notes**: a `@bot` mention is handled if it has a rocket award emoji
 
       ## Exit RESULT lines
 
-      The script prints one of these and exits:
+      The script monitors PR/MR state, CI, target branch, review threads, and `@bot` mentions.
+      It prints one of these and exits:
       - **GitHub**: `RESULT: PR merged` / `RESULT: PR closed` -> transition to done
       - **GitLab**: `RESULT: MR merged` / `RESULT: MR closed` -> transition to done
       - `RESULT: needs rebase` -> transition to rebase
