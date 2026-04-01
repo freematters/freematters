@@ -3,7 +3,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import { serializeMarkdown } from "../markdown-serializer.js";
-import { jsonSuccess, printJson } from "../output.js";
+import { jsonSuccess, printJson, substituteVars } from "../output.js";
 
 export interface RenderArgs {
   fsmPath: string;
@@ -51,7 +51,8 @@ export function render(args: RenderArgs): void {
   const workflowDir = dirname(resolve(args.fsmPath));
 
   const rawMarkdown = serializeMarkdown(fsm);
-  const markdown = rawMarkdown.replace(/\$\{workflow_dir\}/g, workflowDir);
+  // render has no run_id context, so only workflow_dir is substituted
+  const markdown = substituteVars(rawMarkdown, { workflow_dir: workflowDir });
 
   // Output routing
   let outputPath: string | undefined;
