@@ -79,22 +79,13 @@ states:
 
       ## Post-creation comment
 
-      After the PR/MR is created (or found), post a comment/note with:
-      1. **Implementation summary**: A concise overview of what was implemented and key design decisions.
-      2. **Integration test results**: Run integration tests (if any) and include the output.
-      3. **E2E test results**: If `e2e.md` exists in the spec directory (`./specs/<feature>/e2e.md`)
-         or in the project, run the e2e tests and include the output.
+      After the PR/MR is created (or found), post a comment/note with an implementation summary:
+      a concise overview of what was implemented and key design decisions.
 
       **GitHub** format:
       ```
       ## Implementation Summary
       <summary>
-
-      ## Integration Test Results
-      <test output or "N/A -- no integration tests">
-
-      ## E2E Test Results
-      <test output or "N/A -- no e2e tests">
       ```
 
       **GitLab** format (note the `[from bot]` prefix):
@@ -102,12 +93,6 @@ states:
       [from bot]
       ## Implementation Summary
       <summary>
-
-      ## Integration Test Results
-      <test output or "N/A -- no integration tests">
-
-      ## E2E Test Results
-      <test output or "N/A -- no e2e tests">
       ```
 
       Record all platform-specific identifiers -- subsequent states will need them.
