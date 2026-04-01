@@ -25,6 +25,7 @@ export interface GatewayInfo {
 export interface RunMeta {
   run_id: string;
   fsm_path: string;
+  workflow_dir?: string;
   created_at: string;
   version: number;
   session_id?: string;
@@ -90,8 +91,12 @@ export class Store {
     this.root = root;
   }
 
-  private runDir(runId: string): string {
+  getRunDir(runId: string): string {
     return join(this.root, "runs", runId);
+  }
+
+  private runDir(runId: string): string {
+    return this.getRunDir(runId);
   }
 
   private metaPath(runId: string): string {
