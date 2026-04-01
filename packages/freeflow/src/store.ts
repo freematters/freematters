@@ -95,24 +95,20 @@ export class Store {
     return join(this.root, "runs", runId);
   }
 
-  private runDir(runId: string): string {
-    return this.getRunDir(runId);
-  }
-
   private metaPath(runId: string): string {
-    return join(this.runDir(runId), "fsm.meta.json");
+    return join(this.getRunDir(runId), "fsm.meta.json");
   }
 
   private eventsPath(runId: string): string {
-    return join(this.runDir(runId), "events.jsonl");
+    return join(this.getRunDir(runId), "events.jsonl");
   }
 
   private snapshotPath(runId: string): string {
-    return join(this.runDir(runId), "snapshot.json");
+    return join(this.getRunDir(runId), "snapshot.json");
   }
 
   private lockPath(runId: string): string {
-    return join(this.runDir(runId), "lock");
+    return join(this.getRunDir(runId), "lock");
   }
 
   private sessionsDir(): string {
@@ -169,7 +165,7 @@ export class Store {
     lite?: boolean,
     gatewayInfo?: GatewayInfo,
   ): RunMeta {
-    const dir = this.runDir(runId);
+    const dir = this.getRunDir(runId);
     if (existsSync(dir)) {
       throw new Error(`Run "${runId}" already exists`);
     }
@@ -190,7 +186,7 @@ export class Store {
   }
 
   runExists(runId: string): boolean {
-    return existsSync(this.runDir(runId));
+    return existsSync(this.getRunDir(runId));
   }
 
   readMeta(runId: string): RunMeta {

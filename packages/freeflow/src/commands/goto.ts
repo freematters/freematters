@@ -141,13 +141,16 @@ ${labels}`,
         data.completion_reason = "done_auto";
       }
       printJson(jsonSuccess("Transition complete", data));
-    } else if (card.subagent) {
-      const cardOutput = formatSubagentDispatch(card, args.runId);
-      process.stdout.write(`${cardOutput}\n`);
-    } else if (result.alreadyVisited) {
-      process.stdout.write(`${formatLiteCard(card)}\n`);
     } else {
-      process.stdout.write(`${formatStateCard(card)}\n`);
+      const dirLine = workflowDir ? `workflow_dir: ${workflowDir}\n` : "";
+      if (card.subagent) {
+        const cardOutput = formatSubagentDispatch(card, args.runId);
+        process.stdout.write(`${dirLine}${cardOutput}\n`);
+      } else if (result.alreadyVisited) {
+        process.stdout.write(`${dirLine}${formatLiteCard(card)}\n`);
+      } else {
+        process.stdout.write(`${dirLine}${formatStateCard(card)}\n`);
+      }
     }
   } catch (err: unknown) {
     handleError(err, args.json);

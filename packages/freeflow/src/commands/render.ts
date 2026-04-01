@@ -55,7 +55,7 @@ export function render(args: RenderArgs): void {
   // Insert workflow_dir comment after the closing frontmatter delimiter
   const markdown = rawMarkdown.replace(
     /^(---\n[\s\S]*?\n---\n)/,
-    `$1\n<!-- workflow_dir: ${workflowDir} -->\n`,
+    (match) => `${match}\n<!-- workflow_dir: ${workflowDir} -->\n`,
   );
 
   // Output routing
