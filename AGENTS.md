@@ -17,7 +17,7 @@ Monorepo for FreeMatters — agent-native developer tools.
 | `/spec-to-code` | `/fflow spec-to-code` |
 | `/pr` | `/fflow pr-lifecycle` |
 | `/release` | `/fflow release` |
-| `/idea-to-pr` | `/fflow idea-to-pr` |
+| `/spec-driven` | `/fflow spec-driven` (use `--lite` for lightweight mode) |
 
 ## Build & Test
 
