@@ -51,10 +51,7 @@ export function render(args: RenderArgs): void {
   const workflowDir = dirname(resolve(args.fsmPath));
 
   const rawMarkdown = serializeMarkdown(fsm);
-  const markdown = rawMarkdown.replace(
-    /^(---\n[\s\S]*?\n---\n)/,
-    (match) => `${match}\n<!-- workflow_dir: ${workflowDir} -->\n`,
-  );
+  const markdown = rawMarkdown.replace(/\$\{workflow_dir\}/g, workflowDir);
 
   // Output routing
   let outputPath: string | undefined;

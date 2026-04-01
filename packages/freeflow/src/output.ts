@@ -4,6 +4,24 @@ import { CliError } from "./errors.js";
 import type { FsmState } from "./fsm.js";
 import { FsmError } from "./fsm.js";
 
+// --- Variable Substitution ---
+
+export function substituteVars(text: string, vars: Record<string, string>): string {
+  return text.replace(/\$\{(\w+)\}/g, (match, name) => vars[name] ?? match);
+}
+
+export function substituteCard(
+  card: StateCard,
+  vars: Record<string, string>,
+): StateCard {
+  return {
+    ...card,
+    prompt: substituteVars(card.prompt, vars),
+    guide: card.guide ? substituteVars(card.guide, vars) : card.guide,
+    todos: card.todos ? card.todos.map((t) => substituteVars(t, vars)) : card.todos,
+  };
+}
+
 // --- State Card (human-readable) ---
 
 export interface StateCard {

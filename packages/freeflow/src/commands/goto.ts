@@ -1,3 +1,4 @@
+import { dirname } from "node:path";
 import { CliError } from "../errors.js";
 import { loadFsm } from "../fsm.js";
 import {
@@ -9,6 +10,7 @@ import {
   jsonSuccess,
   printJson,
   stateCardFromFsm,
+  substituteCard,
 } from "../output.js";
 import { type RunStatus, Store } from "../store.js";
 
@@ -111,7 +113,16 @@ ${labels}`,
 
     const workflowDir = meta.workflow_dir ?? null;
 
-    const card = stateCardFromFsm(args.target, fsm.states[args.target]);
+    const fsmState = fsm.states[args.target];
+    const stateSourceDir = fsmState.source_path
+      ? dirname(fsmState.source_path)
+      : (meta.workflow_dir ?? "");
+    const runDir = store.getRunDir(args.runId);
+    const vars: Record<string, string> = {
+      workflow_dir: stateSourceDir,
+      run_dir: runDir,
+    };
+    const card = substituteCard(stateCardFromFsm(args.target, fsmState), vars);
 
     // Compute time spent in previous state
     const events = store.readEvents(args.runId);

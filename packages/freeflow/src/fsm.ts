@@ -12,6 +12,7 @@ export interface FsmState {
   transitions: Record<string, string>;
   guide?: string;
   subagent?: boolean;
+  source_path?: string;
 }
 
 export interface Fsm {
@@ -171,6 +172,9 @@ function resolveRefs(
     if (state.subagent === undefined && baseState.subagent !== undefined) {
       state.subagent = baseState.subagent;
     }
+
+    // Track source path for variable substitution
+    state.source_path = basePath;
 
     // Remove from field after merge
     state.from = undefined;
@@ -351,6 +355,11 @@ function resolveWorkflowStates(
       // Apply child guide as per-state guide override
       if (childFsm.guide) {
         expandedState.guide = childFsm.guide;
+      }
+
+      // Preserve source_path from child state for variable substitution
+      if (childState.source_path) {
+        expandedState.source_path = childState.source_path;
       }
 
       states[expandedName] = expandedState;
@@ -565,6 +574,11 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
     }
 
     states[name] = { prompt: s.prompt as string, transitions };
+    if (typeof s.source_path === "string") {
+      states[name].source_path = s.source_path;
+    } else {
+      states[name].source_path = absPath;
+    }
     if (todos !== undefined) {
       states[name].todos = todos;
     }

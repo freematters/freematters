@@ -10,6 +10,7 @@ import {
   jsonSuccess,
   printJson,
   stateCardFromFsm,
+  substituteCard,
 } from "../output.js";
 import { Store } from "../store.js";
 
@@ -64,7 +65,16 @@ export function start(args: StartArgs): void {
       },
     );
 
-    const card = stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]);
+    const initialSourcePath = fsm.states[fsm.initial].source_path;
+    const stateSourceDir = initialSourcePath ? dirname(initialSourcePath) : workflowDir;
+    const vars: Record<string, string> = {
+      workflow_dir: stateSourceDir,
+      run_dir: runDir,
+    };
+    const card = substituteCard(
+      stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]),
+      vars,
+    );
 
     const mermaid = fsmToMermaid(fsm.states, fsm.initial);
 

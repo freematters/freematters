@@ -1,3 +1,4 @@
+import { dirname } from "node:path";
 import { CliError } from "../errors.js";
 import { loadFsm } from "../fsm.js";
 import {
@@ -6,6 +7,7 @@ import {
   jsonSuccess,
   printJson,
   stateCardFromFsm,
+  substituteCard,
 } from "../output.js";
 import { Store } from "../store.js";
 
@@ -42,7 +44,15 @@ export function current(args: CurrentArgs): void {
       });
     }
 
-    const card = stateCardFromFsm(snapshot.state, fsmState);
+    const stateSourceDir = fsmState.source_path
+      ? dirname(fsmState.source_path)
+      : (meta.workflow_dir ?? "");
+    const runDir = store.getRunDir(args.runId);
+    const vars: Record<string, string> = {
+      workflow_dir: stateSourceDir,
+      run_dir: runDir,
+    };
+    const card = substituteCard(stateCardFromFsm(snapshot.state, fsmState), vars);
 
     const workflowDir = meta.workflow_dir ?? null;
 
