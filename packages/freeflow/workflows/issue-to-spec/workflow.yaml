@@ -129,20 +129,17 @@ guide: |
   Whenever you need to wait for a user reply on the issue, run the bundled polling script
   as a **background bash job** so the conversation is not blocked.
 
-  Find the script directory via:
-  ```bash
-  SCRIPT_DIR="$(dirname "$(readlink -f "$(fflow current --run-id {run_id} -j | jq -r '.data.fsm_path')")")"
-  ```
+  Use `workflow_dir` from CLI output to locate the scripts.
 
   **GitHub**:
   ```bash
-  python3 "$SCRIPT_DIR/scripts/poll_issue.py" {owner} {repo} {n} {issue_creator} \
+  python3 "{workflow_dir}/scripts/poll_issue.py" {owner} {repo} {n} {issue_creator} \
     --run-id {run_id}
   ```
 
   **GitLab**:
   ```bash
-  python3 "$SCRIPT_DIR/scripts/poll_issue_gl.py" {project_path} {issue_iid} {issue_creator} \
+  python3 "{workflow_dir}/scripts/poll_issue_gl.py" {project_path} {issue_iid} {issue_creator} \
     --run-id {run_id}
   ```
   If using a self-hosted GitLab instance, add `--hostname {gitlab_hostname}`.
@@ -205,13 +202,10 @@ guide: |
 
   ### Reference Docs
 
-  Find the script directory via:
-  ```bash
-  SCRIPT_DIR="$(dirname "$(readlink -f "$(fflow current --run-id {run_id} -j | jq -r '.data.fsm_path')")")"
-  ```
+  Use `workflow_dir` from CLI output to locate reference docs:
 
-  - **GitHub**: Read `$SCRIPT_DIR/../references/github-cli.md` for CLI conventions, auth, and error handling.
-  - **GitLab**: Read `$SCRIPT_DIR/../references/gitlab-cli.md` for CLI conventions, auth, ENCODED_PATH,
+  - **GitHub**: Read `{workflow_dir}/../references/github-cli.md` for CLI conventions, auth, and error handling.
+  - **GitLab**: Read `{workflow_dir}/../references/gitlab-cli.md` for CLI conventions, auth, ENCODED_PATH,
     command reference table, error handling, and `@bot` rules.
 
 initial: create-issue

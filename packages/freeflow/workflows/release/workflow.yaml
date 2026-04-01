@@ -5,7 +5,7 @@ guide: |
 
   ## GitHub CLI
 
-  Read `$SCRIPT_DIR/../references/github-cli.md` for CLI conventions and auth.
+  Read `{workflow_dir}/../references/github-cli.md` for CLI conventions and auth.
 
   ## Configuration (set these before starting)
 
