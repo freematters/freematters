@@ -98,6 +98,33 @@ it's just a structured prompt with a clean start/done lifecycle.
    - Ensure prompts are self-contained and agent-agnostic (work across Claude, Codex, etc.).
    - Ensure at least one rework/failure path when appropriate.
 
+4.5. **Generate SKILL.md**
+
+   After validation succeeds, generate a `SKILL.md` file in the same directory as the
+   workflow YAML. This makes the workflow installable as an agent skill.
+
+   **How to derive the fields:**
+   - `{name}`: the workflow directory name (e.g., if the workflow is at
+     `workflows/spec-gen/workflow.yaml`, the name is `spec-gen`).
+   - `{description}`: derive from the entire `guide` field of the workflow YAML — read the
+     full guide and write a concise one-line summary that captures the workflow's purpose.
+     If `guide` is empty or missing, use `"Run the {name} workflow"`.
+   - `{title}`: convert the name to title case, replacing hyphens with spaces
+     (e.g., `spec-gen` -> `Spec Gen`).
+
+   **Write this exact template** to `SKILL.md` in the workflow directory:
+
+   ```markdown
+   ---
+   name: {name}
+   description: {description}
+   ---
+
+   # {title}
+
+   Run `/fflow {name}` with any arguments passed to this skill.
+   ```
+
 5. **Present results in user's language**
 
    - Summarize as phases and decision points.
@@ -145,3 +172,4 @@ and merge rules for `from:`, `extends_guide`, `workflow:`, and `subagent:`.
 - no state prompt repeats rules already in `guide`
 - if `from:` is used, the referenced workflow and state exist
 - if `extends_guide:` is used, the referenced workflow exists and has a `guide` field
+- SKILL.md exists alongside workflow.yaml with correct `name` (matching directory name) and `description` (derived from guide)

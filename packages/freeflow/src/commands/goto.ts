@@ -1,3 +1,4 @@
+import { dirname } from "node:path";
 import { CliError } from "../errors.js";
 import { loadFsm } from "../fsm.js";
 import {
@@ -9,6 +10,7 @@ import {
   jsonSuccess,
   printJson,
   stateCardFromFsm,
+  substituteCard,
 } from "../output.js";
 import { type RunStatus, Store } from "../store.js";
 
@@ -109,7 +111,18 @@ ${labels}`,
       return { isDone, newStatus, fromState: snapshot.state, alreadyVisited };
     });
 
-    const card = stateCardFromFsm(args.target, fsm.states[args.target]);
+    const workflowDir = meta.workflow_dir ?? null;
+
+    const fsmState = fsm.states[args.target];
+    const stateSourceDir = fsmState.source_path
+      ? dirname(fsmState.source_path)
+      : (meta.workflow_dir ?? "");
+    const runDir = store.getRunDir(args.runId);
+    const vars: Record<string, string> = {
+      workflow_dir: stateSourceDir,
+      run_dir: runDir,
+    };
+    const card = substituteCard(stateCardFromFsm(args.target, fsmState), vars);
 
     // Compute time spent in previous state
     const events = store.readEvents(args.runId);
@@ -126,6 +139,7 @@ ${labels}`,
       const data: Record<string, unknown> = {
         state: card.state,
         from_state: result.fromState,
+        ...(workflowDir ? { workflow_dir: workflowDir } : {}),
         prompt: card.prompt,
         todos: card.todos,
         transitions: card.transitions,
@@ -138,13 +152,16 @@ ${labels}`,
         data.completion_reason = "done_auto";
       }
       printJson(jsonSuccess("Transition complete", data));
-    } else if (card.subagent) {
-      const cardOutput = formatSubagentDispatch(card, args.runId);
-      process.stdout.write(`${cardOutput}\n`);
-    } else if (result.alreadyVisited) {
-      process.stdout.write(`${formatLiteCard(card)}\n`);
     } else {
-      process.stdout.write(`${formatStateCard(card)}\n`);
+      const dirLine = workflowDir ? `workflow_dir: ${workflowDir}\n` : "";
+      if (card.subagent) {
+        const cardOutput = formatSubagentDispatch(card, args.runId);
+        process.stdout.write(`${dirLine}${cardOutput}\n`);
+      } else if (result.alreadyVisited) {
+        process.stdout.write(`${dirLine}${formatLiteCard(card)}\n`);
+      } else {
+        process.stdout.write(`${dirLine}${formatStateCard(card)}\n`);
+      }
     }
   } catch (err: unknown) {
     handleError(err, args.json);

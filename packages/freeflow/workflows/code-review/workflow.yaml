@@ -14,7 +14,7 @@ guide: |
 
   ## GitHub CLI
 
-  Read `$SCRIPT_DIR/../references/github-cli.md` for CLI conventions, auth, GraphQL tips,
+  Read `{workflow_dir}/../references/github-cli.md` for CLI conventions, auth, GraphQL tips,
   thread resolution, review submission, and error handling.
 
 
@@ -75,23 +75,16 @@ states:
       Do not raise issues that are already covered by existing threads.
       Use semantic comparison — same issue phrased differently still counts as duplicate.
 
-      ## Derive SCRIPT_DIR
-
-      The review agent prompts reference `$SCRIPT_DIR` for agent instruction files.
-      ```bash
-      SCRIPT_DIR=$(fflow resolve code-review --wf-dir)
-      ```
-
       ## Concurrent subagent review
 
       Use the Agent tool to **launch 3 subagents concurrently** (all in a single message).
 
-      Each subagent prompt follows this template:
+      Each subagent prompt follows this template (use `workflow_dir` from CLI output):
 
       ```
       Review the code changes in PR #{pr_number}.
 
-      Read your review instructions from: $SCRIPT_DIR/agents/{agent}.md
+      Read your review instructions from: {workflow_dir}/agents/{agent}.md
 
       Steps:
       1. Read `/tmp/pr_changed_files.txt` to get the changed files list

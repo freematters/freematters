@@ -22,13 +22,33 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
       - run: npm ci
       - run: npm run build
-      - run: npm test
+      - name: Run tests (full suite on main, changed packages on PRs)
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            npm test
+          else
+            CHANGED=$(git diff --name-only origin/main...HEAD -- packages/)
+            PACKAGES=""
+            for pkg in packages/*/; do
+              pkg_name=$(basename "$pkg")
+              if echo "$CHANGED" | grep -q "^packages/$pkg_name/"; then
+                PACKAGES="$PACKAGES -w packages/$pkg_name"
+              fi
+            done
+            if [ -z "$PACKAGES" ]; then
+              echo "No package changes detected, skipping tests"
+            else
+              npm run test $PACKAGES
+            fi
+          fi
 
   claude:
     runs-on: ubuntu-latest

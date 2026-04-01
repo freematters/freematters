@@ -2,7 +2,13 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { runCli, runCliJson } from "./e2e/helpers.js";
-import { MINIMAL_FSM, MULTI_FSM, cleanupTempDir, createTempDir } from "./fixtures.js";
+import {
+  MINIMAL_FSM,
+  MULTI_FSM,
+  cleanupTempDir,
+  createTempDir,
+  uniqueRunId,
+} from "./fixtures.js";
 
 let tmp: string;
 let fsmMinimal: string; // 2-state: start → done
@@ -19,12 +25,6 @@ beforeAll(() => {
 afterAll(() => {
   cleanupTempDir(tmp);
 });
-
-let runCounter = 0;
-function uniqueRunId(prefix = "run"): string {
-  runCounter++;
-  return `${prefix}-${runCounter}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
 
 const defaultRoot = () => join(tmp, "root");
 

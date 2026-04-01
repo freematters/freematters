@@ -1,3 +1,4 @@
+import { dirname } from "node:path";
 import { CliError } from "../errors.js";
 import { loadFsm } from "../fsm.js";
 import {
@@ -6,6 +7,7 @@ import {
   jsonSuccess,
   printJson,
   stateCardFromFsm,
+  substituteCard,
 } from "../output.js";
 import { Store } from "../store.js";
 
@@ -42,12 +44,23 @@ export function current(args: CurrentArgs): void {
       });
     }
 
-    const card = stateCardFromFsm(snapshot.state, fsmState);
+    const stateSourceDir = fsmState.source_path
+      ? dirname(fsmState.source_path)
+      : (meta.workflow_dir ?? "");
+    const runDir = store.getRunDir(args.runId);
+    const vars: Record<string, string> = {
+      workflow_dir: stateSourceDir,
+      run_dir: runDir,
+    };
+    const card = substituteCard(stateCardFromFsm(snapshot.state, fsmState), vars);
+
+    const workflowDir = meta.workflow_dir ?? null;
 
     if (args.json) {
       printJson(
         jsonSuccess("Current state", {
           run_id: args.runId,
+          ...(workflowDir ? { workflow_dir: workflowDir } : {}),
           state: card.state,
           prompt: card.prompt,
           todos: card.todos,
@@ -56,7 +69,8 @@ export function current(args: CurrentArgs): void {
         }),
       );
     } else {
-      process.stdout.write(`${formatStateCard(card)}\n`);
+      const dirLine = workflowDir ? `workflow_dir: ${workflowDir}\n` : "";
+      process.stdout.write(`${dirLine}${formatStateCard(card)}\n`);
     }
   } catch (err: unknown) {
     handleError(err, args.json);

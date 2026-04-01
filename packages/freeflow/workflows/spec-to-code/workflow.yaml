@@ -46,8 +46,8 @@ states:
       - **Local mode**: Neither of the above. Remember `source_mode = "local"`. The argument is the spec directory path.
 
       When entering issue mode, read the platform CLI reference:
-      - GitHub: `$SCRIPT_DIR/../references/github-cli.md`
-      - GitLab: `$SCRIPT_DIR/../references/gitlab-cli.md`
+      - GitHub: `{workflow_dir}/../references/github-cli.md`
+      - GitLab: `{workflow_dir}/../references/gitlab-cli.md`
 
       ### 2. Load spec
 
@@ -58,12 +58,12 @@ states:
 
       2. Download spec artifacts:
          ```bash
-         python3 $SCRIPT_DIR/download_spec.py {owner} {repo} {issue_number} --slug {slug}
+         python3 {workflow_dir}/download_spec.py {owner} {repo} {issue_number} --slug {slug}
          ```
 
       3. Prepare implementation (add `doing` label, post start comment):
          ```bash
-         python3 $SCRIPT_DIR/prepare_implementation.py {owner} {repo} {issue_number} {slug}
+         python3 {workflow_dir}/prepare_implementation.py {owner} {repo} {issue_number} {slug}
          ```
          Returns JSON with `branch_name`. Remember `branch_name` for later states.
 
@@ -74,14 +74,14 @@ states:
 
       2. Download spec artifacts from GitLab issue notes:
          ```bash
-         python3 $SCRIPT_DIR/download_spec_gl.py {project_path} {iid} --slug {slug} --hostname {gitlab_hostname}
+         python3 {workflow_dir}/download_spec_gl.py {project_path} {iid} --slug {slug} --hostname {gitlab_hostname}
          ```
          Where `{gitlab_hostname}` is the GitLab instance hostname (e.g., `gitlab.corp.example.com`).
          If not known, omit `--hostname` and the script will auto-detect from git remote.
 
       3. Prepare implementation (add `doing` label, post start note):
          ```bash
-         python3 $SCRIPT_DIR/prepare_implementation_gl.py {project_path} {iid} {slug} --hostname {gitlab_hostname}
+         python3 {workflow_dir}/prepare_implementation_gl.py {project_path} {iid} {slug} --hostname {gitlab_hostname}
          ```
          If hostname is not known, omit `--hostname` for auto-detection.
          Returns JSON with `branch_name`. Remember `branch_name` for later states.
@@ -199,7 +199,6 @@ states:
          - Merge its worktree branch into the feature branch.
            Resolve conflicts if any — prefer the feature branch for plan.md/progress.md,
            prefer the worktree branch for implementation files.
-         - Run the full test suite to verify the merge is clean.
          - Update `./specs/<slug>/plan.md` — check off the step (`- [x] Step N`).
          - Update `./specs/<slug>/progress.md` — append a summary:
            ```
@@ -254,6 +253,12 @@ states:
          ```
 
       Then proceed to the next wave. Repeat until all steps are complete.
+
+      ### Final verification
+
+      After all steps are complete (before transitioning to `all steps complete`),
+      run the full test suite once to verify the merged result. Do NOT run tests
+      after each individual worktree merge — sub-agents already test in their worktrees.
 
       ### Constraints
       - The orchestrator MUST NOT write implementation code — only manage branches,

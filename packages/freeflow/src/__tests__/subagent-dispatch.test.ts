@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { loadFsm } from "../fsm.js";
 import { runCli } from "./e2e/helpers.js";
-import { cleanupTempDir, createTempDir } from "./fixtures.js";
+import { cleanupTempDir, createTempDir, uniqueRunId } from "./fixtures.js";
 
 // biome-ignore lint/style/noNonNullAssertion: dirname is always defined for file modules
 const FIXTURES = join(import.meta.dirname!, "fixtures");
@@ -63,12 +63,6 @@ beforeAll(() => {
 afterAll(() => {
   cleanupTempDir(tmp);
 });
-
-let runCounter = 0;
-function uniqueRunId(prefix = "sub"): string {
-  runCounter++;
-  return `${prefix}-${runCounter}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
 
 const defaultRoot = () => join(tmp, "root");
 

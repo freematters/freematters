@@ -1,9 +1,9 @@
 import { writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import { serializeMarkdown } from "../markdown-serializer.js";
-import { jsonSuccess, printJson } from "../output.js";
+import { jsonSuccess, printJson, substituteVars } from "../output.js";
 
 export interface RenderArgs {
   fsmPath: string;
@@ -48,9 +48,11 @@ export function render(args: RenderArgs): void {
 
   // Load and resolve the FSM (handles from:, workflow:, extends_guide:)
   const fsm: Fsm = loadFsm(args.fsmPath);
+  const workflowDir = dirname(resolve(args.fsmPath));
 
-  // Serialize to markdown
-  const markdown = serializeMarkdown(fsm);
+  const rawMarkdown = serializeMarkdown(fsm);
+  // render has no run_id context, so only workflow_dir is substituted
+  const markdown = substituteVars(rawMarkdown, { workflow_dir: workflowDir });
 
   // Output routing
   let outputPath: string | undefined;

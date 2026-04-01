@@ -1,12 +1,12 @@
-# Test: idea-to-pr full pipeline on testbed
+# Test: spec-driven full pipeline on testbed
 
-Verify that the idea-to-pr composite workflow runs the complete pipeline:
+Verify that the spec-driven composite workflow runs the complete pipeline:
 spec-gen (fast-forward) → decide (full auto) → spec-to-code → pr-lifecycle,
 ending with a real PR on freematters/testbed.
 
 ## Background
 
-The idea-to-pr workflow composes three child workflows (spec-gen, spec-to-code,
+The spec-driven workflow composes three child workflows (spec-gen, spec-to-code,
 pr-lifecycle) via `workflow:` composition (version 1.2). States from child
 workflows are namespaced: spec-gen's states become `spec/create-structure`,
 `spec/requirements`, etc.
@@ -26,7 +26,7 @@ Key phases:
 
 The executor should:
 - Clone freematters/testbed to a temp directory
-- Run the idea-to-pr workflow from that directory
+- Run the spec-driven workflow from that directory
 - Choose "requirements clarification" → answer briefly → "fast forward"
 - Choose "full auto" at the decide gate
 - Let spec-to-code and pr-lifecycle run automatically
@@ -34,11 +34,11 @@ The executor should:
 ## Setup
 
 - Ensure fflow CLI is built: run `npm run build` in `packages/freeflow/`
-- Clone testbed: `git clone https://github.com/freematters/testbed.git /tmp/idea-to-pr-testbed`
+- Clone testbed: `git clone https://github.com/freematters/testbed.git /tmp/spec-driven-testbed`
 - Executor prompt: |
-    You are testing the idea-to-pr workflow end-to-end. Your working directory is /tmp/idea-to-pr-testbed.
+    You are testing the spec-driven workflow end-to-end. Your working directory is /tmp/spec-driven-testbed.
 
-    Start by running: /fflow packages/freeflow/workflows/idea-to-pr/workflow.yaml
+    Start by running: /fflow packages/freeflow/workflows/spec-driven/workflow.yaml
 
     The idea: "Add a greet module to the project. Create src/greet.py with a function
     greet(name: str) -> str that returns 'Hello, <name>!' and a CLI entry point that
@@ -104,5 +104,5 @@ The executor should:
 ## Cleanup
 
 - Close the test PR if still open: `gh pr close --repo freematters/testbed <branch> --delete-branch` or equivalent
-- Remove the cloned repo: `rm -rf /tmp/idea-to-pr-testbed`
+- Remove the cloned repo: `rm -rf /tmp/spec-driven-testbed`
 - The freeflow run storage is automatically cleaned up

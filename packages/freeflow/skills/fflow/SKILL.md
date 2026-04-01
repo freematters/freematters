@@ -124,27 +124,14 @@ This outputs the full resolved workflow as markdown to stdout.
 
 ---
 
-## `$SCRIPT_DIR` Resolution
+## `workflow_dir` — Workflow Directory
 
-Workflow guides and state prompts may reference files via `$SCRIPT_DIR` (e.g.,
-`$SCRIPT_DIR/../references/github-cli.md`). This is the directory containing the
-workflow YAML file. Resolve it once at the start and reuse throughout:
+The CLI commands (`fflow start`, `fflow current`, `fflow goto`) include a `workflow_dir`
+field in their output. In markdown mode (`fflow render`), it appears as an HTML comment:
+`<!-- workflow_dir: /path -->`. This is the directory containing the workflow YAML file.
 
-```bash
-SCRIPT_DIR=$(fflow resolve <workflow-name-or-path> --wf-dir)
-```
-
-Examples:
-```bash
-fflow resolve pr-lifecycle --wf-dir           # → /path/to/workflows/pr-lifecycle
-fflow resolve spec-to-code --wf-dir          # → /path/to/workflows/spec-to-code
-```
-
-When a workflow instructs you to read `$SCRIPT_DIR/...`, substitute the resolved
-directory and read the file. These reference files contain shared conventions
-(CLI usage, auth patterns, etc.) that apply across the workflow.
-
----
+Use `workflow_dir` from CLI output whenever workflow prompts reference files relative to
+the workflow directory (e.g., `{workflow_dir}/../references/github-cli.md`).
 
 ## Error Handling
 

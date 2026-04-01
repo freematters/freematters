@@ -17,14 +17,10 @@ guide: |
 
   ## Reference docs
 
-  Resolve the workflow script directory:
-  ```bash
-  SCRIPT_DIR="$(dirname "$(readlink -f "$(fflow current --run-id <run_id> -j | jq -r '.data.fsm_path')")")"
-  ```
-
-  Read the appropriate reference doc for CLI conventions, auth, and API patterns:
-  - **GitHub**: `$SCRIPT_DIR/../references/github-cli.md`
-  - **GitLab**: `$SCRIPT_DIR/../references/gitlab-cli.md`
+  Read the appropriate reference doc for CLI conventions, auth, and API patterns
+  (use `workflow_dir` from CLI output):
+  - **GitHub**: `{workflow_dir}/../references/github-cli.md`
+  - **GitLab**: `{workflow_dir}/../references/gitlab-cli.md`
 
   ## Workflow directory
 
@@ -83,22 +79,13 @@ states:
 
       ## Post-creation comment
 
-      After the PR/MR is created (or found), post a comment/note with:
-      1. **Implementation summary**: A concise overview of what was implemented and key design decisions.
-      2. **Integration test results**: Run integration tests (if any) and include the output.
-      3. **E2E test results**: If `e2e.md` exists in the spec directory (`./specs/<feature>/e2e.md`)
-         or in the project, run the e2e tests and include the output.
+      After the PR/MR is created (or found), post a comment/note with an implementation summary:
+      a concise overview of what was implemented and key design decisions.
 
       **GitHub** format:
       ```
       ## Implementation Summary
       <summary>
-
-      ## Integration Test Results
-      <test output or "N/A -- no integration tests">
-
-      ## E2E Test Results
-      <test output or "N/A -- no e2e tests">
       ```
 
       **GitLab** format (note the `[from bot]` prefix):
@@ -106,12 +93,6 @@ states:
       [from bot]
       ## Implementation Summary
       <summary>
-
-      ## Integration Test Results
-      <test output or "N/A -- no integration tests">
-
-      ## E2E Test Results
-      <test output or "N/A -- no e2e tests">
       ```
 
       Record all platform-specific identifiers -- subsequent states will need them.
@@ -126,13 +107,13 @@ states:
 
       **GitHub**:
       ```bash
-      python3 "$SCRIPT_DIR/scripts/poll_pr.py" <owner> <repo> <pr_number> \
+      python3 "{workflow_dir}/scripts/poll_pr.py" <owner> <repo> <pr_number> \
         --target <target_branch> --interval 20 --wf-dir "$WF_DIR"
       ```
 
       **GitLab**:
       ```bash
-      python3 "$SCRIPT_DIR/scripts/poll_mr_gl.py" <project_path> <mr_iid> \
+      python3 "{workflow_dir}/scripts/poll_mr_gl.py" <project_path> <mr_iid> \
         --target <target_branch> --interval 20 --wf-dir "$WF_DIR" \
         --hostname <hostname>
       ```
@@ -170,8 +151,9 @@ states:
          - **GitHub**: See reference for viewing run logs.
          - **GitLab**: Fetch failed pipeline jobs and their logs (see reference for CI job APIs).
       3. Fix the code to resolve the CI failures.
-      4. Run lint/format/unit tests locally to confirm the fix doesn't introduce new issues
-         (refer to project CLAUDE.md for check commands).
+      4. Run lint/format checks and unit tests only in the affected package(s) to confirm the
+         fix doesn't introduce new issues (refer to project CLAUDE.md for check commands).
+         Only run the full test suite if changes span multiple packages.
 
       If upon inspection there is nothing to fix (e.g., flaky test that passed on re-read),
       transition back to polling.
@@ -179,7 +161,7 @@ states:
       - Read status file for failed CI checks / pipeline status
       - Read failed job logs
       - Fix the code
-      - Run lint/format/unit tests to verify
+      - Run lint/format and affected package tests to verify
     transitions:
       fixed: push
       nothing to fix: poll
@@ -213,14 +195,15 @@ states:
 
       ## Verify
 
-      Run lint/format/unit tests locally to confirm the rebase doesn't break anything
-      (refer to project CLAUDE.md for check commands).
+      Run lint/format checks and unit tests only in the affected package(s) to confirm the
+      rebase doesn't break anything (refer to project CLAUDE.md for check commands).
+      Only run the full test suite if changes span multiple packages.
     todos:
       - Check if PR/MR was merged before rebasing
       - "GitLab: Try GitLab native rebase API"
       - Fallback to local git rebase if needed
       - Resolve any conflicts
-      - Run lint/format/unit tests to verify
+      - Run lint/format and affected package tests to verify
     transitions:
       rebased: push
       merged: done
@@ -262,8 +245,9 @@ states:
 
       ## After fixing
 
-      Run lint/format/unit tests locally to confirm fixes don't introduce new issues
-      (refer to project CLAUDE.md for check commands).
+      Run lint/format checks and unit tests only in the affected package(s) to confirm fixes
+      don't introduce new issues (refer to project CLAUDE.md for check commands).
+      Only run the full test suite if changes span multiple packages.
 
       ## Before transitioning to push
 
@@ -271,13 +255,13 @@ states:
 
       **GitHub**:
       ```bash
-      python3 "$SCRIPT_DIR/scripts/poll_pr.py" <owner> <repo> <pr_number> \
+      python3 "{workflow_dir}/scripts/poll_pr.py" <owner> <repo> <pr_number> \
         --target <target_branch> --wf-dir "$WF_DIR" --once
       ```
 
       **GitLab**:
       ```bash
-      python3 "$SCRIPT_DIR/scripts/poll_mr_gl.py" <project_path> <mr_iid> \
+      python3 "{workflow_dir}/scripts/poll_mr_gl.py" <project_path> <mr_iid> \
         --target <target_branch> --wf-dir "$WF_DIR" --hostname <hostname> --once
       ```
 
@@ -290,7 +274,7 @@ states:
       - React with eyes emoji on each @bot comment/note to acknowledge receipt
       - Handle @bot mentions (code changes or prepare answers)
       - Fix blocker-severity review threads
-      - Run lint/format/unit tests to verify
+      - Run lint/format and affected package tests to verify
       - Re-check for new @bot mentions before transitioning
     transitions:
       addressed: push
