@@ -27,7 +27,9 @@ Core runtime flow:
 transitioning between states. More states = more context loss. Fewer states = better coherence.
 
 **The `guide` field persists across ALL states.** Rules that apply everywhere belong in
-`guide`, not repeated in each state prompt. This is the most powerful part of a workflow.
+`guide`, not repeated in each state prompt. Keep `guide` concise and high-level — only
+cross-cutting constraints and conventions. Detailed instructions belong in each state's
+`prompt`. Never duplicate content between `guide` and state prompts.
 
 **State prompts describe WHAT, not HOW.** The agent already knows how to code, research,
 write tests, etc. Prompts add value by providing domain context, constraints, and success

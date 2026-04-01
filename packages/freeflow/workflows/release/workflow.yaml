@@ -28,65 +28,26 @@ states:
       # Phase: Version Bump
 
       ## 1. Check preconditions
-
-      ```bash
-      git status --porcelain
-      git branch --show-current
-      ```
-
-      - Working tree must be clean. If dirty, stop and ask the user to commit or stash.
-      - Must be on `main` (or the project's default branch). If not, stop and warn.
-      - Pull latest: `git pull --ff-only`
+      - Working tree must be clean; must be on `main`. Pull latest with `--ff-only`.
 
       ## 2. Determine bump type
+      Find the last release tag (`${TAG_PREFIX}*`), get commits since that tag
+      (scoped to `${COMMIT_SCOPE}`), and classify:
+      - **major**: `BREAKING CHANGE` or `!:` suffix
+      - **minor**: `feat:` commits
+      - **patch**: everything else
 
-      Find the last release tag:
-      ```bash
-      git tag --list '${TAG_PREFIX}*' --sort=-version:refname | head -1
-      ```
-
-      If no tag exists, use the full commit history. Otherwise, get commits since that tag:
-      ```bash
-      git log <last_tag>..HEAD -- ${COMMIT_SCOPE}
-      ```
-
-      Analyze the commit messages and determine the bump type:
-      - **major**: any commit with `BREAKING CHANGE` or `!:` (e.g. `feat!:`)
-      - **minor**: any `feat:` or `feat(...):`
-      - **patch**: everything else (`fix:`, `perf:`, `chore:`, non-conventional commits)
-
-      Use the highest applicable level. Present your analysis to the user:
-      - Show the commit list
-      - Show your recommended bump type and reasoning
-      - Ask the user to confirm or override
+      Present commit list, recommended bump, and ask user to confirm.
 
       ## 3. Generate release notes
-
-      If a RELEASE_NOTES_TEMPLATE is configured, read the template and fill in placeholders:
-
-      - `{{VERSION}}`: the new version (from step 4 below)
-      - `{{ONE_LINE_SUMMARY}}`: a single-sentence summary of the release theme
-      - `{{NARRATIVE}}`: 2-3 sentences on what changed and why it matters
-      - `{{Breaking Changes}}`: list or omit section entirely if none
-      - `{{Features/Fixes/Other}}`: categorize commits by conventional commit prefix
-      - `{{OWNER}}/{{REPO}}`: GitHub owner/repo (from `gh repo view --json owner,name`)
-      - `{{PREV_TAG}}`: the previous release tag
-
-      Write the filled-in notes to `WF_DIR/RELEASE_NOTES.md` (the workflow run directory,
-      NOT the repo). Do not commit this file. Show the draft to the user and ask if they
-      want to adjust anything before proceeding.
-
-      If no template is configured, generate release notes in a standard format with
-      the same sections.
+      If RELEASE_NOTES_TEMPLATE is configured, read and fill placeholders
+      (`{{VERSION}}`, `{{ONE_LINE_SUMMARY}}`, `{{NARRATIVE}}`, `{{Breaking Changes}}`,
+      `{{Features/Fixes/Other}}`, `{{OWNER}}/{{REPO}}`, `{{PREV_TAG}}`).
+      Write to `WF_DIR/RELEASE_NOTES.md` (NOT the repo). Show draft and ask for approval.
 
       ## 4. Create release branch and bump
-
+      Run `${VERSION_CMD}` in `${PKG_DIR}`, optionally `${FORMAT_CMD}`, then:
       ```bash
-      cd ${PKG_DIR}
-      ${VERSION_CMD}
-      ${FORMAT_CMD}  # skip if not configured
-      VERSION=$(${VERSION_READ_CMD})
-      cd <repo_root>
       git checkout -b release/${TAG_PREFIX}${VERSION}
       git add ${PKG_DIR}
       git commit -m "release: ${TAG_PREFIX}${VERSION}"
@@ -94,9 +55,7 @@ states:
       ```
 
       ## 5. Open PR
-
-      Create a PR with title `release: ${TAG_PREFIX}${VERSION}` using the release notes
-      as the body. Record the PR number and VERSION for the next state.
+      Create PR titled `release: ${TAG_PREFIX}${VERSION}` with release notes as body.
     transitions:
       pr opened: ci
 
@@ -104,12 +63,9 @@ states:
     prompt: |
       # Phase: Wait for CI
 
-      Watch the PR checks until all pass.
-
-      - If all checks pass, merge the PR (squash, delete branch).
-      - If a **lint** or **format** check fails and FORMAT_CMD is configured, auto-fix locally
-        (`${FORMAT_CMD}`), commit, push, then re-poll.
-      - If any other check fails, show the failure and stop — ask the user how to proceed.
+      Watch PR checks until all pass, then merge (squash, delete branch).
+      - Lint/format failures: auto-fix with `${FORMAT_CMD}` if configured, commit, push, re-poll.
+      - Other failures: show logs and ask user how to proceed.
 
       After merge, checkout main and pull.
     transitions:
@@ -119,12 +75,8 @@ states:
     prompt: |
       # Phase: Tag and Push
 
-      Read the version (source of truth):
-
+      Read VERSION via `${VERSION_READ_CMD}` in `${PKG_DIR}`, then tag and push:
       ```bash
-      cd ${PKG_DIR}
-      VERSION=$(${VERSION_READ_CMD})
-      cd <repo_root>
       git tag "${TAG_PREFIX}${VERSION}"
       git push origin "${TAG_PREFIX}${VERSION}"
       ```
@@ -136,22 +88,11 @@ states:
     prompt: |
       # Phase: Monitor Release
 
-      ## 1. Find the release workflow run
+      If RELEASE_WORKFLOW is configured, watch the workflow run until completion.
 
-      If RELEASE_WORKFLOW is configured, find the latest run for the workflow.
-      If no release workflow is configured, skip to step 3 (verify).
-
-      ## 2. Watch until completion
-
-      Watch the workflow run until it completes.
-
-      ## 3. Verify
-
-      Once the run completes (or if no workflow):
-
-      - If **success** (or no workflow): create or update the GitHub release with the
-        generated notes file, then show the release URL.
-      - If **failure**: show the failed job logs.
+      - **Success** (or no workflow configured): create/update the GitHub release
+        with the generated notes, show the release URL.
+      - **Failure**: show failed job logs.
     transitions:
       release succeeded: done
       release failed: done

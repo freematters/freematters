@@ -5,35 +5,17 @@
 
 version: 1
 guide: |
-  E2E test verifier workflow. Drives verification of a test plan by controlling
-  an embedded Claude Code agent session.
+  E2E test verifier workflow. Control an embedded Claude Code agent session
+  to verify a test plan. Execute steps exactly as described — do NOT skip or
+  invent steps.
 
-  The test plan file path and test output directory are provided in the initial prompt.
-  The agent reads the test plan, starts an embedded agent, interacts with it
-  via run_agent/wait/send, judges each step, and writes a report.
+  ## MCP Tools
 
-  ## Available MCP Tools
+  Beyond standard tools (Read, Write, Bash):
 
-  In addition to standard tools (Read, Write, Bash), you have:
-
-  ### run_agent
-  Start an embedded Claude Code agent session with a given prompt.
-  Returns `{ ok: true }` on success. Only one session can be active at a time.
-
-  ### wait
-  Wait for the embedded agent to finish its current turn.
-  Returns `{ output }` — the assistant text produced during that turn.
-  Use timeout parameter (ms) to avoid waiting forever (default 120s).
-
-  ### send
-  Send a follow-up message to the embedded agent to start a new turn.
-  Returns `{ ok: true }`. The agent will process the message on the next `wait()`.
-
-  Rules:
-  - Read the test plan file to understand what to test.
-  - Execute steps exactly as described in the test plan.
-  - Decide what input to provide based on the test plan's steps and goals.
-  - Do NOT skip steps or invent steps not in the plan.
+  - **run_agent**: Start an embedded agent session with a prompt. Only one active at a time.
+  - **wait**: Wait for the agent's current turn to finish. Returns `{ output }`. Optional timeout (ms, default 120s).
+  - **send**: Send a follow-up message to start a new agent turn.
 
 initial: verify
 

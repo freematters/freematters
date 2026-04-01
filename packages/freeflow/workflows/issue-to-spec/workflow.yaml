@@ -5,10 +5,6 @@
 # state definitions (requirements, research, design, plan, e2e-gen) via
 # extends_guide + from:.
 #
-# Platform detection:
-#   - GitHub: argument contains "/" (owner/repo format) or git remote is github.com
-#   - GitLab: argument contains no "/" or git remote is a non-github host
-#
 # Lite mode:
 #   - design.md: 4 sections (Overview, Goal & Constraints, Architecture & Components, E2E Testing)
 #   - plan.md: exactly 1 step (all implementation in a single step)
@@ -33,22 +29,6 @@ version: 1.1
 extends_guide: ../spec-gen/workflow.yaml
 guide: |
   {{base}}
-
-  ### Platform Detection
-
-  Detect the platform from the user's argument format and git remote:
-
-  1. **Argument format**:
-     - If the argument looks like `owner/repo` (GitHub-style), set platform = **GitHub**.
-     - If no argument or ambiguous, fall back to git remote detection.
-  2. **Git remote detection**:
-     ```bash
-     git remote get-url origin
-     ```
-     - If the URL contains `github.com`, set platform = **GitHub**.
-     - Otherwise (e.g., `gitlab.corp.metabit-trading.com`), set platform = **GitLab**.
-
-  Remember the detected `platform` value (`github` or `gitlab`) across all states.
 
   ### Lite Mode
 
@@ -241,19 +221,31 @@ states:
     prompt: |
       ## Create Issue
 
-      ### Platform Detection
-
-      Detect the platform from the user's argument and git remote (see guide).
-      Remember the `platform` value for all subsequent states.
-
       ### Authentication
 
       - **GitHub**: Verify GitHub authentication (see reference). If authentication fails, tell the user and stop.
       - **GitLab**: Verify GitLab authentication (see reference). If this fails, tell the user to authenticate and stop.
 
-      ### Parse Input
+      ### Existing issue (URL in the prompt)
 
-      Parse the user's prompt to extract:
+      If the user provided a full **GitHub** or **GitLab** issue URL (e.g. `https://github.com/owner/repo/issues/42`
+      or `https://gitlab.example.com/group/proj/-/issues/7`):
+
+      1. Parse `platform` and identifiers (`owner`, `repo`, `issue_number` for GitHub; `project_path`, `issue_iid`,
+         `gitlab_url` / hostname for GitLab).
+      2. Fetch the issue (`gh issue view` / GitLab API) and confirm access. On 404/403, stop with a clear error.
+      3. Remember `issue_creator` as the issue **author** (for polling -- the account whose replies count).
+      4. **Do not** create a new issue.
+      5. If the body/description lacks the workflow **Status** checklist below, add it (append or merge without
+         wiping existing content).
+
+      Then go to **Welcome Comment** (skip **New issue**).
+
+      ### New issue (no issue URL)
+
+      Use this path only when the user did **not** give a full issue URL (rough idea + repo / project context).
+
+      #### Parse input
 
       **GitHub**:
       1. **Repository**: The `owner/repo` string (e.g., `freematters/testbed`). The user provides this in their prompt -- there is no `--repo` flag.
@@ -266,7 +258,7 @@ states:
       3. **Idea**: The description of what they want to build.
       4. **Title**: Generate a concise issue title from the idea.
 
-      ### Create the Issue
+      #### Create the issue
 
       Create the issue with the title and body. If this fails with 404/403, report the error and ask the user to check the repo name and permissions.
 
@@ -290,7 +282,7 @@ states:
       - [ ] spec-ready
       ```
 
-      ### Extract Identifiers
+      #### Extract identifiers
 
       **GitHub**:
       From the issue creation output, extract and remember:
@@ -376,45 +368,6 @@ states:
     prompt: |
       {{base}}
 
-      ### Lite Mode Conditional
-
-      **If lite mode is active**, replace the full design format with the simplified 4-section format:
-
-      Required sections (exactly 4):
-      1. **Overview** -- one-paragraph summary of what we're building and why
-      2. **Goal & Constraints** -- derived from requirements and codebase exploration.
-         Goal: list of feature requirements (what the implementation must deliver).
-         Constraints: list of MUST NOTs (boundaries the implementation must not violate).
-      3. **Architecture & Components** -- merged section covering:
-         - High-level architecture with a Mermaid diagram
-         - Component responsibilities, API surface, and how components interact
-         - Key data structures, schemas, state, and their relationships
-         - Integration test cases verifying module boundaries. Format each test case as:
-           - **Given**: preconditions and setup
-           - **When**: the action or interaction under test
-           - **Then**: expected outcome
-      4. **E2E Testing** -- describe key end-to-end scenarios as user journeys. Read
-         `@packages/freeflow/docs/e2e-testing-design.md` for the verifier-executor model.
-         Format each as a named scenario with numbered steps mixing user actions,
-         system responses, and verification points:
-         ```
-         **Scenario: <name>**
-         1. User does X
-         2. System shows Y
-         3. User does Z
-         4. **Verify:** expected side effect
-         ```
-         **CRITICAL**: If e2e testing was required in requirements, every command, process,
-         or API referenced in the e2e scenarios MUST be covered by a component in the design.
-
-      Do NOT include an "Error Handling" section -- keep to exactly 4 sections.
-
-      Skip the "Design approaches" step (Step 1) -- proceed directly to the full design.
-
-      **If normal mode (not lite)**, use the full design format from the base spec-gen workflow
-      (all 8 sections including Architecture Overview, Components & Interfaces, Data Models,
-      Integration Testing, E2E Testing, Error Handling).
-
       ### Issue Platform Adaptation
 
       Skip the "Design approaches" step (Step 1) -- proceed directly to the full design.
@@ -442,53 +395,6 @@ states:
     from: "../spec-gen/workflow.yaml#plan"
     prompt: |
       {{base}}
-
-      ### Lite Mode Conditional
-
-      **If lite mode is active**, produce exactly 1 step covering ALL implementation instead
-      of N steps per component.
-
-      Required format for lite mode:
-      ```markdown
-      # Implementation Plan: <Feature Name>
-
-      ## Checklist
-      - [ ] Step 1: Implement the feature
-
-      ---
-
-      ## Step 1: Implement the feature
-
-      **Depends on**: none
-
-      **Objective**: Implement all components described in design.md.
-
-      **Sub-items**:
-      - <bullet referencing design component 1>
-      - <bullet referencing design component 2>
-      - ...
-
-      **Related Files**: <all files from design>
-
-      **Test Requirements**: <integration tests from design>
-      ```
-
-      Step 1 sub-items MUST reference the specific components from design.md's
-      Architecture & Components section. Each bullet should describe what to implement
-      for that component.
-
-      **CRITICAL: E2E completeness check.** If design.md has an E2E Testing section,
-      verify that EVERY command, server process, or setup step referenced in the e2e
-      scenarios has a corresponding sub-item in Step 1.
-
-      Constraints for lite mode:
-      - Exactly 1 step. Do NOT add more steps. No separate e2e step in the plan --
-        spec-to-code handles e2e testing automatically when e2e.md exists.
-      - You MUST NOT duplicate design details -- reference design.md sections instead.
-      - You MUST present the plan to the user and iterate on feedback until approved.
-
-      **If normal mode (not lite)**, use the full multi-step plan format from the base
-      spec-gen workflow (N steps per component, dependency graph, integration test step).
 
       ### Issue Platform Adaptation
 

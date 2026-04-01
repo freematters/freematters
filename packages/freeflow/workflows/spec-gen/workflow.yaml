@@ -20,23 +20,16 @@ guide: |
   Spec-Gen — generates a complete specification from a rough idea through interactive
   requirements gathering, research, design, and implementation planning.
 
-  Supports `--lite` mode: simplified design (4 sections) and plan (1 step).
-
   Rules that apply across ALL states:
 
   - User-driven flow: You MUST NOT proceed to the next state without explicit user confirmation.
     At each transition point, present the options and wait for the user's choice.
   - Iterative: The user can move between requirements and research at any time.
     Research always returns to requirements (not directly to design).
-    You MUST always offer this option at state transitions.
   - Record as you go: You MUST persist artifacts incrementally. You MUST NOT batch-write
     content at the end of a phase.
-  - Mermaid diagrams: Include diagrams for architectures, data flows, and component relationships
-    in research and design documents.
-  - Sources: Cite references and links in research documents when based on external materials.
   - Planning only: This workflow produces planning artifacts. You MUST NOT implement code,
     run containers, execute scripts, or begin any implementation work.
-  - When proposing options to user, always provide a numbered list of options.
 
   ### Artifact Output
 

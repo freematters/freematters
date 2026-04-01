@@ -1,7 +1,6 @@
 # Issue-to-PR — end-to-end pipeline from issue to merged pull request / merge request.
 #
-# Platform-agnostic: supports both GitHub and GitLab, detected from argument
-# format and git remote URL. Supports --lite mode for simplified specs.
+# Platform-agnostic: supports both GitHub and GitLab. Supports --lite mode for simplified specs.
 #
 # Flow:
 #
@@ -34,22 +33,10 @@ guide: |
   This workflow composes `issue-to-spec`, `spec-to-code`, and `pr-lifecycle` into a
   single end-to-end pipeline driven entirely through an issue (GitHub or GitLab).
 
-  #### Platform Detection
+  #### Input
 
-  Platform detection is handled by the `issue-to-spec` sub-workflow in its `create-issue` state.
-  The detected `platform` value (`github` or `gitlab`) is propagated through agent memory.
-  In states that need to post comments/notes (decide, confirm-implement, confirm-pr, done),
-  use the polling pattern from the `issue-to-spec` guide based on the remembered platform.
-
-  #### Input Modes
-
-  The workflow accepts two input modes:
-  - **New idea**: The user provides a repo/project name and a rough idea description.
-    The `spec` sub-workflow will create a new issue and run the full spec-gen process.
-  - **Existing issue**: The user provides an issue reference. The `start` state fetches
-    the issue context and attaches to it, then hands off to `spec`.
-    - **GitHub**: `owner/repo#N`
-    - **GitLab**: GitLab issue URL or `project/path#N`
+  The user provides a **full issue URL** to an existing issue (GitHub or GitLab), optionally with `--lite`.
+  Pass that URL through to `issue-to-spec`; do not expect `owner/repo#N`, project paths, or free-form ideas here.
 
   #### Execution Modes
 
@@ -70,29 +57,6 @@ guide: |
   When lite mode is active, it is propagated to the `issue-to-spec` sub-workflow, which
   produces simplified design (4 sections) and plan (1 step) artifacts.
 
-  #### Agent Memory
-
-  You MUST remember these values across states (keep them in your conversation memory):
-
-  **Common (both platforms)**:
-  - `platform` — `github` or `gitlab`
-  - `slug` — spec directory slug (derived from issue title)
-  - `mode` — `full-auto` or `fast-forward` (set in `decide` state)
-  - `lite` — whether `--lite` was specified
-
-  **GitHub-specific**:
-  - `owner` — repository owner
-  - `repo` — repository name (the `owner/repo` string)
-  - `issue_number` — the GitHub issue number
-  - `issue_creator` — the username of the issue creator
-
-  **GitLab-specific**:
-  - `project_path` — the full GitLab project path (e.g., `group/subgroup/project`)
-  - `gitlab_url` — the GitLab instance URL (e.g., `https://gitlab.corp.metabit-trading.com`)
-  - `hostname` — the GitLab hostname (e.g., `gitlab.corp.metabit-trading.com`)
-  - `issue_iid` — the GitLab issue IID (project-scoped)
-  - `issue_creator` — the username of the issue creator
-
   #### Fast-Forward Propagation
 
   When the user chose **fast-forward** mode:
@@ -112,25 +76,17 @@ initial: start
 states:
   start:
     prompt: |
-      ## Parse Input and Detect Lite Mode
+      
+      ## Issue URL and lite mode
 
-      Parse the user's prompt to extract the issue reference or idea description.
-      Platform detection is handled by the `issue-to-spec` sub-workflow — you do NOT
-      need to detect GitHub vs GitLab here.
+      The user must supply a **full issue URL** (GitHub or GitLab) to an existing issue.
 
-      ### Lite Mode Detection
+      ### Lite mode
 
-      Check if the user specified `--lite` in their arguments or if a parent workflow
-      propagated the lite flag. Remember `lite = true` or `lite = false`.
+      Check if the user specified `--lite` or if a parent workflow propagated the lite flag.
+      Remember `lite = true` or `lite = false`.
 
-      ### Input Parsing
-
-      Extract whatever the user provided:
-      - An issue reference (e.g., `owner/repo#N`, a GitLab URL, `project/path#N`)
-      - A repo/project name + rough idea description
-
-      Pass the parsed input through to the `spec` sub-workflow, which will handle
-      platform detection, issue creation, and spec generation.
+      Pass the issue URL (and lite flag) to the `spec` sub-workflow.
 
       Transition to `proceed`.
     transitions:
@@ -272,7 +228,7 @@ states:
       ```
 
       If the workflow stopped early (e.g., after spec only), suggest running
-      `/spec-to-code` with the issue reference to continue implementation.
+      `/spec-to-code` with the same issue URL to continue implementation.
 
       Present the final summary to the user.
     transitions: {}

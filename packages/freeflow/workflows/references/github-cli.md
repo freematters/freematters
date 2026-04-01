@@ -9,10 +9,21 @@ If not logged in, prompt user to run `gh auth login`.
 
 ## Command Preference
 
-**Prefer `gh pr` / `gh run` / `gh issue` high-level commands** over raw `gh api` calls.
-They handle auth, pagination, and output formatting automatically.
+**Prefer native `gh` commands** — they handle auth, pagination, and output formatting automatically:
 
-**Use `gh api` only** when high-level commands can't do the job:
+| Operation | Command |
+|-----------|---------|
+| Create issue | `gh issue create -t "title" -b "body"` |
+| View issue | `gh issue view <number> --json <fields>` |
+| Update issue | `gh issue edit <number> -b "body" --add-label label --remove-label label` |
+| Post comment | `gh issue comment <number> -b "body"` |
+| Create PR | `gh pr create -t "title" -b "body" -B base -H head` |
+| View PR | `gh pr view <number> --json <fields>` |
+| Update PR | `gh pr edit <number> -b "body"` |
+| PR checks | `gh pr checks <number>` |
+| Run logs | `gh run view <run_id> --log-failed` |
+
+**Use `gh api` only** when native commands can't do the job:
 - GraphQL mutations (resolve threads, add reactions)
 - Bulk operations with custom jq filters
 - Endpoints without a CLI equivalent
