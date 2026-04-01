@@ -17,7 +17,13 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { RunMeta, Snapshot } from "../store.js";
 import { Store } from "../store.js";
 import { runCli, runCliJson } from "./e2e/helpers.js";
-import { MINIMAL_FSM, MULTI_FSM, cleanupTempDir, createTempDir } from "./fixtures.js";
+import {
+  MINIMAL_FSM,
+  MULTI_FSM,
+  cleanupTempDir,
+  createTempDir,
+  uniqueRunId,
+} from "./fixtures.js";
 
 let tmp: string;
 let fsmMulti: string;
@@ -34,12 +40,6 @@ beforeAll(() => {
 afterAll(() => {
   cleanupTempDir(tmp);
 });
-
-let runCounter = 0;
-function uniqueRunId(prefix = "integ"): string {
-  runCounter++;
-  return `${prefix}-${runCounter}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
 
 // ─── Design Test 1: Lite flag persistence ────────────────────────
 

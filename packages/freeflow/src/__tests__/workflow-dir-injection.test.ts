@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { render } from "../commands/render.js";
 import { runCli, runCliJson } from "./e2e/helpers.js";
-import { MINIMAL_FSM, cleanupTempDir, createTempDir } from "./fixtures.js";
+import { MINIMAL_FSM, cleanupTempDir, createTempDir, uniqueRunId } from "./fixtures.js";
 
 let tmp: string;
 let fsmPath: string;
@@ -19,12 +19,6 @@ beforeAll(() => {
 afterAll(() => {
   cleanupTempDir(tmp);
 });
-
-let runCounter = 0;
-function uniqueRunId(prefix = "wfdir"): string {
-  runCounter++;
-  return `${prefix}-${runCounter}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
 
 const defaultRoot = () => join(tmp, "root");
 

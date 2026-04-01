@@ -50,9 +50,7 @@ export function render(args: RenderArgs): void {
   const fsm: Fsm = loadFsm(args.fsmPath);
   const workflowDir = dirname(resolve(args.fsmPath));
 
-  // Serialize to markdown and inject workflow_dir metadata after frontmatter
   const rawMarkdown = serializeMarkdown(fsm);
-  // Insert workflow_dir comment after the closing frontmatter delimiter
   const markdown = rawMarkdown.replace(
     /^(---\n[\s\S]*?\n---\n)/,
     (match) => `${match}\n<!-- workflow_dir: ${workflowDir} -->\n`,

@@ -91,6 +91,14 @@ states:
     transitions: {}
 `;
 
+// ─── Unique Run ID Helper ───────────────────────────────────────
+
+let runCounter = 0;
+export function uniqueRunId(prefix = "run"): string {
+  runCounter++;
+  return `${prefix}-${runCounter}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 // ─── Temp Directory Helpers ──────────────────────────────────────
 
 export function createTempDir(prefix: string): string {
