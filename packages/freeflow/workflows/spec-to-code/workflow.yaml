@@ -199,7 +199,6 @@ states:
          - Merge its worktree branch into the feature branch.
            Resolve conflicts if any — prefer the feature branch for plan.md/progress.md,
            prefer the worktree branch for implementation files.
-         - Run the full test suite to verify the merge is clean.
          - Update `./specs/<slug>/plan.md` — check off the step (`- [x] Step N`).
          - Update `./specs/<slug>/progress.md` — append a summary:
            ```
@@ -254,6 +253,12 @@ states:
          ```
 
       Then proceed to the next wave. Repeat until all steps are complete.
+
+      ### Final verification
+
+      After all steps are complete (before transitioning to `all steps complete`),
+      run the full test suite once to verify the merged result. Do NOT run tests
+      after each individual worktree merge — sub-agents already test in their worktrees.
 
       ### Constraints
       - The orchestrator MUST NOT write implementation code — only manage branches,
