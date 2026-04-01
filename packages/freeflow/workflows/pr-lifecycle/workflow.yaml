@@ -151,8 +151,9 @@ states:
          - **GitHub**: See reference for viewing run logs.
          - **GitLab**: Fetch failed pipeline jobs and their logs (see reference for CI job APIs).
       3. Fix the code to resolve the CI failures.
-      4. Run lint/format/unit tests locally to confirm the fix doesn't introduce new issues
-         (refer to project CLAUDE.md for check commands).
+      4. Run lint/format checks and unit tests only in the affected package(s) to confirm the
+         fix doesn't introduce new issues (refer to project CLAUDE.md for check commands).
+         Only run the full test suite if changes span multiple packages.
 
       If upon inspection there is nothing to fix (e.g., flaky test that passed on re-read),
       transition back to polling.
@@ -160,7 +161,7 @@ states:
       - Read status file for failed CI checks / pipeline status
       - Read failed job logs
       - Fix the code
-      - Run lint/format/unit tests to verify
+      - Run lint/format and affected package tests to verify
     transitions:
       fixed: push
       nothing to fix: poll
@@ -194,14 +195,15 @@ states:
 
       ## Verify
 
-      Run lint/format/unit tests locally to confirm the rebase doesn't break anything
-      (refer to project CLAUDE.md for check commands).
+      Run lint/format checks and unit tests only in the affected package(s) to confirm the
+      rebase doesn't break anything (refer to project CLAUDE.md for check commands).
+      Only run the full test suite if changes span multiple packages.
     todos:
       - Check if PR/MR was merged before rebasing
       - "GitLab: Try GitLab native rebase API"
       - Fallback to local git rebase if needed
       - Resolve any conflicts
-      - Run lint/format/unit tests to verify
+      - Run lint/format and affected package tests to verify
     transitions:
       rebased: push
       merged: done
@@ -243,8 +245,9 @@ states:
 
       ## After fixing
 
-      Run lint/format/unit tests locally to confirm fixes don't introduce new issues
-      (refer to project CLAUDE.md for check commands).
+      Run lint/format checks and unit tests only in the affected package(s) to confirm fixes
+      don't introduce new issues (refer to project CLAUDE.md for check commands).
+      Only run the full test suite if changes span multiple packages.
 
       ## Before transitioning to push
 
@@ -271,7 +274,7 @@ states:
       - React with eyes emoji on each @bot comment/note to acknowledge receipt
       - Handle @bot mentions (code changes or prepare answers)
       - Fix blocker-severity review threads
-      - Run lint/format/unit tests to verify
+      - Run lint/format and affected package tests to verify
       - Re-check for new @bot mentions before transitioning
     transitions:
       addressed: push
