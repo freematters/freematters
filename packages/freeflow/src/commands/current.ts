@@ -44,10 +44,13 @@ export function current(args: CurrentArgs): void {
 
     const card = stateCardFromFsm(snapshot.state, fsmState);
 
+    const workflowDir = meta.workflow_dir ?? null;
+
     if (args.json) {
       printJson(
         jsonSuccess("Current state", {
           run_id: args.runId,
+          ...(workflowDir ? { workflow_dir: workflowDir } : {}),
           state: card.state,
           prompt: card.prompt,
           todos: card.todos,
@@ -56,7 +59,8 @@ export function current(args: CurrentArgs): void {
         }),
       );
     } else {
-      process.stdout.write(`${formatStateCard(card)}\n`);
+      const dirLine = workflowDir ? `workflow_dir: ${workflowDir}\n` : "";
+      process.stdout.write(`${dirLine}${formatStateCard(card)}\n`);
     }
   } catch (err: unknown) {
     handleError(err, args.json);

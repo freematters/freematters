@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { dirname, resolve } from "node:path";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import {
@@ -28,10 +29,13 @@ export function start(args: StartArgs): void {
   try {
     const fsm: Fsm = loadFsm(args.fsmPath);
     const runId = args.runId ?? generateRunId();
+    const workflowDir = dirname(resolve(args.fsmPath));
 
     const store = new Store(args.root);
+    const runDir = store.getRunDir(runId);
     try {
       store.initRun(runId, args.fsmPath, args.lite);
+      store.updateMeta(runId, { workflow_dir: workflowDir });
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("already exists")) {
         throw new CliError(
@@ -68,6 +72,8 @@ export function start(args: StartArgs): void {
       printJson(
         jsonSuccess("Run started", {
           run_id: runId,
+          workflow_dir: workflowDir,
+          run_dir: runDir,
           state: card.state,
           prompt: card.prompt,
           todos: card.todos,
@@ -85,6 +91,8 @@ export function start(args: StartArgs): void {
         : formatStateCard(card);
       process.stdout.write(`${header}
 run_id: ${runId}
+workflow_dir: ${workflowDir}
+run_dir: ${runDir}
 
 ${cardOutput}
 `);

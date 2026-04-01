@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import { serializeMarkdown } from "../markdown-serializer.js";
@@ -48,9 +48,15 @@ export function render(args: RenderArgs): void {
 
   // Load and resolve the FSM (handles from:, workflow:, extends_guide:)
   const fsm: Fsm = loadFsm(args.fsmPath);
+  const workflowDir = dirname(resolve(args.fsmPath));
 
-  // Serialize to markdown
-  const markdown = serializeMarkdown(fsm);
+  // Serialize to markdown and inject workflow_dir metadata after frontmatter
+  const rawMarkdown = serializeMarkdown(fsm);
+  // Insert workflow_dir comment after the closing frontmatter delimiter
+  const markdown = rawMarkdown.replace(
+    /^(---\n[\s\S]*?\n---\n)/,
+    `$1\n<!-- workflow_dir: ${workflowDir} -->\n`,
+  );
 
   // Output routing
   let outputPath: string | undefined;

@@ -109,6 +109,8 @@ ${labels}`,
       return { isDone, newStatus, fromState: snapshot.state, alreadyVisited };
     });
 
+    const workflowDir = meta.workflow_dir ?? null;
+
     const card = stateCardFromFsm(args.target, fsm.states[args.target]);
 
     // Compute time spent in previous state
@@ -126,6 +128,7 @@ ${labels}`,
       const data: Record<string, unknown> = {
         state: card.state,
         from_state: result.fromState,
+        ...(workflowDir ? { workflow_dir: workflowDir } : {}),
         prompt: card.prompt,
         todos: card.todos,
         transitions: card.transitions,
