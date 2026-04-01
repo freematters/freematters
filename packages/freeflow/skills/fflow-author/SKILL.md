@@ -106,7 +106,8 @@ it's just a structured prompt with a clean start/done lifecycle.
    **How to derive the fields:**
    - `{name}`: the workflow directory name (e.g., if the workflow is at
      `workflows/spec-gen/workflow.yaml`, the name is `spec-gen`).
-   - `{description}`: extract the first sentence of the `guide` field from the workflow YAML.
+   - `{description}`: derive from the entire `guide` field of the workflow YAML — read the
+     full guide and write a concise one-line summary that captures the workflow's purpose.
      If `guide` is empty or missing, use `"Run the {name} workflow"`.
    - `{title}`: convert the name to title case, replacing hyphens with spaces
      (e.g., `spec-gen` -> `Spec Gen`).

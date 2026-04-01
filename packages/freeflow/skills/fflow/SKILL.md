@@ -133,11 +133,6 @@ field in their output. In markdown mode (`fflow render`), it appears as an HTML 
 Use `workflow_dir` from CLI output whenever workflow prompts reference files relative to
 the workflow directory (e.g., `{workflow_dir}/../references/github-cli.md`).
 
-**Backward compatibility**: Workflows may still reference `$SCRIPT_DIR` in their prompts.
-Treat `$SCRIPT_DIR` as equivalent to `workflow_dir` — substitute the value from CLI output.
-
----
-
 ## Error Handling
 
 - **`RUN_EXISTS`** — The generated run_id is already taken. Generate a different slug and retry.
