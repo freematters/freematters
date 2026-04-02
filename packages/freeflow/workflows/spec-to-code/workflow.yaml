@@ -480,7 +480,7 @@ states:
 
          ---
          **Branch**: `{branch_name}`
-         Ready for PR — run `/pr` to create a pull request.
+         Ready for PR — run `/pr-lifecycle` to create a pull request.
          ```
 
       3. Write `./specs/<slug>/source-issue` containing the issue reference

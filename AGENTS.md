@@ -9,15 +9,15 @@ Monorepo for FreeMatters — agent-native developer tools.
 | [freeflow](packages/freeflow/) | CLI-first workflow runtime for agent workflows |
 | [codoc](packages/codoc/) | Real-time collaborative markdown editing between AI agents and humans |
 
-## Local Commands
+## Local Skills
 
-| Command | Expands to |
-|---------|------------|
-| `/spec-gen` | `/fflow spec-gen` |
-| `/spec-to-code` | `/fflow spec-to-code` |
-| `/pr` | `/fflow pr-lifecycle` |
-| `/release` | `/fflow release` |
-| `/spec-driven` | `/fflow spec-driven` (use `--lite` for lightweight mode) |
+| Skill | Description |
+|-------|-------------|
+| `spec-gen` | Generate a complete specification from a rough idea |
+| `spec-to-code` | Implement a completed spec into working code |
+| `pr-lifecycle` | Create and monitor a pull request until it is merged or closed |
+| `release` | Run the release workflow |
+| `spec-driven` | Run the end-to-end spec-to-implementation workflow |
 
 ## Build & Test
 
