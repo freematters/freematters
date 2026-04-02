@@ -33,6 +33,16 @@ export class CliError extends Error {
     return lines.join("\n");
   }
 
+  static assertNotMarkdown(meta: { markdown?: boolean }, runId: string): void {
+    if (meta.markdown) {
+      throw new CliError(
+        "MARKDOWN_MODE",
+        `Run "${runId}" is in markdown mode — state tracking is disabled.`,
+        { context: { runId } },
+      );
+    }
+  }
+
   toJSON(): Record<string, unknown> {
     return {
       code: this.code,

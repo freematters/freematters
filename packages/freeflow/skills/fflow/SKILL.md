@@ -95,7 +95,7 @@ fflow start <PATH> --run-id <run-id> --lite
 
 ## Markdown Mode (`/fflow --markdown PATH`)
 
-The agent reads the full workflow once and self-manages state transitions — no CLI calls after the initial render.
+The agent reads the full workflow once and self-manages state transitions — no CLI calls after the initial render. Uses `fflow start --markdown` to create a minimal run directory and output the full workflow as markdown.
 
 ### Process
 
@@ -103,24 +103,24 @@ The agent reads the full workflow once and self-manages state transitions — no
 2. Run:
 
 ```bash
-fflow render <PATH>
+fflow start <PATH> --run-id <run-id> --markdown
 ```
 
-This outputs the full resolved workflow as markdown to stdout.
+This creates a run directory with only `fsm.meta.json` (no event sourcing) and outputs the full resolved workflow as markdown to stdout with `${workflow_dir}` and `${run_dir}` substituted.
 
-3. Read the **complete, untruncated** output. This is the entire workflow specification.
+3. **Remember the run ID** — you can use `fflow current --run-id <run-id>` to retrieve metadata (run_id, mode, workflow_dir, run_dir), but `goto` and `finish` are blocked in markdown mode.
 
-4. You are now running a workflow. The full workflow is rendered above. Follow these rules:
+4. Read the **complete, untruncated** output. This is the entire workflow specification.
+
+5. You are now running a workflow. The full workflow is rendered above. Follow these rules:
 
    - **Start at the initial state** (the first state in the document).
    - **Read the state's instructions** and execute them fully.
    - **Check transitions**: after completing a state's work, evaluate which transition condition is met and move to that target state.
-   - **Track your current state yourself** — there are no CLI commands to call.
+   - **Track your current state yourself** — there are no CLI commands to call (`goto` and `finish` will error with `MARKDOWN_MODE`).
    - **Keep driving forward**: after every state transition, immediately execute the new state's instructions. Do NOT stop between states.
    - **Terminal state**: a state with no transitions ends the workflow. Only stop when you reach a terminal state.
    - **Guide rules**: if the workflow has a guide section, follow those rules throughout all states.
-
-5. Remember the run ID for reference, but do not use it for CLI state tracking.
 
 ---
 

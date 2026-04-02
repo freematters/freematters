@@ -6,12 +6,12 @@
 #               |
 #         pass → review (self-fixing loop)
 #               |
-#         user approves → checkpoint → simplify → done
+#         user approves → checkpoint → simplify → verify → done
 #                              |
 #                         re-run e2e
 #
 # Fast forward mode (chosen at setup):
-#   setup → implement → e2e-test → review → simplify → done  (skips checkpoint)
+#   setup → implement → e2e-test → review → simplify → verify → done  (skips checkpoint)
 #
 # Picks up where spec-gen left off — reads ./specs/<slug>/ artifacts and implements them.
 
@@ -438,6 +438,41 @@ states:
       ### 4. Transition
 
       Proceed to done.
+    transitions:
+      done: verify
+
+  verify:
+    prompt: |
+      ## Verify
+
+      Run the full test suite and linter to confirm everything is clean before finalizing.
+
+      ### 1. Run tests
+
+      Run the affected package's test suite:
+      ```bash
+      npm test -w <package>
+      ```
+
+      If tests fail, fix the issues and re-run until all pass.
+
+      ### 2. Run linter
+
+      Run the linter/formatter:
+      ```bash
+      npm run check
+      ```
+
+      If there are lint issues, fix them.
+
+      ### 3. Commit fixes
+
+      If any fixes were needed, commit them:
+      ```
+      fix: address test/lint issues from verify step
+      ```
+
+      If `source_mode == "issue"`, push to remote.
     transitions:
       done: done
 

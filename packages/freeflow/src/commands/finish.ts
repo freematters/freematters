@@ -59,6 +59,10 @@ export function finish(args: FinishArgs): void {
       });
     }
 
+    const meta = store.readMeta(args.runId);
+
+    CliError.assertNotMarkdown(meta, args.runId);
+
     const abortedState = store.withLock(args.runId, () => {
       const snapshot = store.readSnapshot(args.runId);
       if (!snapshot) {

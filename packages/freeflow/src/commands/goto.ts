@@ -33,6 +33,9 @@ export function goto(args: GotoArgs): void {
     }
 
     const meta = store.readMeta(args.runId);
+
+    CliError.assertNotMarkdown(meta, args.runId);
+
     const fsm = loadFsm(meta.fsm_path);
 
     const result = store.withLock(args.runId, () => {

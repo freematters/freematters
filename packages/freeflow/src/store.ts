@@ -30,6 +30,7 @@ export interface RunMeta {
   version: number;
   session_id?: string;
   lite?: boolean;
+  markdown?: boolean;
   gateway_id?: string;
   client_id?: string;
   daemon_id?: string;
@@ -162,9 +163,13 @@ export class Store {
   initRun(
     runId: string,
     fsmPath: string,
-    lite?: boolean,
-    gatewayInfo?: GatewayInfo,
+    opts?: {
+      lite?: boolean;
+      gatewayInfo?: GatewayInfo;
+      markdown?: boolean;
+    },
   ): RunMeta {
+    const { lite, gatewayInfo, markdown } = opts ?? {};
     const dir = this.getRunDir(runId);
     if (existsSync(dir)) {
       throw new Error(`Run "${runId}" already exists`);
@@ -177,6 +182,7 @@ export class Store {
       created_at: nowISO(),
       version: 1,
       ...(lite && { lite: true }),
+      ...(markdown && { markdown: true }),
       ...(gatewayInfo?.gateway_id && { gateway_id: gatewayInfo.gateway_id }),
       ...(gatewayInfo?.client_id && { client_id: gatewayInfo.client_id }),
       ...(gatewayInfo?.daemon_id && { daemon_id: gatewayInfo.daemon_id }),

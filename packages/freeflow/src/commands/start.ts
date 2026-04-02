@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { dirname, resolve } from "node:path";
 import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
+import { serializeMarkdown } from "../markdown-serializer.js";
 import {
   formatStateCard,
   formatSubagentDispatch,
@@ -11,6 +12,7 @@ import {
   printJson,
   stateCardFromFsm,
   substituteCard,
+  substituteVars,
 } from "../output.js";
 import { Store } from "../store.js";
 
@@ -24,10 +26,21 @@ export interface StartArgs {
   root: string;
   json: boolean;
   lite?: boolean;
+  markdown?: boolean;
 }
 
 export function start(args: StartArgs): void {
   try {
+    if (args.lite && args.markdown) {
+      throw new CliError(
+        "ARGS_INVALID",
+        "--lite and --markdown are mutually exclusive",
+        {
+          context: { fsmPath: args.fsmPath },
+        },
+      );
+    }
+
     const fsm: Fsm = loadFsm(args.fsmPath);
     const runId = args.runId ?? generateRunId();
     const workflowDir = dirname(resolve(args.fsmPath));
@@ -35,7 +48,10 @@ export function start(args: StartArgs): void {
     const store = new Store(args.root);
     const runDir = store.getRunDir(runId);
     try {
-      store.initRun(runId, args.fsmPath, args.lite);
+      store.initRun(runId, args.fsmPath, {
+        lite: args.lite,
+        markdown: args.markdown,
+      });
       store.updateMeta(runId, { workflow_dir: workflowDir });
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("already exists")) {
@@ -46,6 +62,40 @@ export function start(args: StartArgs): void {
         );
       }
       throw err;
+    }
+
+    // Markdown mode: skip event sourcing, render full workflow as markdown
+    if (args.markdown) {
+      const rawMarkdown = serializeMarkdown(fsm);
+      const vars: Record<string, string> = {
+        workflow_dir: workflowDir,
+        run_dir: runDir,
+      };
+      const markdown = substituteVars(rawMarkdown, vars);
+
+      if (args.json) {
+        printJson(
+          jsonSuccess("Run started (markdown mode)", {
+            run_id: runId,
+            workflow_dir: workflowDir,
+            run_dir: runDir,
+            mode: "markdown",
+            markdown,
+          }),
+        );
+      } else {
+        const header = fsm.guide
+          ? `FSM started (markdown mode). ${fsm.guide}`
+          : "FSM started (markdown mode).";
+        process.stdout.write(`${header}
+run_id: ${runId}
+workflow_dir: ${workflowDir}
+run_dir: ${runDir}
+
+${markdown}
+`);
+      }
+      return;
     }
 
     store.commit(
