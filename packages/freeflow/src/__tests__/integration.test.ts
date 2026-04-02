@@ -198,14 +198,14 @@ describe.concurrent("CLI — goto command", () => {
   });
 });
 
-// ─── CLI — finish command ────────────────────────────────────────
+// ─── CLI — abort command ────────────────────────────────────────
 
-describe.concurrent("CLI — finish command", () => {
+describe.concurrent("CLI — abort command", () => {
   test("aborts active run, shows transition history", () => {
-    const id = uniqueRunId("finish-human");
+    const id = uniqueRunId("abort-human");
     runCli(`start ${fsmMulti} --run-id ${id}`, { root: defaultRoot() });
     runCli(`goto review --run-id ${id} --on ready`, { root: defaultRoot() });
-    const { stdout, exitCode } = runCli(`finish --run-id ${id}`, {
+    const { stdout, exitCode } = runCli(`abort --run-id ${id}`, {
       root: defaultRoot(),
     });
     expect(exitCode).toBe(0);
@@ -217,9 +217,9 @@ describe.concurrent("CLI — finish command", () => {
   });
 
   test("JSON output with completion_reason=manual_abort", () => {
-    const id = uniqueRunId("finish-json");
+    const id = uniqueRunId("abort-json");
     runCli(`start ${fsmMinimal} --run-id ${id}`, { root: defaultRoot() });
-    const { envelope, exitCode } = runCliJson(`finish --run-id ${id}`, {
+    const { envelope, exitCode } = runCliJson(`abort --run-id ${id}`, {
       root: defaultRoot(),
     });
     expect(exitCode).toBe(0);
@@ -232,10 +232,10 @@ describe.concurrent("CLI — finish command", () => {
   });
 
   test("RUN_NOT_ACTIVE error on already aborted run", () => {
-    const id = uniqueRunId("finish-double");
+    const id = uniqueRunId("abort-double");
     runCli(`start ${fsmMinimal} --run-id ${id}`, { root: defaultRoot() });
-    runCli(`finish --run-id ${id}`, { root: defaultRoot() });
-    const { envelope, exitCode } = runCliJson(`finish --run-id ${id}`, {
+    runCli(`abort --run-id ${id}`, { root: defaultRoot() });
+    const { envelope, exitCode } = runCliJson(`abort --run-id ${id}`, {
       root: defaultRoot(),
       expectFail: true,
     });

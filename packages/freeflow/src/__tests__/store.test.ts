@@ -118,14 +118,14 @@ describe("Store — terminal states", () => {
     expect(snap?.run_status).toBe("completed");
   });
 
-  test("finish produces aborted snapshot", () => {
+  test("abort produces aborted snapshot", () => {
     const s = freshStore();
     s.initRun("abort", "/fake.yaml");
     s.commit("abort", startEvent("plan"), startSnapshot("plan"));
     const { snapshot } = s.commit(
       "abort",
       {
-        event: "finish",
+        event: "abort",
         from_state: "plan",
         to_state: null,
         on_label: null,
@@ -140,6 +140,33 @@ describe("Store — terminal states", () => {
 
     const snap = s.readSnapshot("abort");
     expect(snap?.run_status).toBe("aborted");
+  });
+
+  test("backward compat: reading finish events normalizes to abort", () => {
+    const s = freshStore();
+    s.initRun("compat-finish", "/fake.yaml");
+    s.commit("compat-finish", startEvent("plan"), startSnapshot("plan"));
+
+    // Manually write a "finish" event to the JSONL file (simulating old data)
+    const { appendFileSync } = require("node:fs");
+    const eventsPath = join(s.getRunDir("compat-finish"), "events.jsonl");
+    const finishEvent = JSON.stringify({
+      seq: 2,
+      ts: new Date().toISOString(),
+      run_id: "compat-finish",
+      event: "finish",
+      from_state: "plan",
+      to_state: null,
+      on_label: null,
+      actor: "human",
+      reason: "manual_abort",
+      metadata: null,
+    });
+    appendFileSync(eventsPath, `${finishEvent}\n`, "utf-8");
+
+    const events = s.readEvents("compat-finish");
+    expect(events).toHaveLength(2);
+    expect(events[1].event).toBe("abort");
   });
 });
 

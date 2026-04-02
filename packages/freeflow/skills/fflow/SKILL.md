@@ -30,7 +30,7 @@ Strip the mode flag from args before extracting PATH.
 If there is a remembered `run_id` from a previous `/fflow` in this conversation, run `fflow current --run-id <run_id>`. If the current state is **not** `done`, prompt the user:
 - "You have an active workflow `<run_id>` in state `<state>`. Abort it and start a new one?"
 - Options: "Abort and start new" / "Keep it, start new anyway"
-- If the user chooses to abort, run `fflow finish --run-id <run_id>` first.
+- If the user chooses to abort, run `fflow abort --run-id <run_id>` first.
 - If the state is `done` or the run doesn't exist, skip this step silently.
 
 ### 2. Generate a run ID

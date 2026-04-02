@@ -13,7 +13,7 @@ import { join } from "node:path";
 // --- Types ---
 
 export type RunStatus = "active" | "completed" | "aborted";
-export type EventType = "start" | "goto" | "finish";
+export type EventType = "start" | "goto" | "abort";
 export type Actor = "agent" | "human" | "system";
 
 export interface GatewayInfo {
@@ -225,7 +225,13 @@ export class Store {
     if (raw.length === 0) {
       return [];
     }
-    return raw.split("\n").map((line) => JSON.parse(line) as StoreEvent);
+    return raw.split("\n").map((line) => {
+      const ev = JSON.parse(line) as StoreEvent;
+      if ((ev.event as string) === "finish") {
+        ev.event = "abort";
+      }
+      return ev;
+    });
   }
 
   withLock<T>(runId: string, fn: () => T): T {

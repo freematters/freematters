@@ -16,7 +16,7 @@ Read the design docs before making any changes.
 
 ```
 fflow CLI (human-readable default, -j JSON)
-    ├── commands/ (start, current, goto, finish)
+    ├── commands/ (start, current, goto, abort)
     ├── commands/e2e/ (gen, verify)
     ├── e2e/ (agent-session, multi-turn-session, verifier-tools, dual-stream-logger, verify-runner, parser, path-enumerator)
     ├── hooks/ (PostToolUse reminder)
@@ -43,7 +43,7 @@ Design principles:
 | `src/commands/start.ts` | Initialize run, commit start event |
 | `src/commands/current.ts` | Read snapshot, resolve state card |
 | `src/commands/goto.ts` | Validate transition, commit goto event |
-| `src/commands/finish.ts` | Abort run, commit finish event |
+| `src/commands/abort.ts` | Abort run, commit abort event |
 | `src/hooks/post-tool-use.ts` | PostToolUse hook: auto-detect, counter, reminder |
 | `hooks/hooks.json` | Claude Code hook declarations |
 | `skills/fflow-author/SKILL.md` | /fflow-author — guided workflow YAML creation |
@@ -64,7 +64,7 @@ Design principles:
 fflow start <fsm_path> [--run-id <id>] [-j]
 fflow current --run-id <id> [-j]
 fflow goto <target> --run-id <id> --on <label> [-j]
-fflow finish --run-id <id> [-j]
+fflow abort --run-id <id> [-j]
 fflow verify <plan.md> --test-dir <path> [--model <model>] [--verbose] [-j]
 ```
 

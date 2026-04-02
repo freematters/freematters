@@ -23,7 +23,7 @@ function computeRunStats(events: StoreEvent[]): RunStats {
       if (e.to_state && !statesVisited.includes(e.to_state)) {
         statesVisited.push(e.to_state);
       }
-    } else if (e.event === "finish") {
+    } else if (e.event === "abort" || e.event === ("finish" as string)) {
       parts.push("-[aborted]");
     }
   }
@@ -43,13 +43,13 @@ function computeRunStats(events: StoreEvent[]): RunStats {
   };
 }
 
-export interface FinishArgs {
+export interface AbortArgs {
   runId: string;
   root: string;
   json: boolean;
 }
 
-export function finish(args: FinishArgs): void {
+export function abort(args: AbortArgs): void {
   try {
     const store = new Store(args.root);
 
@@ -81,7 +81,7 @@ export function finish(args: FinishArgs): void {
       store.commit(
         args.runId,
         {
-          event: "finish",
+          event: "abort",
           from_state: snapshot.state,
           to_state: null,
           on_label: null,

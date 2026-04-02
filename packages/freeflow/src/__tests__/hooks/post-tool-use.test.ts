@@ -80,16 +80,16 @@ describe("handlePostToolUse — auto-detect fflow start", () => {
   });
 });
 
-describe("handlePostToolUse — auto-detect fflow finish", () => {
-  test("unbinds session on fflow finish", () => {
+describe("handlePostToolUse — auto-detect fflow abort", () => {
+  test("unbinds session on fflow abort", () => {
     const root = freshRoot();
     enableHook(root);
-    const store = setupActiveRun(root, "finish-run", fsmPath, "test-session", "plan");
+    const store = setupActiveRun(root, "abort-run", fsmPath, "test-session", "plan");
 
     const input = makeInput({
       tool_name: "Bash",
       tool_input: {
-        command: `fflow finish --run-id finish-run --root ${root}`,
+        command: `fflow abort --run-id abort-run --root ${root}`,
       },
       tool_response: "Run aborted.",
     });

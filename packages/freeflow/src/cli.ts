@@ -7,8 +7,8 @@ import { dirname, join, resolve } from "node:path";
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
 import { Command } from "commander";
+import { abort } from "./commands/abort.js";
 import { current } from "./commands/current.js";
-import { finish } from "./commands/finish.js";
 import { goto } from "./commands/goto.js";
 import { history } from "./commands/history.js";
 import { install } from "./commands/install.js";
@@ -51,7 +51,7 @@ Example:
   $ fflow start workflow.yaml --run-id my-run
   $ fflow goto review --run-id my-run --on "draft ready"
   $ fflow current --run-id my-run
-  $ fflow finish --run-id my-run`,
+  $ fflow abort --run-id my-run`,
   )
   .version(version)
   .option("--root <path>", "storage root (default: ~/.freeflow/ or $FREEFLOW_ROOT)")
@@ -143,12 +143,12 @@ program
   });
 
 program
-  .command("finish")
+  .command("abort")
   .description("abort an active run")
   .requiredOption("--run-id <id>", "run identifier")
   .action((opts: Record<string, unknown>, cmd: Command) => {
     const { root, json } = getGlobalOpts(cmd);
-    finish({
+    abort({
       runId: opts.runId as string,
       root: resolveRoot(root),
       json: json ?? false,
