@@ -24,7 +24,7 @@ If `CURRENT_BRANCH == DEFAULT_BRANCH`:
    ```bash
    git worktree add .claude/worktrees/<branch_name> -b <branch_name>
    ```
-   Then set your working directory to the worktree path (e.g., via the `EnterWorktree` tool or equivalent). Do not rely on `cd` — it does not persist across shell invocations in agent contexts.
+   Then enter the worktree and use it as your working directory.
 3. Proceed with the workflow from the worktree directory. All subsequent commands must run from the worktree path.
 
 Run `/fflow spec-driven` with any arguments passed to this skill.
