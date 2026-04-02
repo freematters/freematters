@@ -12,7 +12,7 @@ export interface HookInput {
 }
 
 const START_RE = /(?:fflow|freefsm)\s+start\b/;
-const FINISH_RE = /(?:fflow|freefsm)\s+finish\b/;
+const ABORT_RE = /(?:fflow|freefsm)\s+abort\b/;
 const GOTO_DONE_RE = /(?:fflow|freefsm)\s+goto\s+done\b/;
 const RUN_ID_FLAG_RE = /--run-id\s+(\S+)/;
 
@@ -40,7 +40,7 @@ export function handlePostToolUse(input: HookInput, root: string): string | null
           store.updateMeta(runId, { session_id: sessionId });
         }
       }
-    } else if (FINISH_RE.test(cmd) || GOTO_DONE_RE.test(cmd)) {
+    } else if (ABORT_RE.test(cmd) || GOTO_DONE_RE.test(cmd)) {
       store.unbindSession(sessionId);
       return null;
     }

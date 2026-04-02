@@ -82,12 +82,12 @@ describe("markdown mode", () => {
     expect(envelope.code).toBe("MARKDOWN_MODE");
   });
 
-  test("finish on markdown run → CliError MARKDOWN_MODE", () => {
-    const id = uniqueRunId("md-finish-block");
+  test("abort on markdown run → CliError MARKDOWN_MODE", () => {
+    const id = uniqueRunId("md-abort-block");
     const root = defaultRoot();
     runCli(`start ${fsmMinimal} --run-id ${id} --markdown`, { root });
 
-    const { envelope, exitCode } = runCliJson(`finish --run-id ${id}`, {
+    const { envelope, exitCode } = runCliJson(`abort --run-id ${id}`, {
       root,
       expectFail: true,
     });

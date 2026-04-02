@@ -27,7 +27,7 @@ Code is deterministic but rigid, hard to extend, and bug-prone.
 | Transitions            | Hard constraint (CLI rejects illegal)    | `goto` validates against FSM definition before committing                  |
 | Hook reminder interval | Every 5 tool calls (PostToolUse)         | Fixed interval, configurable later                                         |
 | Terminal state         | Fixed as `done`                          | Must exist in schema; `goto done` completes the run                        |
-| Scope (v1)             | `start`, `current`, `goto`, `finish`     | No `todo`, `viz`, `log`, `compile`                                         |
+| Scope (v1)             | `start`, `current`, `goto`, `abort`      | No `todo`, `viz`, `log`, `compile`                                         |
 
 ## Architecture
 
@@ -39,7 +39,7 @@ Code is deterministic but rigid, hard to extend, and bug-prone.
 |  +-- fflow-author/    +-- hooks.json         |
 |  +-- fflow/                                  |
 |  +-- current/          PostToolUse:           |
-|  +-- finish/            - every 5 tool calls |
+|  +-- abort/             - every 5 tool calls |
 |                           inject state       |
 |                           reminder           |
 |                                              |
@@ -50,7 +50,7 @@ Code is deterministic but rigid, hard to extend, and bug-prone.
 |                          initial state       |
 |  fflow current         query current state   |
 |  fflow goto <state>    validate+transition   |
-|  fflow finish          abort run             |
+|  fflow abort           abort run             |
 |                                              |
 +----------------------------------------------+
 |              ~/.freeflow/                     |
@@ -72,17 +72,17 @@ Code is deterministic but rigid, hard to extend, and bug-prone.
 3. Agent works -> PostToolUse hook every 5 tool calls injects state reminder via `fflow current`
 4. Agent calls `fflow goto X --on "label"` -> CLI validates transition legality; if legal, writes event, outputs new state card
 5. Agent reaches `done` state -> run completes (`run_status=completed`)
-6. `/fflow:finish` -> aborts an active run (`run_status=aborted`)
+6. `/fflow:abort` -> aborts an active run (`run_status=aborted`)
 
 ## Run Lifecycle
 
 ```
 active -> completed   (goto done)
-active -> aborted     (finish)
+active -> aborted     (abort)
 completed/aborted     terminal, no further operations
 ```
 
-`finish` is abort-only. Normal completion is `goto done`.
+`abort` is abort-only. Normal completion is `goto done`.
 
 ## FSM YAML Schema
 
@@ -187,7 +187,7 @@ states:
 
 ### Write path
 
-For state-changing operations (`start`, `goto`, `finish`):
+For state-changing operations (`start`, `goto`, `abort`):
 
 1. Acquire per-run directory lock (`lock/`)
 2. Read `snapshot.json`
@@ -263,10 +263,10 @@ Transitions:
 - If target is `done`: sets `run_status=completed`, `completion_reason=done_auto`
 - Errors with available transitions if illegal (`INVALID_TRANSITION`)
 
-### `fflow finish --run-id <id> [-j]`
+### `fflow abort --run-id <id> [-j]`
 
 ```
-$ fflow finish --run-id a1b2c3
+$ fflow abort --run-id a1b2c3
 OK FSM aborted (run_id: a1b2c3)
 Final state: Execute
 ```
@@ -347,9 +347,9 @@ Start an FSM workflow run. Generates a descriptive slug as `run_id`, calls `fflo
 
 Show current FSM state. Calls `fflow current` and displays the state card.
 
-### `/fflow:finish`
+### `/fflow:abort`
 
-Abort the current FSM run. Calls `fflow finish` and displays the terminal summary.
+Abort the current FSM run. Calls `fflow abort` and displays the terminal summary.
 
 ### Skills design decisions
 
@@ -368,7 +368,7 @@ Abort the current FSM run. Calls `fflow finish` and displays the terminal summar
 │   │   └── SKILL.md
 │   ├── current/
 │   │   └── SKILL.md
-│   └── finish/
+│   └── abort/
 │       └── SKILL.md
 ├── hooks/
 │   └── hooks.json
@@ -380,7 +380,7 @@ Abort the current FSM run. Calls `fflow finish` and displays the terminal summar
 │   │   ├── start.ts
 │   │   ├── current.ts
 │   │   ├── goto.ts
-│   │   └── finish.ts
+│   │   └── abort.ts
 │   ├── hooks/
 │   │   └── post-tool-use.ts   # periodic reminder hook
 │   ├── fsm.ts                 # core FSM logic (load yaml, validate)
