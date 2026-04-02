@@ -37,7 +37,9 @@ describe("repo local workflow skills", () => {
       "utf-8",
     );
 
-    expect(workflow).toContain("Every question MUST include numbered response options.");
+    expect(workflow).toContain(
+      "Every question MUST include numbered response options.",
+    );
     expect(workflow).toContain("**Quick mode**: If the user requested `--quick`");
     expect(workflow).not.toContain("**Lite mode**: If the user started with `--lite`");
   });
