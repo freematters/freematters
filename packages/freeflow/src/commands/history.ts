@@ -76,7 +76,7 @@ function formatTimeline(summaries: TransitionSummary[]): string {
         target: s.to ?? "?",
         duration,
       });
-    } else if (s.event === "finish") {
+    } else if (s.event === "abort") {
       const duration =
         s.duration_ms !== null ? `(${formatDuration(s.duration_ms)})` : "";
       rows.push({ prefix, transition: "-- (aborted)", target: "", duration });
