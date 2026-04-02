@@ -348,4 +348,25 @@ states:
       - Final status (merged or closed)
       - Total `@bot` interactions handled
       - Brief overview of main fixes applied
+
+      ## Worktree cleanup
+
+      Check if the current working directory is inside a git worktree:
+
+      ```bash
+      git rev-parse --git-common-dir 2>/dev/null
+      ```
+
+      If the output differs from `.git` (i.e., it points to another repo's `.git` directory),
+      you are in a worktree. Print cleanup instructions for the user:
+
+      ```
+      To clean up the worktree, run:
+        cd <main_repo_root>
+        git worktree remove <current_worktree_path>
+        git branch -d <branch_name>
+        git checkout <DEFAULT_BRANCH> && git pull
+      ```
+
+      Do NOT execute the cleanup yourself — removing the worktree from within it breaks the session.
     transitions: {}
