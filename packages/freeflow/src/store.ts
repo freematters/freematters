@@ -227,8 +227,10 @@ export class Store {
     }
     return raw.split("\n").map((line) => {
       const ev = JSON.parse(line) as StoreEvent;
+      // Backward-compat: runs persisted before the finish→abort rename still have
+      // event:"finish" on disk. Normalize on read so all callers see "abort".
       if ((ev.event as string) === "finish") {
-        ev.event = "abort";
+        return { ...ev, event: "abort" as EventType };
       }
       return ev;
     });
