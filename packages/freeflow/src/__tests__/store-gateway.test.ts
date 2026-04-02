@@ -14,10 +14,12 @@ afterAll(() => {
 describe("Store — gateway fields on RunMeta", () => {
   test("initRun with gateway fields stores them in meta", () => {
     const store = freshStore(tmp);
-    const meta = store.initRun("gw-run-1", "/fake/path.yaml", false, {
-      gateway_id: "gw-123",
-      client_id: "cli-456",
-      daemon_id: "dmn-789",
+    const meta = store.initRun("gw-run-1", "/fake/path.yaml", {
+      gatewayInfo: {
+        gateway_id: "gw-123",
+        client_id: "cli-456",
+        daemon_id: "dmn-789",
+      },
     });
 
     expect(meta.gateway_id).toBe("gw-123");

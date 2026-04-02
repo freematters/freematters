@@ -434,7 +434,7 @@ export async function runCore(
     logFn(`run=${runId} already exists, resuming`, c.cyan);
   } else {
     try {
-      store.initRun(runId, opts.fsmPath, opts.lite);
+      store.initRun(runId, opts.fsmPath, { lite: opts.lite });
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("already exists")) {
         throw new CliError(

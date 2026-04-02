@@ -163,10 +163,13 @@ export class Store {
   initRun(
     runId: string,
     fsmPath: string,
-    lite?: boolean,
-    gatewayInfo?: GatewayInfo,
-    markdown?: boolean,
+    opts?: {
+      lite?: boolean;
+      gatewayInfo?: GatewayInfo;
+      markdown?: boolean;
+    },
   ): RunMeta {
+    const { lite, gatewayInfo, markdown } = opts ?? {};
     const dir = this.getRunDir(runId);
     if (existsSync(dir)) {
       throw new Error(`Run "${runId}" already exists`);

@@ -38,7 +38,10 @@ export function start(args: StartArgs): void {
     const store = new Store(args.root);
     const runDir = store.getRunDir(runId);
     try {
-      store.initRun(runId, args.fsmPath, args.lite, undefined, args.markdown);
+      store.initRun(runId, args.fsmPath, {
+        lite: args.lite,
+        markdown: args.markdown,
+      });
       store.updateMeta(runId, { workflow_dir: workflowDir });
     } catch (err: unknown) {
       if (err instanceof Error && err.message.includes("already exists")) {
@@ -71,7 +74,16 @@ export function start(args: StartArgs): void {
           }),
         );
       } else {
-        process.stdout.write(markdown);
+        const header = fsm.guide
+          ? `FSM started (markdown mode). ${fsm.guide}`
+          : "FSM started (markdown mode).";
+        process.stdout.write(`${header}
+run_id: ${runId}
+workflow_dir: ${workflowDir}
+run_dir: ${runDir}
+
+${markdown}
+`);
       }
       return;
     }
