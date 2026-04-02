@@ -101,5 +101,5 @@ states:
       - Final status (PR URL if applicable)
 
       If the workflow stopped early, suggest the next manual step the user can take
-      (e.g., "run /spec-to-code to implement" or "run /pr to create a pull request").
+      (e.g., "run /spec-to-code to implement" or "run /pr-lifecycle to create a pull request").
     transitions: {}
