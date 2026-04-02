@@ -23,7 +23,7 @@ function computeRunStats(events: StoreEvent[]): RunStats {
       if (e.to_state && !statesVisited.includes(e.to_state)) {
         statesVisited.push(e.to_state);
       }
-    } else if (e.event === "abort" || e.event === ("finish" as string)) {
+    } else if (e.event === "abort") {
       parts.push("-[aborted]");
     }
   }
