@@ -20,11 +20,11 @@ CURRENT_BRANCH=$(git branch --show-current)
 
 If `CURRENT_BRANCH == DEFAULT_BRANCH`:
 1. Determine a branch name automatically from the user's idea (e.g., `feat/short-description` or `fix/short-description` using conventional commit style).
-2. Create a worktree in `.claude/worktrees/<branch_name>` and check it out:
+2. Create a worktree in `.claude/worktrees/<branch_name>` and switch your working directory to it:
    ```bash
    git worktree add .claude/worktrees/<branch_name> -b <branch_name>
-   cd .claude/worktrees/<branch_name>
    ```
-3. Proceed with the workflow from the worktree directory.
+   Then set your working directory to the worktree path (e.g., via the `EnterWorktree` tool or equivalent). Do not rely on `cd` — it does not persist across shell invocations in agent contexts.
+3. Proceed with the workflow from the worktree directory. All subsequent commands must run from the worktree path.
 
 Run `/fflow spec-driven` with any arguments passed to this skill.

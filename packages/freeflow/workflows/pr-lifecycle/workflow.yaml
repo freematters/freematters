@@ -354,11 +354,12 @@ states:
       Check if the current working directory is inside a git worktree:
 
       ```bash
-      git rev-parse --git-common-dir 2>/dev/null
+      GIT_DIR=$(git rev-parse --git-dir 2>/dev/null)
+      GIT_COMMON=$(git rev-parse --git-common-dir 2>/dev/null)
       ```
 
-      If the output differs from `.git` (i.e., it points to another repo's `.git` directory),
-      you are in a worktree. Print cleanup instructions for the user:
+      If `GIT_DIR` and `GIT_COMMON` differ, you are in a worktree.
+      Print cleanup instructions for the user:
 
       ```
       To clean up the worktree, run:
