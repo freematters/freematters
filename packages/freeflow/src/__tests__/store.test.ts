@@ -1,3 +1,4 @@
+import { appendFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { Store } from "../store.js";
@@ -148,7 +149,6 @@ describe("Store — terminal states", () => {
     s.commit("compat-finish", startEvent("plan"), startSnapshot("plan"));
 
     // Manually write a "finish" event to the JSONL file (simulating old data)
-    const { appendFileSync } = require("node:fs");
     const eventsPath = join(s.getRunDir("compat-finish"), "events.jsonl");
     const finishEvent = JSON.stringify({
       seq: 2,
