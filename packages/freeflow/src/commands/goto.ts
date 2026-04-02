@@ -34,13 +34,7 @@ export function goto(args: GotoArgs): void {
 
     const meta = store.readMeta(args.runId);
 
-    if (meta.markdown) {
-      throw new CliError(
-        "MARKDOWN_MODE",
-        `Run ${args.runId} is in markdown mode — state tracking is disabled.`,
-        { context: { runId: args.runId } },
-      );
-    }
+    CliError.assertNotMarkdown(meta, args.runId);
 
     const fsm = loadFsm(meta.fsm_path);
 
