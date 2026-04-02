@@ -27,14 +27,33 @@ export function current(args: CurrentArgs): void {
       });
     }
 
+    const meta = store.readMeta(args.runId);
+
+    if (meta.markdown) {
+      const runDir = store.getRunDir(args.runId);
+      if (args.json) {
+        printJson(
+          jsonSuccess("Current state (markdown mode)", {
+            run_id: args.runId,
+            mode: "markdown",
+            workflow_dir: meta.workflow_dir ?? null,
+            run_dir: runDir,
+          }),
+        );
+      } else {
+        process.stdout.write(
+          `run_id: ${args.runId}\nmode: markdown\nworkflow_dir: ${meta.workflow_dir ?? ""}\nrun_dir: ${runDir}\n`,
+        );
+      }
+      return;
+    }
+
     const snapshot = store.readSnapshot(args.runId);
     if (!snapshot) {
       throw new CliError("RUN_NOT_FOUND", "run has no snapshot", {
         context: { runId: args.runId },
       });
     }
-
-    const meta = store.readMeta(args.runId);
     const fsm = loadFsm(meta.fsm_path);
 
     const fsmState = fsm.states[snapshot.state];
