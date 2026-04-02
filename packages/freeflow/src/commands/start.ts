@@ -32,9 +32,13 @@ export interface StartArgs {
 export function start(args: StartArgs): void {
   try {
     if (args.lite && args.markdown) {
-      throw new CliError("ARGS_INVALID", "--lite and --markdown are mutually exclusive", {
-        context: { fsmPath: args.fsmPath },
-      });
+      throw new CliError(
+        "ARGS_INVALID",
+        "--lite and --markdown are mutually exclusive",
+        {
+          context: { fsmPath: args.fsmPath },
+        },
+      );
     }
 
     const fsm: Fsm = loadFsm(args.fsmPath);
