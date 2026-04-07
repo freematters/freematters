@@ -32,16 +32,22 @@ npm run check
 ```
 freematters/
 ├── packages/
-│   └── freeflow/        # Workflow runtime package
-│       ├── src/           # TypeScript source
-│       ├── skills/        # Claude Code / Codex skills
-│       ├── hooks/         # Claude Code hooks
-│       ├── workflows/     # Bundled workflow definitions
-│       └── docs/          # Design docs
+│   ├── freeflow/        # Workflow runtime package
+│   │   ├── src/           # TypeScript source
+│   │   ├── skills/        # Claude Code / Codex skills
+│   │   ├── hooks/         # Claude Code hooks
+│   │   ├── workflows/     # Bundled workflow definitions
+│   │   └── docs/          # Design docs
+│   └── codoc/             # Collaborative markdown editor
+├── docs/                  # Repo-level documentation
 ├── biome.json           # Shared lint/format config
 ├── tsconfig.base.json   # Shared TypeScript base config
 └── tsconfig.json        # Project references
 ```
+
+## Deployment
+
+Deployable packages each have their own `vercel.json` and a dedicated Vercel project with Root Directory pointing to the package path. See [docs/vercel-deploy.md](docs/vercel-deploy.md) for the full convention and how to add new deployable apps.
 
 ## Code Style
 
