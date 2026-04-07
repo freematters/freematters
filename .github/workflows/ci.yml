@@ -40,7 +40,11 @@ jobs:
             for pkg in packages/*/; do
               pkg_name=$(basename "$pkg")
               if echo "$CHANGED" | grep -q "^packages/$pkg_name/"; then
-                PACKAGES="$PACKAGES -w packages/$pkg_name"
+                if jq -e '.scripts.test' "$pkg/package.json" > /dev/null 2>&1; then
+                  PACKAGES="$PACKAGES -w packages/$pkg_name"
+                else
+                  echo "Skipping packages/$pkg_name (no test script)"
+                fi
               fi
             done
             if [ -z "$PACKAGES" ]; then
