@@ -1,0 +1,97 @@
+/* ── Theme tokens ── */
+
+[data-theme="noir"] {
+  --bg: #0e0d0b;
+  --bg2: #181714;
+  --text: #f5f0e8;
+  --accent: #d4622a;
+  --dim: #5a5549;
+  --border: #2a2723;
+  --ok: #3a6b35;
+  --fh: "Playfair Display", Georgia, serif;
+  --fb: "Inter", sans-serif;
+  --fm: "JetBrains Mono", monospace;
+  --term-bg: #080807;
+  --term-border: #1e1d1b;
+  --term-bar: #0c0b0a;
+}
+
+[data-theme="aurora"] {
+  --bg: #09090f;
+  --bg2: #101018;
+  --text: #efecf8;
+  --accent: #c8a96a;
+  --dim: #5a5870;
+  --border: #1e1c28;
+  --ok: #4a7a60;
+  --fh: "Playfair Display", Georgia, serif;
+  --fb: "Inter", sans-serif;
+  --fm: "JetBrains Mono", monospace;
+  --term-bg: #07060e;
+  --term-border: #2a2640;
+  --term-bar: #0d0b18;
+}
+
+[data-theme="light"] {
+  --bg: #fafaf7;
+  --bg2: #f2f0eb;
+  --text: #1c1814;
+  --accent: #d4622a;
+  --dim: #8a8278;
+  --border: #e2ddd6;
+  --ok: #3a7a35;
+  --fh: "Playfair Display", Georgia, serif;
+  --fb: "Inter", sans-serif;
+  --fm: "JetBrains Mono", monospace;
+  --term-bg: #f8f7f4;
+  --term-border: #d8d4ce;
+  --term-bar: #eeebe4;
+}
+
+[data-theme="mono"] {
+  --bg: #0a0a0a;
+  --bg2: #141414;
+  --text: #efefef;
+  --accent: #efefef;
+  --dim: #505050;
+  --border: #2a2a2a;
+  --ok: #a0a0a0;
+  --fh: "JetBrains Mono", monospace;
+  --fb: "JetBrains Mono", monospace;
+  --fm: "JetBrains Mono", monospace;
+  --term-bg: #050505;
+  --term-border: #222;
+  --term-bar: #0a0a0a;
+}
+
+[data-theme="glass"] {
+  --bg: transparent;
+  --bg2: rgba(255, 255, 255, 0.05);
+  --text: #eef0f8;
+  --accent: #c8a96a;
+  --dim: rgba(238, 240, 248, 0.4);
+  --border: rgba(255, 255, 255, 0.09);
+  --ok: rgba(100, 200, 140, 0.8);
+  --fh: "Playfair Display", Georgia, serif;
+  --fb: "Inter", sans-serif;
+  --fm: "JetBrains Mono", monospace;
+  --term-bg: rgba(255, 255, 255, 0.04);
+  --term-border: rgba(255, 255, 255, 0.09);
+  --term-bar: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="paper"] {
+  --bg: #f5f0e4;
+  --bg2: #ede8d8;
+  --text: #2a2018;
+  --accent: #7a3a14;
+  --dim: #9a8e78;
+  --border: #c8bcaa;
+  --ok: #4a6a38;
+  --fh: "Playfair Display", Georgia, serif;
+  --fb: "Lora", Georgia, serif;
+  --fm: "JetBrains Mono", monospace;
+  --term-bg: #fafaf0;
+  --term-border: #d4c8b0;
+  --term-bar: #f0ebe0;
+}

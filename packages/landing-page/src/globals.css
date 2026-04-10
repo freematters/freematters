@@ -1,0 +1,335 @@
+@import "tailwindcss";
+@import "./themes/tokens.css";
+
+/* ── shadcn/ui variable bridge ── */
+/* Maps project theme tokens to shadcn's expected CSS variables */
+@theme inline {
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--bg2);
+  --color-card-foreground: var(--text);
+  --color-muted: var(--bg2);
+  --color-muted-foreground: var(--dim);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--bg);
+  --color-secondary: var(--bg2);
+  --color-secondary-foreground: var(--text);
+  --color-accent: var(--bg2);
+  --color-accent-foreground: var(--text);
+  --color-destructive: oklch(0.396 0.141 25.723);
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--accent);
+  --radius: 0.625rem;
+  --font-heading: var(--fh);
+  --font-body: var(--fb);
+  --font-mono: var(--fm);
+}
+
+/* ── Base ── */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--fb);
+  overflow-x: hidden;
+  transition: background 0.35s, color 0.35s;
+  min-height: 100vh;
+}
+
+/* ── Top accent rule ── */
+body::before {
+  content: "";
+  display: block;
+  height: 3px;
+  background: var(--accent);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+}
+
+/* ── Aurora background ── */
+[data-theme="aurora"] body {
+  background: radial-gradient(
+      ellipse 70% 45% at 15% 20%,
+      color-mix(in oklch, oklch(75% 0.18 195) 28%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 55% 40% at 85% 12%,
+      color-mix(in oklch, oklch(78% 0.14 75) 22%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      ellipse 80% 55% at 50% 90%,
+      color-mix(in oklch, oklch(55% 0.22 295) 18%, transparent),
+      transparent
+    ), #09090f;
+}
+
+/* ── Glass background ── */
+[data-theme="glass"] body {
+  background: radial-gradient(ellipse at 30% 50%, #1a0f2e, #050b18 70%);
+  background-attachment: fixed;
+}
+
+/* ── Grain texture (mono + paper) ── */
+[data-theme="mono"] body::after,
+[data-theme="paper"] body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+[data-theme="mono"] body::after {
+  opacity: 0.05;
+}
+[data-theme="paper"] body::after {
+  opacity: 0.025;
+}
+
+/* ── Mono: no transitions ── */
+[data-theme="mono"] * {
+  transition: none !important;
+}
+
+/* ── Scrollbar ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+*::-webkit-scrollbar {
+  width: 4px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+/* ── YAML syntax highlight colors ── */
+.sk {
+  color: #c792ea;
+}
+.sv {
+  color: #c3e88d;
+}
+.ss {
+  color: #ffcb6b;
+}
+.sn {
+  color: #f78c6c;
+}
+.sp {
+  color: #89ddff;
+}
+[data-theme="light"] .sk {
+  color: #7c3aed;
+}
+[data-theme="light"] .sv {
+  color: #2d6a4f;
+}
+[data-theme="light"] .ss {
+  color: #b45309;
+}
+[data-theme="light"] .sn {
+  color: #9b2226;
+}
+[data-theme="mono"] .sk,
+[data-theme="mono"] .sv,
+[data-theme="mono"] .ss,
+[data-theme="mono"] .sn,
+[data-theme="mono"] .sp {
+  color: var(--text);
+}
+[data-theme="paper"] .sk {
+  color: #6d3a1f;
+}
+[data-theme="paper"] .sv {
+  color: #3b5e2a;
+}
+[data-theme="paper"] .ss {
+  color: #92400e;
+}
+
+/* ── Keyframes ── */
+@keyframes pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 40%, transparent));
+  }
+  50% {
+    filter: drop-shadow(0 0 22px color-mix(in srgb, var(--accent) 65%, transparent));
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+
+@keyframes inkSpread {
+  from {
+    transform: scale(0.65);
+    opacity: 0.5;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes branchSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes branchPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dotLight {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  20% {
+    opacity: 1;
+  }
+}
+
+@keyframes reminderFlash {
+  0%,
+  80%,
+  100% {
+    opacity: 0;
+  }
+  85%,
+  95% {
+    opacity: 1;
+  }
+}
+
+/* ── Aurora ribbons ── */
+.ribbon {
+  display: none;
+  position: fixed;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(200, 169, 106, 0.05),
+    transparent
+  );
+  height: clamp(4rem, 8vw, 7rem);
+  left: -20%;
+  width: 140%;
+}
+[data-theme="aurora"] .ribbon {
+  display: block;
+}
+.ribbon-1 {
+  top: 12%;
+  transform: rotate(-7deg);
+}
+.ribbon-2 {
+  top: 44%;
+  transform: rotate(-3deg);
+}
+.ribbon-3 {
+  top: 76%;
+  transform: rotate(2deg);
+}
+
+/* ── Terminal: state cards ── */
+.state-card {
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin: 6px 0;
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+[data-theme="glass"] .state-card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(8px);
+}
+[data-theme="paper"] .state-card {
+  border-style: double;
+  border-width: 2px;
+}
+.sc-name {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 12px;
+  margin-bottom: 5px;
+}
+.sc-sec {
+  color: var(--dim);
+  font-size: 10px;
+  margin-bottom: 2px;
+  opacity: 0.7;
+}
+.sc-prompt {
+  color: var(--text);
+  padding-left: 8px;
+  border-left: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  margin: 2px 0 5px;
+  opacity: 0.75;
+  font-size: 11px;
+}
+.sc-tr-row {
+  color: var(--dim);
+  font-size: 10px;
+}
+.sc-tr-row .arr {
+  color: var(--accent);
+}
+
+/* ── Glass panels ── */
+[data-theme="glass"] .duo-left {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(18px);
+}
+[data-theme="glass"] .duo-right {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(18px);
+}

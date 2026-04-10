@@ -1,0 +1,8 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "ignoreCommand": "git diff HEAD^ HEAD --quiet .",
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
