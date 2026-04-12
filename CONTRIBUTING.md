@@ -39,7 +39,6 @@ freematters/
 │   │   ├── workflows/     # Bundled workflow definitions
 │   │   └── docs/          # Design docs
 │   └── codoc/             # Collaborative markdown editor
-├── docs/                  # Repo-level documentation
 ├── biome.json           # Shared lint/format config
 ├── tsconfig.base.json   # Shared TypeScript base config
 └── tsconfig.json        # Project references
