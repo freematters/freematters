@@ -10,6 +10,7 @@ interface Props {
   branchOptions: string[];
   onBranchChoice: (choice: string) => void;
   chosenBranch: string | null;
+  onRestart: () => void;
 }
 
 function lineClassName(cls: string): string {
@@ -37,6 +38,7 @@ export function TerminalPanel({
   branchOptions,
   onBranchChoice,
   chosenBranch,
+  onRestart,
 }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -62,6 +64,21 @@ export function TerminalPanel({
         <span className="ml-1.5 text-[11px] font-mono text-muted-foreground opacity-70">
           fflow start code-review
         </span>
+        <button
+          type="button"
+          onClick={onRestart}
+          className={cn(
+            "ml-auto cursor-pointer p-0.5",
+            "text-muted-foreground opacity-60 hover:opacity-100 hover:text-[var(--accent)]",
+            "transition-all duration-200",
+          )}
+          title="Restart"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 4v4h4" />
+            <path d="M3.51 10a6 6 0 1 0 .49-5L1 8" />
+          </svg>
+        </button>
       </div>
 
       {/* Body */}

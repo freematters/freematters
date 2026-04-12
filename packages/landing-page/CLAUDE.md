@@ -132,7 +132,7 @@ Composable workflows (`src/data/composable.ts`) extend this with `composite?: st
 
 ## UI Development Workflow
 
-Playwright MCP enables the agent to directly inspect the live page — reading element trees and taking screenshots without the user having to describe UI state. This makes UI iteration significantly faster and more precise.
+Playwright MCP enables the agent to directly inspect the live page — reading element trees via `browser_snapshot` without the user having to describe UI state. This makes UI iteration significantly faster and more precise.
 
 ### First-Time Setup
 
@@ -157,15 +157,15 @@ Check if Playwright MCP is available by looking for `mcp__playwright__*` tools i
 ```
 npm run dev                  # start Vite dev server
 browser_navigate(url)        # open in Playwright
-browser_snapshot()           # read element tree (preferred for understanding structure)
-browser_take_screenshot()    # visual capture (preferred for layout/style checks)
+browser_snapshot()           # read element tree — use this for all verification
 ```
 
 ### Recommended Patterns
 
 1. **Before editing a component**: run `browser_snapshot` to read the current element structure — understand what's on the page before changing code
-2. **After editing**: `browser_snapshot` or `browser_take_screenshot` to verify the change rendered correctly
-3. **Theme verification**: click theme buttons via `browser_click` → snapshot/screenshot to confirm rendering across different themes
+2. **After editing**: `browser_snapshot` to verify the change rendered correctly
+3. **Theme verification**: click theme buttons via `browser_click` → `browser_snapshot` to confirm structure, ask the user to visually confirm in their browser
+4. **Do NOT use `browser_take_screenshot`** — it generates PNG files that pollute the repo and consumes excessive image tokens. Visual checks (layout, color, spacing) should be done by the user in their browser
 
 ### Without Playwright MCP (Fallback)
 

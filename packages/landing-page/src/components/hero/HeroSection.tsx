@@ -1,5 +1,4 @@
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
 import { useWorkflowAnimation } from "../../hooks/use-workflow-animation";
 import { StateGraph } from "./StateGraph";
 import { TerminalPanel } from "./TerminalPanel";
@@ -50,20 +49,6 @@ export function HeroSection() {
         </p>
 
         <div className="flex flex-col items-center gap-4">
-          <Button
-            variant="outline"
-            onClick={anim.start}
-            className={cn(
-              "h-auto cursor-pointer rounded-md px-[22px] py-[9px]",
-              "font-mono text-[0.83rem]",
-              "border-[var(--accent)] bg-transparent text-[var(--accent)]",
-              "hover:bg-[var(--accent)] hover:text-[var(--bg)]",
-              "transition-all duration-200 shadow-none",
-            )}
-          >
-            &#9654; Run the workflow
-          </Button>
-
           <div
             className={cn(
               "flex items-center gap-3 rounded-lg px-5 py-2.5",
@@ -99,6 +84,7 @@ export function HeroSection() {
             branchOptions={anim.branchOptions}
             onBranchChoice={anim.onBranchChoice}
             chosenBranch={anim.chosenBranch}
+            onRestart={anim.start}
           />
         </div>
 
