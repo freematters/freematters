@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 function InjectAnimation() {
   return (
@@ -56,9 +56,7 @@ function StepCard({
           <span className="block text-lg font-semibold font-heading text-foreground">
             {title}
           </span>
-          <span className="text-sm font-body text-muted-foreground">
-            {subtitle}
-          </span>
+          <span className="text-sm font-body text-muted-foreground">{subtitle}</span>
         </div>
       </div>
       {visual && <div className="flex justify-center">{visual}</div>}
@@ -76,23 +74,23 @@ function StepCard({
 
 export function HowItWorks() {
   return (
-    <section className="py-24">
-      <div className="mx-auto max-w-[1280px] px-10">
-        <div className="mb-16 flex flex-col items-center gap-3">
+    <section className="py-14 md:py-24">
+      <div className="mx-auto max-w-[1280px] px-5 md:px-10">
+        <div className="mb-10 flex flex-col items-center gap-3 md:mb-16">
           <span className="text-xs uppercase tracking-widest font-mono text-[var(--accent)]">
             Mechanism
           </span>
-          <h2 className="text-4xl text-center font-heading text-foreground">
+          <h2 className="text-2xl text-center font-heading text-foreground md:text-4xl">
             Prompt injection via hooks
           </h2>
           <p className="mt-1 max-w-[560px] text-center text-sm text-muted-foreground">
-            Natural language prompts drift. FreeFlow injects state-scoped
-            context into the agent's conversation at fixed intervals,
-            keeping it on a deterministic path.
+            Natural language prompts drift. FreeFlow injects state-scoped context into
+            the agent's conversation at fixed intervals, keeping it on a deterministic
+            path.
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <StepCard
             icon="&#9998;"
             title="State-scoped prompts"

@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useEffect, useRef } from "react";
 import type { TerminalLine } from "../../hooks/use-workflow-animation";
 
 interface Props {
@@ -74,7 +74,16 @@ export function TerminalPanel({
           )}
           title="Restart"
         >
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M1 4v4h4" />
             <path d="M3.51 10a6 6 0 1 0 .49-5L1 8" />
           </svg>
@@ -141,9 +150,7 @@ export function TerminalPanel({
                     className={cn(
                       "relative flex-1 cursor-pointer rounded-[5px] px-3 py-[5px]",
                       "font-mono text-[11px] transition-all duration-200",
-                      isPicked
-                        ? "text-[var(--accent)]"
-                        : "text-foreground",
+                      isPicked ? "text-[var(--accent)]" : "text-foreground",
                     )}
                     style={{
                       border: `1px solid ${isPicked || isRec ? "var(--accent)" : "color-mix(in srgb, var(--accent) 40%, transparent)"}`,
@@ -153,9 +160,10 @@ export function TerminalPanel({
                       opacity: isFaded ? 0.3 : 1,
                       textDecoration: isFaded ? "line-through" : "none",
                       pointerEvents: isFaded ? "none" : "auto",
-                      animation: isFaded || isPicked
-                        ? "none"
-                        : `branchSlideIn .3s ease-out ${i * 0.08}s both, branchPulse 2s ease-in-out ${0.6 + i * 0.08}s infinite`,
+                      animation:
+                        isFaded || isPicked
+                          ? "none"
+                          : `branchSlideIn .3s ease-out ${i * 0.08}s both, branchPulse 2s ease-in-out ${0.6 + i * 0.08}s infinite`,
                     }}
                   >
                     {isRec && !isPicked && !isFaded && (

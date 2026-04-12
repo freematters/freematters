@@ -22,7 +22,7 @@ export function ThemeSwitcher() {
 
   return (
     <div
-      className="fixed top-4 right-4 z-[1000] flex gap-1.5 items-center rounded-full px-2 py-1.5"
+      className="fixed top-5 right-3 z-[1000] flex gap-1 items-center rounded-full px-1.5 py-1 md:top-4 md:right-4 md:gap-1.5 md:px-2 md:py-1.5"
       style={{
         background:
           theme === "light"

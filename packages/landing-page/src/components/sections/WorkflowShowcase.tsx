@@ -1,6 +1,6 @@
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import { type WorkflowGraph, workflows } from "../../data/showcase";
 
 const NODE_W = 80;
@@ -107,13 +107,13 @@ function WorkflowSvg({ graph }: { graph: WorkflowGraph }) {
 
 export function WorkflowShowcase() {
   return (
-    <section className="py-24 bg-[var(--bg)]">
-      <div className="mx-auto max-w-[1280px] px-10">
+    <section className="py-14 bg-[var(--bg)] md:py-24">
+      <div className="mx-auto max-w-[1280px] px-5 md:px-10">
         <div className="mb-14 flex flex-col items-center gap-3">
           <span className="text-xs uppercase tracking-widest font-mono text-[var(--accent)]">
             Included
           </span>
-          <h2 className="text-4xl text-center font-heading text-foreground">
+          <h2 className="text-2xl text-center font-heading text-foreground md:text-4xl">
             Built-in Workflows
           </h2>
         </div>
@@ -122,7 +122,7 @@ export function WorkflowShowcase() {
           <TabsList
             variant="line"
             className={cn(
-              "mb-12 flex w-full justify-center bg-transparent",
+              "mb-8 flex w-full justify-start overflow-x-auto bg-transparent md:mb-12 md:justify-center",
               "h-auto gap-2",
             )}
           >
@@ -151,18 +151,18 @@ export function WorkflowShowcase() {
                 value={w.id}
                 className={cn(
                   "rounded-xl border border-[var(--border)] bg-[var(--bg2)]",
-                  "p-[32px_36px]",
+                  "p-5 md:p-[32px_36px]",
                   "animate-[fadeIn_0.25s_ease]",
                 )}
               >
-                <div className="flex gap-10 items-start">
+                <div className="flex flex-col gap-6 md:flex-row md:gap-10 md:items-start">
                   {/* Left: SVG graph */}
                   <div className="min-w-0 flex-1">
                     <WorkflowSvg graph={w} />
                   </div>
 
                   {/* Right: info */}
-                  <div className="flex w-[320px] shrink-0 flex-col gap-4">
+                  <div className="flex w-full shrink-0 flex-col gap-4 md:w-[320px]">
                     <h3 className="text-xl font-semibold font-heading text-foreground">
                       {w.label}
                     </h3>

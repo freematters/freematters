@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
+import { useState } from "react";
 import {
   type ComposableGraph,
   childWorkflows,
@@ -262,8 +262,7 @@ function YamlSnippet({
       {"\n"}
       {"  "}
       <span className="sk">workflow</span>
-      <span className="sp">:</span>{" "}
-      <span className="sv">{yamlRef}</span>
+      <span className="sp">:</span> <span className="sv">{yamlRef}</span>
       {"\n"}
       {"  "}
       <span className="sk">transitions</span>
@@ -271,8 +270,7 @@ function YamlSnippet({
       {"\n"}
       {"    "}
       <span className="sv">completed</span>
-      <span className="sp">:</span>{" "}
-      <span className="ss">{getNextState(stateId)}</span>
+      <span className="sp">:</span> <span className="ss">{getNextState(stateId)}</span>
     </pre>
   );
 }
@@ -291,20 +289,20 @@ export function Composable() {
   const parentNode = parentGraph.nodes.find((n) => n.composite === selected);
 
   return (
-    <section className="py-24">
-      <div className="mx-auto max-w-[960px] px-10">
+    <section className="py-14 md:py-24">
+      <div className="mx-auto max-w-[960px] px-5 md:px-10">
         {/* Header */}
         <div className="mb-14 flex flex-col items-center gap-3">
           <span className="text-xs uppercase tracking-widest font-mono text-[var(--accent)]">
             Architecture
           </span>
-          <h2 className="text-4xl text-center font-heading text-foreground">
+          <h2 className="text-2xl text-center font-heading text-foreground md:text-4xl">
             Composable by Design
           </h2>
           <p className="mt-1 max-w-[560px] text-center text-sm text-muted-foreground">
-            Embed entire workflows as single states. Each sub-workflow runs its
-            own prompt injection loop with scoped todos and deterministic
-            transitions, then hands control back to the parent.
+            Embed entire workflows as single states. Each sub-workflow runs its own
+            prompt injection loop with scoped todos and deterministic transitions, then
+            hands control back to the parent.
           </p>
         </div>
 
@@ -322,7 +320,7 @@ export function Composable() {
         <div
           className={cn(
             "rounded-xl border border-[var(--border)] bg-[var(--bg2)]",
-            "px-8 pb-6 pt-7",
+            "px-4 pb-5 pt-5 md:px-8 md:pb-6 md:pt-7",
           )}
         >
           <ParentGraph graph={parentGraph} selected={selected} onSelect={setSelected} />
@@ -345,7 +343,7 @@ export function Composable() {
             key={child.id}
             className={cn(
               "rounded-xl border border-[var(--border)] bg-[var(--bg2)]",
-              "px-8 py-6 transition-opacity duration-200",
+              "px-4 py-5 transition-opacity duration-200 md:px-8 md:py-6",
             )}
           >
             {/* Child header */}
@@ -364,11 +362,11 @@ export function Composable() {
             </div>
 
             {/* Child graph + YAML side by side */}
-            <div className="flex items-start gap-6">
+            <div className="flex flex-col gap-5 md:flex-row md:items-start md:gap-6">
               <div className="min-w-0 flex-1">
                 <ChildGraph graph={child.graph} />
               </div>
-              <div className="w-[300px] shrink-0">
+              <div className="w-full shrink-0 md:w-[300px]">
                 <div className="mb-2 text-xs font-mono text-muted-foreground opacity-60">
                   One line embeds the entire workflow:
                 </div>

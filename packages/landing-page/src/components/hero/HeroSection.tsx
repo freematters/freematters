@@ -18,7 +18,7 @@ export function HeroSection() {
       <div
         className={cn(
           "relative z-[1] mx-auto max-w-[1280px]",
-          "px-10 pt-14 text-center",
+          "px-5 pt-10 text-center md:px-10 md:pt-14",
         )}
       >
         <div
@@ -56,7 +56,9 @@ export function HeroSection() {
             )}
           >
             <span className="font-mono text-[13px] text-muted-foreground">$</span>
-            <span className="font-mono text-[13px] text-foreground">npx freeflow init</span>
+            <span className="font-mono text-[13px] text-foreground">
+              npx freeflow init
+            </span>
           </div>
         </div>
       </div>
@@ -65,14 +67,15 @@ export function HeroSection() {
       <div
         className={cn(
           "relative z-[1] mx-auto mt-8 flex max-w-[1280px]",
-          "h-[480px] px-10",
+          "flex-col px-5 md:flex-row md:h-[480px] md:px-10",
         )}
       >
         {/* Left: YAML + Terminal */}
         <div
           className={cn(
             "flex min-w-0 flex-1 flex-col overflow-hidden",
-            "rounded-l-[10px] border border-[var(--border)]",
+            "rounded-t-[10px] border border-[var(--border)] h-[360px]",
+            "md:rounded-l-[10px] md:rounded-tr-none md:h-auto",
           )}
         >
           <YamlPanel activeState={anim.activeYamlState} />
@@ -92,8 +95,9 @@ export function HeroSection() {
         <div
           className={cn(
             "flex min-w-0 flex-1 items-center justify-center",
-            "rounded-r-[10px] border border-l-0 border-[var(--border)]",
-            "bg-[var(--bg2)] px-8 py-10",
+            "rounded-b-[10px] border border-t-0 border-[var(--border)]",
+            "md:rounded-r-[10px] md:rounded-bl-none md:border-t md:border-l-0",
+            "bg-[var(--bg2)] px-4 py-6 md:px-8 md:py-10",
           )}
         >
           <StateGraph

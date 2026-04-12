@@ -2,12 +2,12 @@ import { cn } from "@/lib/utils";
 
 export function CtaFooter() {
   return (
-    <footer className="flex flex-col items-center gap-10 py-28">
+    <footer className="flex flex-col items-center gap-8 px-5 py-16 md:gap-10 md:px-10 md:py-28">
       {/* CTA */}
       <div className="flex flex-col items-center gap-8">
         <h2
           className={cn(
-            "text-3xl text-center leading-snug",
+            "text-2xl text-center leading-snug md:text-3xl",
             "font-heading text-foreground max-w-[520px]",
           )}
         >
@@ -21,9 +21,7 @@ export function CtaFooter() {
             "bg-[var(--bg2)] border border-[var(--border)]",
           )}
         >
-          <span className="font-mono text-[13px] text-muted-foreground">
-            $
-          </span>
+          <span className="font-mono text-[13px] text-muted-foreground">$</span>
           <span className="font-mono text-[13px] text-foreground">
             npx freeflow init
           </span>

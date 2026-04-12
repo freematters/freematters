@@ -11,18 +11,15 @@ export function Nav() {
       <div
         className={cn(
           "mx-auto flex items-center justify-between",
-          "max-w-[1280px] px-10 py-[26px]",
+          "max-w-[1280px] px-5 py-4 md:px-10 md:py-[26px]",
         )}
       >
         <span
-          className={cn(
-            "text-xl italic font-semibold",
-            "font-heading text-foreground",
-          )}
+          className={cn("text-xl italic font-semibold", "font-heading text-foreground")}
         >
           FreeFlow
         </span>
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-5 md:gap-8">
           <a
             href="/docs"
             className={cn(
