@@ -1,0 +1,29 @@
+egress:
+  allowed:
+    - host: api.anthropic.com
+    - host: github.com
+    - host: gitlab.com
+    - host: astral.sh
+    - host: release.astral.sh
+    - host: archive.ubuntu.com
+    - host: security.ubuntu.com
+    - host: chatgpt.com
+  rewrites: []
+
+env_vars:
+  IS_SANDBOX: "1"
+
+mounts:
+  - source: "~/.claude"
+    target: "~/.claude"
+    options: rw
+  - source: "~/.codex"
+    target: "~/.codex"
+    options: rw
+  - source: "~/.claude.json"
+    target: "~/.claude.json"
+    options: rw
+
+captured_env_prefixes:
+  - ANTHROPIC_
+  - CLAUDE_CODE_
