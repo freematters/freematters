@@ -6,3 +6,11 @@ dist/
 .worktrees/
 docs/plans/
 specs/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.ruff_cache/
+.pytest_cache/

@@ -8,6 +8,7 @@ Monorepo for FreeMatters — agent-native developer tools.
 |---------|-------------|
 | [freeflow](packages/freeflow/) | CLI-first workflow runtime for agent workflows |
 | [codoc](packages/codoc/) | Real-time collaborative markdown editing between AI agents and humans |
+| [freejail](packages/freejail/) | Daemonless container sandboxing CLI with egress policy enforcement |
 
 ## Local Skills
 

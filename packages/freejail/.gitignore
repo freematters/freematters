@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# Ruff
+.ruff_cache/
+
+# Pytest
+.pytest_cache/
+
+# Site-specific overrides (internal infra, not for open-source)
+site/
+
+# Local scratch
+tmp/
+
+# Build
+dist/
+build/
