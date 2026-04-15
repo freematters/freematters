@@ -39,6 +39,8 @@ jobs:
             PACKAGES=""
             for pkg in packages/*/; do
               pkg_name=$(basename "$pkg")
+              # Skip non-npm packages (e.g. Python packages without package.json)
+              [ ! -f "$pkg/package.json" ] && continue
               if echo "$CHANGED" | grep -q "^packages/$pkg_name/"; then
                 PACKAGES="$PACKAGES -w packages/$pkg_name"
               fi
