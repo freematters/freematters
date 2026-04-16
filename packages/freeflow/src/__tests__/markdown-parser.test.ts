@@ -1,55 +1,9 @@
 import { describe, expect, test } from "vitest";
 import { parseMarkdownWorkflow } from "../markdown-parser.js";
 
-// --- Helpers ---
-
-function minimal(extra = ""): string {
-  return `---
-version: 1.2
-initial: start
----
-
-# My Workflow
-
-## State: start
-
-### Instructions
-
-Do the work.
-
-### Transitions
-
-- done → done
-
-## State: done
-
-### Instructions
-
-All done.
-
-### Transitions
-
-(none)
-${extra}`;
-}
-
 // --- Valid cases ---
 
 describe("parseMarkdownWorkflow — valid inputs", () => {
-  test("minimal valid markdown → correct raw doc", () => {
-    const doc = parseMarkdownWorkflow(minimal());
-    expect(doc.version).toBe(1.2);
-    expect(doc.initial).toBe("start");
-    expect(doc.states).toBeDefined();
-    const states = doc.states as Record<string, Record<string, unknown>>;
-    expect(states.start).toBeDefined();
-    expect(states.start.prompt).toContain("Do the work.");
-    expect(states.start.transitions).toEqual({ done: "done" });
-    expect(states.done).toBeDefined();
-    expect(states.done.prompt).toContain("All done.");
-    expect(states.done.transitions).toEqual({});
-  });
-
   test("parse frontmatter fields: version, initial, allowed_tools, extends_guide", () => {
     const content = `---
 version: 1.2

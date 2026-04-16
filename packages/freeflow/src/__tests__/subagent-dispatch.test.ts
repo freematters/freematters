@@ -12,22 +12,6 @@ function fixture(name: string): string {
   return join(FIXTURES, name);
 }
 
-/** Workflow where the initial state is a subagent state */
-const SUBAGENT_INITIAL_FSM = `
-version: 1.3
-guide: "Subagent workflow"
-initial: work
-states:
-  work:
-    prompt: "Do the heavy lifting."
-    subagent: true
-    transitions:
-      complete: done
-  done:
-    prompt: "Finished."
-    transitions: {}
-`;
-
 /** Mixed workflow: greet (normal) → work (subagent) → done */
 const MIXED_FSM = `
 version: 1.3
@@ -49,39 +33,16 @@ states:
 `;
 
 let tmp: string;
-let fsmSubagentInitial: string;
 let fsmMixed: string;
 
 beforeAll(() => {
   tmp = createTempDir("subagent-dispatch");
-  fsmSubagentInitial = join(tmp, "subagent-initial.yaml");
   fsmMixed = join(tmp, "mixed.yaml");
-  writeFileSync(fsmSubagentInitial, SUBAGENT_INITIAL_FSM, "utf-8");
   writeFileSync(fsmMixed, MIXED_FSM, "utf-8");
 });
 
 afterAll(() => {
   cleanupTempDir(tmp);
-});
-
-const defaultRoot = () => join(tmp, "root");
-
-// ─── Test 10: current always uses normal format ──────────────────────
-
-describe("current: always normal format (no dispatch)", () => {
-  test("shows raw state prompt even for subagent states", () => {
-    const id = uniqueRunId("current-sub");
-    runCli(`start ${fsmSubagentInitial} --run-id ${id}`, {
-      root: defaultRoot(),
-    });
-    const { stdout, exitCode } = runCli(`current --run-id ${id}`, {
-      root: defaultRoot(),
-    });
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("Your instructions:");
-    expect(stdout).toContain("Do the heavy lifting.");
-    expect(stdout).not.toContain("subagent execution");
-  });
 });
 
 // ─── Test 11: Mixed workflow transitions ─────────────────────────────

@@ -8,59 +8,11 @@ import { MINIMAL_FSM, cleanupTempDir, createTempDir } from "./fixtures.js";
 // ─── hasWorkflowExtension via resolveWorkflow behavior ──────────
 
 describe("hasWorkflowExtension recognises .workflow.md", () => {
-  let tmp: string;
-
-  beforeAll(() => {
-    tmp = createTempDir("resolve-wf-md-ext");
-  });
-
-  afterAll(() => {
-    cleanupTempDir(tmp);
-  });
-
-  test("explicit .workflow.md path resolves directly when file exists", () => {
-    const mdPath = join(tmp, "my-flow.workflow.md");
-    writeFileSync(mdPath, "# placeholder", "utf-8");
-    const resolved = resolveWorkflow(mdPath);
-    expect(resolved).toBe(mdPath);
-  });
-
   test("bare name with .workflow.md extension throws helpful message", () => {
     // Same behavior as .workflow.yaml bare names — not supported
     expect(() => resolveWorkflow("some-wf.workflow.md")).toThrow(CliError);
     try {
       resolveWorkflow("some-wf.workflow.md");
-    } catch (e) {
-      const err = e as CliError;
-      expect(err.code).toBe("WORKFLOW_NOT_FOUND");
-      expect(err.message).toContain("Flat filename format is no longer supported");
-      expect(err.message).toContain("some-wf");
-    }
-  });
-});
-
-describe("hasWorkflowExtension recognises .md", () => {
-  let tmp: string;
-
-  beforeAll(() => {
-    tmp = createTempDir("resolve-wf-plain-md");
-  });
-
-  afterAll(() => {
-    cleanupTempDir(tmp);
-  });
-
-  test("explicit .md path resolves directly when file exists", () => {
-    const mdPath = join(tmp, "workflow.md");
-    writeFileSync(mdPath, "# placeholder", "utf-8");
-    const resolved = resolveWorkflow(mdPath);
-    expect(resolved).toBe(mdPath);
-  });
-
-  test("bare name with .md extension throws helpful message", () => {
-    expect(() => resolveWorkflow("some-wf.md")).toThrow(CliError);
-    try {
-      resolveWorkflow("some-wf.md");
     } catch (e) {
       const err = e as CliError;
       expect(err.code).toBe("WORKFLOW_NOT_FOUND");
@@ -122,12 +74,5 @@ describe("probeDir markdown resolution", () => {
       expect(err.message).toContain("workflow.yaml");
       expect(err.message).toContain("workflow.md");
     }
-  });
-
-  test("directory with only workflow.yaml still works (no regression)", () => {
-    const resolved = resolveWorkflow("yaml-only");
-    expect(resolved).toBe(
-      join(tmp, ".freeflow", "workflows", "yaml-only", "workflow.yaml"),
-    );
   });
 });

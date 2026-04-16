@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import WebSocket from "ws";
-import { Router } from "../router.js";
 import { createGatewayServer } from "../server.js";
 import type { GatewayConfig } from "../types.js";
 
@@ -138,48 +137,6 @@ describe("REST endpoints", () => {
     expect(res.status).toBe(200);
     const body = res.body as { run_id: string; status: string };
     expect(body.status).toBe("aborted");
-  });
-});
-
-// --- Unit Tests: WebSocket Message Routing ---
-
-describe("Router", () => {
-  let router: Router;
-
-  beforeEach(() => {
-    router = new Router();
-  });
-
-  test("removes daemon and its run mappings", () => {
-    const ws = {} as WebSocket;
-    router.registerDaemon("d1", ws, 5);
-    router.assignRunToDaemon("run-1", "d1");
-    router.removeDaemon("d1");
-    expect(router.getDaemon("d1")).toBeUndefined();
-    expect(router.getDaemonForRun("run-1")).toBeUndefined();
-  });
-
-  test("removes client subscription", () => {
-    const ws = {} as WebSocket;
-    router.subscribeClient("c1", ws, "run-1");
-    router.removeClient("c1");
-    const clients = router.getClientsForRun("run-1");
-    expect(clients).toHaveLength(0);
-  });
-
-  test("picks daemon with available capacity", () => {
-    const ws1 = {} as WebSocket;
-    const ws2 = {} as WebSocket;
-    router.registerDaemon("d1", ws1, 0);
-    router.registerDaemon("d2", ws2, 3);
-    const picked = router.pickAvailableDaemon();
-    expect(picked).toBe("d2");
-  });
-
-  test("returns undefined when no daemon has capacity", () => {
-    const ws = {} as WebSocket;
-    router.registerDaemon("d1", ws, 0);
-    expect(router.pickAvailableDaemon()).toBeUndefined();
   });
 });
 

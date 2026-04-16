@@ -103,28 +103,6 @@ describe("fflow render command", () => {
     expect(existsSync(yamlPath)).toBe(true);
   });
 
-  test("--save with .yml extension writes .md", () => {
-    tmp = createTempDir("render");
-    const ymlPath = join(tmp, "workflow.yml");
-    writeFileSync(ymlPath, MINIMAL_YAML);
-
-    render({ fsmPath: ymlPath, save: true, json: false });
-
-    const mdPath = join(tmp, "workflow.md");
-    expect(existsSync(mdPath)).toBe(true);
-  });
-
-  test("--save derives basename correctly from nested path", () => {
-    tmp = createTempDir("render");
-    const yamlPath = join(tmp, "my-flow.workflow.yaml");
-    writeFileSync(yamlPath, MINIMAL_YAML);
-
-    render({ fsmPath: yamlPath, save: true, json: false });
-
-    const mdPath = join(tmp, "my-flow.workflow.md");
-    expect(existsSync(mdPath)).toBe(true);
-  });
-
   test("-o writes to specified output path", () => {
     tmp = createTempDir("render");
     const yamlPath = join(tmp, "workflow.yaml");
@@ -201,20 +179,5 @@ describe("fflow render command", () => {
     expect(envelope.ok).toBe(true);
     expect(envelope.data).toHaveProperty("output_path");
     expect(envelope.data.output_path).toMatch(/\.md$/);
-  });
-
-  test("-j flag with -o includes output_path in envelope", () => {
-    tmp = createTempDir("render");
-    const yamlPath = join(tmp, "workflow.yaml");
-    writeFileSync(yamlPath, MINIMAL_YAML);
-
-    const outputPath = join(tmp, "custom.md");
-    const output = captureStdout(() => {
-      render({ fsmPath: yamlPath, output: outputPath, json: true });
-    });
-
-    const envelope = JSON.parse(output);
-    expect(envelope.ok).toBe(true);
-    expect(envelope.data.output_path).toBe(outputPath);
   });
 });

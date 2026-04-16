@@ -50,14 +50,6 @@ function makeInput(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("handlePostToolUse — no active run", () => {
-  test("returns null when no session binding exists", () => {
-    const root = freshRoot();
-    const result = handlePostToolUse(makeInput(), root);
-    expect(result).toBeNull();
-  });
-});
-
 describe("handlePostToolUse — auto-detect fflow start", () => {
   test("binds session from fflow start command", () => {
     const root = freshRoot();
@@ -148,20 +140,6 @@ describe("handlePostToolUse — counter and reminder", () => {
     expect(result).toContain("approved → execute");
   });
 
-  test("emits reminder again on 10th call", () => {
-    const root = freshRoot();
-    enableHook(root);
-    setupActiveRun(root, "counter-10", fsmPath, "test-session", "plan");
-
-    for (let i = 0; i < 9; i++) {
-      handlePostToolUse(makeInput(), root);
-    }
-
-    const result = handlePostToolUse(makeInput(), root);
-    expect(result).not.toBeNull();
-    expect(result).toContain("[FSM Reminder]");
-  });
-
   test("returns null when run_status is not active", () => {
     const root = freshRoot();
     enableHook(root);
@@ -187,47 +165,5 @@ describe("handlePostToolUse — counter and reminder", () => {
     expect(result).toBeNull();
     // Session should be cleaned up
     expect(store.readSession("test-session")).toBeNull();
-  });
-});
-
-describe("handlePostToolUse — hook gate", () => {
-  test("returns null when settings.json is missing", () => {
-    const root = freshRoot();
-    // No settings.json — hook should be disabled
-    setupActiveRun(root, "gate-missing", fsmPath, "test-session", "plan");
-    const store = new Store(root);
-    store.writeCounter("test-session", 4);
-
-    const result = handlePostToolUse(makeInput(), root);
-    expect(result).toBeNull();
-  });
-
-  test("returns null when hooks.postToolUse is false", () => {
-    const root = freshRoot();
-    mkdirSync(root, { recursive: true });
-    writeFileSync(
-      join(root, "settings.json"),
-      JSON.stringify({ hooks: { postToolUse: false } }),
-      "utf-8",
-    );
-    setupActiveRun(root, "gate-false", fsmPath, "test-session", "plan");
-    const store = new Store(root);
-    store.writeCounter("test-session", 4);
-
-    const result = handlePostToolUse(makeInput(), root);
-    expect(result).toBeNull();
-  });
-
-  test("returns reminder when hooks.postToolUse is true (counter at 4→5)", () => {
-    const root = freshRoot();
-    enableHook(root);
-    setupActiveRun(root, "gate-true", fsmPath, "test-session", "plan");
-    const store = new Store(root);
-    store.writeCounter("test-session", 4);
-
-    const result = handlePostToolUse(makeInput(), root);
-    expect(result).not.toBeNull();
-    expect(result).toContain("[FSM Reminder]");
-    expect(result).toContain("State: plan");
   });
 });

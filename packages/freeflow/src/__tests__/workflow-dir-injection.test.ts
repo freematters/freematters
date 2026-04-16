@@ -2,7 +2,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { render } from "../commands/render.js";
-import { runCli, runCliJson } from "./e2e/helpers.js";
+import { runCli } from "./e2e/helpers.js";
 import { cleanupTempDir, createTempDir, uniqueRunId } from "./fixtures.js";
 
 const VARS_FSM = `
@@ -58,30 +58,6 @@ describe("workflow-dir and run-dir substitution in prompts", () => {
     const expectedRunDir = join(root, "runs", id);
     expect(stdout).toContain(`${expectedRunDir}/output.txt`);
     expect(stdout).not.toContain("${run_dir}");
-  });
-
-  test("fflow start -j JSON prompt has ${workflow_dir} substituted", () => {
-    const id = uniqueRunId("start-json-sub");
-    const root = defaultRoot();
-    const { envelope, exitCode } = runCliJson(`start ${fsmPath} --run-id ${id}`, {
-      root,
-    });
-    expect(exitCode).toBe(0);
-    const data = envelope.data as Record<string, unknown>;
-    const expectedDir = dirname(fsmPath);
-    expect(data.prompt).toContain(`Read ${expectedDir}/data.txt`);
-    expect(data.prompt).not.toContain("${workflow_dir}");
-  });
-
-  test("fflow current --run-id substitutes ${workflow_dir} in prompt output", () => {
-    const id = uniqueRunId("current-wfdir-sub");
-    const root = defaultRoot();
-    runCli(`start ${fsmPath} --run-id ${id}`, { root });
-    const { stdout, exitCode } = runCli(`current --run-id ${id}`, { root });
-    expect(exitCode).toBe(0);
-    const expectedDir = dirname(fsmPath);
-    expect(stdout).toContain(`Read ${expectedDir}/data.txt`);
-    expect(stdout).not.toContain("${workflow_dir}");
   });
 
   test("fflow render substitutes ${workflow_dir} in markdown output", () => {

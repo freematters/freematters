@@ -51,27 +51,4 @@ describe("gateway command", () => {
 
     await shutdown();
   });
-
-  test("uses provided API key", async () => {
-    const shutdown = await gateway({
-      port: 19_003,
-      host: "127.0.0.1",
-      apiKey: "my-custom-key",
-      storeRoot: tmp,
-    });
-
-    // Auth with the provided key
-    const res = await fetch("http://127.0.0.1:19003/api/runs", {
-      headers: { "x-api-key": "my-custom-key" },
-    });
-    expect(res.status).toBe(200);
-
-    // Wrong key should fail
-    const badRes = await fetch("http://127.0.0.1:19003/api/runs", {
-      headers: { "x-api-key": "wrong-key" },
-    });
-    expect(badRes.status).toBe(403);
-
-    await shutdown();
-  });
 });

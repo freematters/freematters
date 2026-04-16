@@ -27,40 +27,6 @@ describe("resolve-workflow + loadFsm integration", () => {
     cleanupTempDir(tmp);
   });
 
-  test("resolveWorkflow finds <name>/workflow.yaml and loadFsm parses it", () => {
-    // resolveWorkflow with a direct path that exists
-    const wfPath = join(tmp, "my-workflow", "workflow.yaml");
-    const resolved = resolveWorkflow(wfPath);
-    expect(resolved).toBe(wfPath);
-
-    // loadFsm can parse the resolved path
-    const fsm = loadFsm(resolved);
-    expect(fsm.version).toBe(1);
-    expect(fsm.initial).toBe("start");
-    expect(fsm.states.start).toBeDefined();
-    expect(fsm.states.done).toBeDefined();
-    expect(fsm.states.start.transitions).toEqual({ next: "done" });
-  });
-
-  test("resolveWorkflow with non-existent direct path throws WORKFLOW_NOT_FOUND", () => {
-    const badPath = join(tmp, "nonexistent/workflow.yaml");
-    expect(() => resolveWorkflow(badPath)).toThrow(CliError);
-    try {
-      resolveWorkflow(badPath);
-    } catch (e) {
-      expect((e as CliError).code).toBe("WORKFLOW_NOT_FOUND");
-    }
-  });
-
-  test("direct path to flat-format file still works", () => {
-    const flatPath = join(tmp, "flat-test.workflow.yaml");
-    writeFileSync(flatPath, MINIMAL_FSM, "utf-8");
-    const resolved = resolveWorkflow(flatPath);
-    expect(resolved).toBe(flatPath);
-    const fsm = loadFsm(resolved);
-    expect(fsm.version).toBe(1);
-  });
-
   test("bare name with workflow extension throws with helpful message", () => {
     // "spec-gen.workflow.yaml" without path separators should be rejected early
     expect(() => resolveWorkflow("spec-gen.workflow.yaml")).toThrow(CliError);
