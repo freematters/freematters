@@ -516,7 +516,7 @@ function resolveWorkflowStates(
     if (state.transitions === undefined || state.transitions === null) {
       fail(`state "${stateName}": "workflow" states must have "transitions"`);
     }
-    if (doc.version !== 1.2 && doc.version !== 1.3) {
+    if (doc.version !== 1.2 && doc.version !== 1.3 && doc.version !== 1.4) {
       fail(`state "${stateName}": "workflow" requires version 1.2 or higher`);
     }
 
@@ -830,9 +830,7 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
   for (const [name, state] of Object.entries(states)) {
     for (const [label, target] of Object.entries(state.transitions)) {
       if (!(target in states)) {
-        offenders.push(
-          `state "${name}" label "${label}" → "${target}"`,
-        );
+        offenders.push(`state "${name}" label "${label}" → "${target}"`);
       }
     }
   }
