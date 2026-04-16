@@ -48,44 +48,44 @@ export function current(args: CurrentArgs): void {
       return;
     }
 
-    const snapshot = store.readSnapshot(args.runId);
-    if (!snapshot) {
-      throw new CliError("RUN_NOT_FOUND", "run has no snapshot", {
-        context: { runId: args.runId },
-      });
-    }
     const fsm = loadFsm(meta.fsm_path);
 
-    const fsmState = fsm.states[snapshot.state];
-    if (!fsmState) {
-      throw new CliError("STATE_NOT_FOUND", "state not found in FSM", {
-        context: { runId: args.runId, state: snapshot.state },
-      });
-    }
-
-    const { card: rawCard, updatedShownGuides } = buildStateCardForEmit(
-      fsm,
-      snapshot.state,
-      snapshot,
-    );
-
-    // First-time guide emission via `current` must persist the new
-    // shown_guides entry so subsequent reads don't re-show it. Re-read under
-    // the lock to avoid clobbering concurrent writes from other commands.
-    if (updatedShownGuides !== undefined) {
-      store.withLock(args.runId, () => {
-        const latest = store.readSnapshot(args.runId);
-        if (!latest) return;
+    // Build the state card under the per-run lock so the decision to render
+    // the guide and the shown_guides persist are atomic against concurrent
+    // `goto` commits. Otherwise a concurrent goto could commit
+    // shown_guides=[X] between an unlocked read and the lock, and this call
+    // would still emit a duplicate guide card to the user.
+    let snapshot!: NonNullable<ReturnType<typeof store.readSnapshot>>;
+    let rawCard!: ReturnType<typeof buildStateCardForEmit>["card"];
+    store.withLock(args.runId, () => {
+      const latest = store.readSnapshot(args.runId);
+      if (!latest) {
+        throw new CliError("RUN_NOT_FOUND", "run has no snapshot", {
+          context: { runId: args.runId },
+        });
+      }
+      const fsmState = fsm.states[latest.state];
+      if (!fsmState) {
+        throw new CliError("STATE_NOT_FOUND", "state not found in FSM", {
+          context: { runId: args.runId, state: latest.state },
+        });
+      }
+      const built = buildStateCardForEmit(fsm, latest.state, latest);
+      rawCard = built.card;
+      snapshot = latest;
+      if (built.updatedShownGuides !== undefined) {
         const currentShown = latest.shown_guides ?? [];
-        if (currentShown.includes(snapshot.state)) return;
-        const merged = [...currentShown, snapshot.state];
-        // Commit a no-op event-less snapshot update by re-writing the file
-        // directly via the store's public write path.
-        store.writeSnapshot({ ...latest, shown_guides: merged });
-      });
-    }
+        if (!currentShown.includes(latest.state)) {
+          store.writeSnapshot({
+            ...latest,
+            shown_guides: [...currentShown, latest.state],
+          });
+        }
+      }
+    });
 
-    const stateSourceDir = fsmState.source_path
+    const fsmState = fsm.states[snapshot.state];
+    const stateSourceDir = fsmState?.source_path
       ? dirname(fsmState.source_path)
       : (meta.workflow_dir ?? "");
     const runDir = store.getRunDir(args.runId);
