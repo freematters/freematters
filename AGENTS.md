@@ -15,6 +15,8 @@ Monorepo for FreeMatters — agent-native developer tools.
 |-------|-------------|
 | `spec-gen` | Generate a complete specification from a rough idea |
 | `spec-to-code` | Implement a completed spec into working code |
+| `issue-to-spec` | Generate a specification from an existing issue |
+| `issue-to-pr` | End-to-end pipeline from an issue to a merged pull request |
 | `pr-lifecycle` | Create and monitor a pull request until it is merged or closed |
 | `release` | Run the release workflow |
 | `spec-driven` | Run the end-to-end spec-to-implementation workflow |
