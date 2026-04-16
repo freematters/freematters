@@ -33,12 +33,10 @@ fflow install claude
 fflow install codex
 ```
 
-Both commands delegate skill and workflow registration to
-[`npx skills install`](https://www.npmjs.com/package/skills) under the hood — one call for
-`packages/freeflow/skills/` and one for `packages/freeflow/workflows/`. `npx` must be
-available on `PATH` (it ships with Node.js). If `npx skills install` fails during
-`fflow install claude`, the plugin install is rolled back automatically so the operation
-is atomic.
+Both commands register the bundled skills and workflows into the agent's skill
+directories. `fflow install claude` additionally installs the Claude Code plugin
+(for the PostToolUse hook) and rolls it back automatically if skill or workflow
+registration fails, so the install is atomic.
 
 ### For Contributors
 
