@@ -16,9 +16,9 @@ const PACKAGE_ROOT = resolve(__dirname, "../..");
 const SKILLS_DIR = join(PACKAGE_ROOT, "skills");
 const WORKFLOWS_DIR = join(PACKAGE_ROOT, "workflows");
 
-// ─── Install: claude backend ────────────────────────────────────
+// ─── Install ────────────────────────────────────────────────────
 
-describe("install claude (with stubbed execFileSync)", () => {
+describe("install (with stubbed execFileSync)", () => {
   beforeEach(() => {
     execFileSyncMock.mockReset();
     execFileSyncMock.mockImplementation(() => Buffer.from(""));

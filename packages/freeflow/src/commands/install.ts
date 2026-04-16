@@ -19,7 +19,7 @@ function run(cmd: string, args: string[]): void {
   execFileSync(cmd, args, { stdio: "inherit" });
 }
 
-function runNpxSkills(packageRoot: string, onFailure?: () => void): void {
+function runNpxSkills(packageRoot: string, onFailure: () => void): void {
   const dirs = [join(packageRoot, "skills"), join(packageRoot, "workflows")];
   try {
     for (const dir of dirs) {
@@ -27,7 +27,7 @@ function runNpxSkills(packageRoot: string, onFailure?: () => void): void {
       run("npx", ["skills", "install", dir]);
     }
   } catch (err) {
-    onFailure?.();
+    onFailure();
     throw err;
   }
 }
