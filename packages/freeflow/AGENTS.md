@@ -48,7 +48,7 @@ Design principles:
 | `hooks/hooks.json` | Claude Code hook declarations |
 | `skills/fflow-author/SKILL.md` | /fflow-author — guided workflow YAML creation |
 | `skills/fflow/SKILL.md` | /fflow — initialize a workflow run |
-| `skills/e2e-run/SKILL.md` | /fflow:e2e-run — run e2e agent tests |
+| `skills/e2e/SKILL.md` | /e2e — write (gen), run, or fix e2e agent tests |
 | `src/e2e/multi-turn-session.ts` | V1 query() wrapper for multi-turn agent sessions |
 | `src/e2e/agent-session.ts` | High-level agent control with send/wait API |
 | `src/e2e/verifier-tools.ts` | MCP tools (run_agent, wait, send) for verifier agent |
@@ -117,7 +117,7 @@ Test plans are raw markdown read by the verifier agent.
 Output: `test-report.md` in `--test-dir`.
 Dogfood test plans live in `e2e/`.
 
-When generating e2e test plans for freeflow itself (via `/e2e-gen`), the Setup section
+When generating e2e test plans for freeflow itself (via `/e2e gen`), the Setup section
 MUST build from the current working tree (`npm run build` in `packages/freeflow/`) and
 use the local binary (`node packages/freeflow/dist/cli.js`) instead of the globally
 installed `fflow`. This ensures the executor tests the development version, not the

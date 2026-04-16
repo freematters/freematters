@@ -44,7 +44,7 @@ The verifier launches the executor via `run_agent(prompt)`, then interacts throu
 
 ## Trade-offs
 
-**Non-determinism.** Two runs of the same test plan may take different paths because the executor interprets instructions differently. This makes failures harder to reproduce. Mitigation: the e2e-fix workflow writes a deterministic repro shell script from the session logs.
+**Non-determinism.** Two runs of the same test plan may take different paths because the executor interprets instructions differently. This makes failures harder to reproduce. Mitigation: `/e2e fix` writes a deterministic repro shell script from the session logs.
 
 **Cost and speed.** Every run burns two agent sessions. This is too slow for inner-loop TDD (RED-GREEN-REFACTOR). Use freefsm verify for outer-loop validation — after implementation is complete, not after each step.
 
@@ -68,7 +68,7 @@ The two layers complement each other. Fast deterministic tests catch logic error
 
 ## Test Plan Format
 
-Test plans are structured markdown that the verifier reads and executes. See the [e2e-gen skill](../../.claude/skills/e2e-gen/SKILL.md) for the full format specification.
+Test plans are structured markdown that the verifier reads and executes. See the [e2e skill](../skills/e2e/SKILL.md) (`## gen` section) for the full format specification.
 
 Key sections:
 - **Background** — explains expected behavior (the verifier has no prior knowledge)
@@ -85,4 +85,4 @@ Each run directory is self-contained for debugging:
 - `events.jsonl` — FSM event history
 - `snapshot.json` — final FSM state
 
-These artifacts enable the e2e-fix workflow to diagnose failures post-hoc without re-running.
+These artifacts enable `/e2e fix` to diagnose failures post-hoc without re-running.

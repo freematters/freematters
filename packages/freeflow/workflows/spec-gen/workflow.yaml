@@ -457,7 +457,7 @@ states:
       Check if design.md has an E2E Testing section.
 
       - If no → skip directly to done.
-      - If yes → run `/e2e-gen` to generate e2e.md from design and requirements
+      - If yes → run `/e2e gen` to generate e2e.md from design and requirements
         artifacts. Then transition to done.
     transitions:
       e2e plan generated: done

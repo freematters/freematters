@@ -286,18 +286,18 @@ states:
 
       ### Run the test
 
-      Run `/e2e-run` with the test plan at `./specs/<slug>/e2e.md` and
+      Run `/e2e run` with the test plan at `./specs/<slug>/e2e.md` and
       `--test-dir ./specs/<slug>/e2e-out`.
 
       - **Pass** (exit code 0) → transition to review
-      - **Fail** → run `/e2e-fix` to diagnose the failure from the
+      - **Fail** → run `/e2e fix` to diagnose the failure from the
         test-dir artifacts, fix the code, and re-run. Repeat until passing.
 
       Update `./specs/<slug>/progress.md` with E2E result, attempt count, and notes.
     todos:
       - Check if ./specs/<slug>/e2e.md exists
-      - If e2e.md exists, run /e2e-run with the test plan (MUST NOT skip)
-      - If e2e fails, run /e2e-fix and re-run until passing
+      - If e2e.md exists, run /e2e run with the test plan (MUST NOT skip)
+      - If e2e fails, run /e2e fix and re-run until passing
       - Update progress.md with E2E result
     transitions:
       e2e passed: review

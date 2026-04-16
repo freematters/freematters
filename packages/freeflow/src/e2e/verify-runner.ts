@@ -49,7 +49,7 @@ export async function verifyCore(args: VerifyCoreArgs): Promise<VerifyCoreResult
     `Test report file: ${reportPath}`,
     "",
     `Use \`node ${FFLOW_BIN}\` for all fflow commands (start, goto, current).`,
-    "IMPORTANT: Do NOT invoke /e2e-run or /e2e-fix skills — you ARE the verifier. Using them would cause infinite recursion.",
+    "IMPORTANT: Do NOT invoke `/e2e run` or `/e2e fix` — you ARE the verifier. Using them would cause infinite recursion.",
   ].join("\n");
 
   const session = query({
