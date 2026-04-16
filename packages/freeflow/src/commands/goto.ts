@@ -2,6 +2,7 @@ import { dirname } from "node:path";
 import { CliError } from "../errors.js";
 import { loadFsm } from "../fsm.js";
 import {
+  buildStateCardForEmit,
   formatDuration,
   formatLiteCard,
   formatStateCard,
@@ -9,7 +10,6 @@ import {
   handleError,
   jsonSuccess,
   printJson,
-  stateCardFromFsm,
   substituteCard,
 } from "../output.js";
 import { type RunStatus, Store } from "../store.js";
@@ -93,6 +93,14 @@ ${labels}`,
       const isDone = args.target === "done";
       const newStatus: RunStatus = isDone ? "completed" : "active";
 
+      // Build the state card up front so we know whether to append a new
+      // shown_guides entry during the same locked snapshot write.
+      const { card: rawCard, updatedShownGuides } = buildStateCardForEmit(
+        fsm,
+        args.target,
+        snapshot,
+      );
+
       store.commit(
         args.runId,
         {
@@ -107,11 +115,18 @@ ${labels}`,
           run_status: newStatus,
           state: args.target,
           visited_states: visitedStates,
+          ...(updatedShownGuides !== undefined && { shown_guides: updatedShownGuides }),
         },
         { lockHeld: true },
       );
 
-      return { isDone, newStatus, fromState: snapshot.state, alreadyVisited };
+      return {
+        isDone,
+        newStatus,
+        fromState: snapshot.state,
+        alreadyVisited,
+        rawCard,
+      };
     });
 
     const workflowDir = meta.workflow_dir ?? null;
@@ -125,7 +140,7 @@ ${labels}`,
       workflow_dir: stateSourceDir,
       run_dir: runDir,
     };
-    const card = substituteCard(stateCardFromFsm(args.target, fsmState), vars);
+    const card = substituteCard(result.rawCard, vars);
 
     // Compute time spent in previous state
     const events = store.readEvents(args.runId);

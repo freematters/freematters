@@ -2,11 +2,11 @@ import { dirname } from "node:path";
 import { CliError } from "../errors.js";
 import { loadFsm } from "../fsm.js";
 import {
+  buildStateCardForEmit,
   formatStateCard,
   handleError,
   jsonSuccess,
   printJson,
-  stateCardFromFsm,
   substituteCard,
 } from "../output.js";
 import { Store } from "../store.js";
@@ -63,6 +63,28 @@ export function current(args: CurrentArgs): void {
       });
     }
 
+    const { card: rawCard, updatedShownGuides } = buildStateCardForEmit(
+      fsm,
+      snapshot.state,
+      snapshot,
+    );
+
+    // First-time guide emission via `current` must persist the new
+    // shown_guides entry so subsequent reads don't re-show it. Re-read under
+    // the lock to avoid clobbering concurrent writes from other commands.
+    if (updatedShownGuides !== undefined) {
+      store.withLock(args.runId, () => {
+        const latest = store.readSnapshot(args.runId);
+        if (!latest) return;
+        const currentShown = latest.shown_guides ?? [];
+        if (currentShown.includes(snapshot.state)) return;
+        const merged = [...currentShown, snapshot.state];
+        // Commit a no-op event-less snapshot update by re-writing the file
+        // directly via the store's public write path.
+        store.writeSnapshot({ ...latest, shown_guides: merged });
+      });
+    }
+
     const stateSourceDir = fsmState.source_path
       ? dirname(fsmState.source_path)
       : (meta.workflow_dir ?? "");
@@ -71,7 +93,7 @@ export function current(args: CurrentArgs): void {
       workflow_dir: stateSourceDir,
       run_dir: runDir,
     };
-    const card = substituteCard(stateCardFromFsm(snapshot.state, fsmState), vars);
+    const card = substituteCard(rawCard, vars);
 
     const workflowDir = meta.workflow_dir ?? null;
 
