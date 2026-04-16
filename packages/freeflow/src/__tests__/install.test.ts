@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
@@ -6,14 +7,9 @@ const { execFileSyncMock } = vi.hoisted(() => ({
   execFileSyncMock: vi.fn(),
 }));
 
-vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof import("node:child_process")>("node:child_process");
-  return {
-    ...actual,
-    execFileSync: execFileSyncMock,
-  };
-});
+vi.mock("node:child_process", () => ({
+  execFileSync: execFileSyncMock,
+}));
 
 const { install } = await import("../commands/install.js");
 
@@ -57,14 +53,7 @@ describe("install claude (with stubbed execFileSync)", () => {
     expect(npxCalls).toHaveLength(2);
 
     // Order: plugin install before both npx calls
-    const firstNpxIdx = calls.findIndex(
-      (c) =>
-        c[0] === "npx" &&
-        Array.isArray(c[1]) &&
-        c[1][0] === "skills" &&
-        c[1][1] === "install",
-    );
-    expect(firstNpxIdx).toBeGreaterThan(claudePluginInstallIdx);
+    expect(calls.indexOf(npxCalls[0])).toBeGreaterThan(claudePluginInstallIdx);
 
     // Verify both parent dir paths in order: skills then workflows
     expect(npxCalls[0][1]).toEqual(["skills", "install", SKILLS_DIR]);
@@ -111,15 +100,12 @@ describe("install codex (with stubbed execFileSync)", () => {
   });
 
   test("no symlink is created at ~/.agents/skills/freeflow and npx skills install is invoked twice", () => {
-    const agentsTarget = join(process.env.HOME || "", ".agents", "skills", "freeflow");
-    const preExists = existsSync(agentsTarget);
+    const symlinkSpy = vi.spyOn(fs, "symlinkSync").mockImplementation(() => {});
 
     install("codex");
 
-    // No new symlink created by install: if it didn't exist before, it still doesn't.
-    if (!preExists) {
-      expect(existsSync(agentsTarget)).toBe(false);
-    }
+    expect(symlinkSpy).not.toHaveBeenCalled();
+    symlinkSpy.mockRestore();
 
     const npxCalls = execFileSyncMock.mock.calls.filter(
       (c) =>

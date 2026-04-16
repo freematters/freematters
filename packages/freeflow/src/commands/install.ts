@@ -26,15 +26,15 @@ function run(cmd: string, args: string[]): void {
   execFileSync(cmd, args, { stdio: "inherit" });
 }
 
-function runNpxSkills(packageRoot: string, opts?: { onFailure?: () => void }): void {
+function runNpxSkills(packageRoot: string, onFailure?: () => void): void {
   const dirs = [join(packageRoot, "skills"), join(packageRoot, "workflows")];
   try {
     for (const dir of dirs) {
       console.log(`\nInstalling via npx skills install ${dir}`);
-      execFileSync("npx", ["skills", "install", dir], { stdio: "inherit" });
+      run("npx", ["skills", "install", dir]);
     }
   } catch (err) {
-    opts?.onFailure?.();
+    onFailure?.();
     throw err;
   }
 }
@@ -42,11 +42,7 @@ function runNpxSkills(packageRoot: string, opts?: { onFailure?: () => void }): v
 function rollbackClaudeHook(): void {
   try {
     console.warn("\nRolling back Claude plugin install...");
-    execFileSync(
-      "claude",
-      ["plugin", "uninstall", `${PLUGIN_NAME}@${MARKETPLACE_NAME}`],
-      { stdio: "inherit" },
-    );
+    run("claude", ["plugin", "uninstall", `${PLUGIN_NAME}@${MARKETPLACE_NAME}`]);
   } catch (err) {
     console.warn(
       `Warning: failed to roll back Claude plugin install: ${
@@ -67,8 +63,7 @@ function installClaude(packageRoot: string): void {
   console.log(`\nInstalling plugin ${pluginKey}`);
   run("claude", ["plugin", "install", pluginKey]);
 
-  // Register skills and workflows via npx skills install
-  runNpxSkills(packageRoot, { onFailure: rollbackClaudeHook });
+  runNpxSkills(packageRoot, rollbackClaudeHook);
 
   console.log("\nFreeFlow plugin installed for Claude Code.");
   console.log("\nSkills: /fflow-author, /fflow, /e2e-run");
