@@ -12,34 +12,6 @@ specs/
 /pr_status.json
 /mr_status.json
 
-# skills CLI runtime state (per-agent install artifacts, lockfile, pi runtime)
+# skills CLI runtime state (lockfile, local skills install dir)
 /skills/
 /skills-lock.json
-/.pi/
-/.adal/
-/.augment/
-/.bob/
-/.codebuddy/
-/.commandcode/
-/.continue/
-/.cortex/
-/.crush/
-/.factory/
-/.goose/
-/.iflow/
-/.junie/
-/.kilocode/
-/.kiro/
-/.kode/
-/.mcpjam/
-/.mux/
-/.neovate/
-/.openhands/
-/.pochi/
-/.qoder/
-/.qwen/
-/.roo/
-/.trae/
-/.vibe/
-/.windsurf/
-/.zencoder/
