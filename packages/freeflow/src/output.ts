@@ -1,8 +1,9 @@
 import { Marked } from "marked";
 import { markedTerminal } from "marked-terminal";
 import { CliError } from "./errors.js";
-import type { FsmState } from "./fsm.js";
+import type { Fsm, FsmState } from "./fsm.js";
 import { FsmError } from "./fsm.js";
+import type { Snapshot } from "./store.js";
 
 // --- Variable Substitution ---
 
@@ -49,11 +50,51 @@ export function stateCardFromFsm(stateName: string, fsmState: FsmState): StateCa
   return card;
 }
 
+/**
+ * Build a state card for emission by `fflow start`, `fflow goto`, and
+ * `fflow current`, gating per-state `guide` emission on
+ * `snapshot.shown_guides`.
+ *
+ * - First emission of a state with a `guide` keeps the guide on the card and
+ *   returns an `updatedShownGuides` array (existing entries plus `stateName`)
+ *   that the caller must persist to the snapshot.
+ * - Subsequent emissions for the same state strip the `guide` from the card
+ *   and omit `updatedShownGuides` (no snapshot write required).
+ * - States without a `guide` pass through unchanged.
+ *
+ * The subagent dispatch path (`formatSubagentDispatch`) is the bypass: it
+ * always surfaces the per-state guide because subagents run in separate
+ * contexts and are expected to see the guide every time.
+ */
+export function buildStateCardForEmit(
+  fsm: Fsm,
+  stateName: string,
+  snapshot: Snapshot,
+): { card: StateCard; updatedShownGuides?: string[] } {
+  const fsmState = fsm.states[stateName];
+  const card = stateCardFromFsm(stateName, fsmState);
+  const shown = snapshot.shown_guides ?? [];
+
+  if (card.guide === undefined) {
+    return { card };
+  }
+  if (shown.includes(stateName)) {
+    const { guide: _stripped, ...rest } = card;
+    return { card: rest };
+  }
+  return { card, updatedShownGuides: [...shown, stateName] };
+}
+
 const TODO_HEADER =
   "You MUST create a task for each of these items and complete them in order:";
 
 export function formatStateCard(card: StateCard): string {
   const lines: string[] = [];
+
+  if (card.guide) {
+    lines.push(card.guide);
+    lines.push("");
+  }
 
   lines.push(`You are in **${card.state}** state.`);
   lines.push("");

@@ -218,6 +218,21 @@ export class Store {
     return JSON.parse(raw) as Snapshot;
   }
 
+  /**
+   * Overwrite a run's snapshot file with the given `Snapshot`. Event-less —
+   * does not append to the event log or bump `last_seq`. Intended for the
+   * narrow case where runtime tracking fields (e.g. `shown_guides`) need to
+   * be persisted without a user-visible state change. Callers must hold the
+   * lock (via `withLock`) if they need exclusion against concurrent writers.
+   */
+  writeSnapshot(snapshot: Snapshot): void {
+    writeFileSync(
+      this.snapshotPath(snapshot.run_id),
+      JSON.stringify(snapshot, null, 2),
+      "utf-8",
+    );
+  }
+
   readEvents(runId: string): StoreEvent[] {
     const p = this.eventsPath(runId);
     if (!existsSync(p)) {
