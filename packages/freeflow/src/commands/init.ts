@@ -11,7 +11,7 @@ import {
 import { runDeinit } from "./deinit.js";
 
 export interface InitOptions {
-  scope?: "local" | "global";
+  scope?: Scope;
   noHooks?: boolean;
   yes?: boolean;
   /** Forwarded verbatim to the `skills` CLI's `--agent` flag. */

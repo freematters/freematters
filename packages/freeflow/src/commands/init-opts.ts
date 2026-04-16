@@ -1,4 +1,5 @@
 import { CliError } from "../errors.js";
+import type { Scope } from "../runners.js";
 import type { DeinitOptions } from "./deinit.js";
 import type { InitOptions } from "./init.js";
 
@@ -8,11 +9,7 @@ export function normalizeInitOpts(raw: Record<string, unknown>): InitOptions {
   if (local && global) {
     throw new CliError("ARGS_INVALID", "cannot combine --local and --global");
   }
-  const scope: "local" | "global" | undefined = local
-    ? "local"
-    : global
-      ? "global"
-      : undefined;
+  const scope: Scope | undefined = local ? "local" : global ? "global" : undefined;
   const noHooks = raw.hooks === false;
   return {
     scope,
@@ -32,7 +29,7 @@ export function normalizeDeinitOpts(raw: Record<string, unknown>): DeinitOptions
   if (all && (local || global)) {
     throw new CliError("ARGS_INVALID", "cannot combine --all with --local or --global");
   }
-  const scope: "local" | "global" | "all" | undefined = all
+  const scope: Scope | "all" | undefined = all
     ? "all"
     : local
       ? "local"

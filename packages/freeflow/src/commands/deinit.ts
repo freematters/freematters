@@ -15,7 +15,7 @@ import {
 } from "../runners.js";
 
 export interface DeinitOptions {
-  scope?: "local" | "global" | "all";
+  scope?: Scope | "all";
   yes?: boolean;
   /** Internal — used by reinstall/rollback paths. Not exposed on CLI. */
   skipConfirm?: boolean;
@@ -32,7 +32,6 @@ interface TaskFailure {
 }
 
 export async function runDeinit(opts: DeinitOptions): Promise<void> {
-  const detected = detectAllInstalledScopes();
   const isTTY = process.stdin.isTTY === true;
 
   // ── 1. Resolve target scopes ─────────────────────────────────────────
@@ -41,20 +40,21 @@ export async function runDeinit(opts: DeinitOptions): Promise<void> {
     targets = ["local", "global"];
   } else if (opts.scope === "local" || opts.scope === "global") {
     targets = [opts.scope];
-  } else if (detected.length === 0) {
-    console.log("Nothing to remove — FreeFlow is not installed.");
-    return;
-  } else if (detected.length === 1) {
-    targets = [detected[0]];
   } else {
-    // Both scopes populated, no flag.
-    if (!isTTY && !opts.yes) {
+    // No scope flag — probe what's installed and ask if ambiguous.
+    const detected = detectAllInstalledScopes();
+    if (detected.length === 0) {
+      console.log("Nothing to remove — FreeFlow is not installed.");
+      return;
+    }
+    if (detected.length === 1) {
+      targets = [detected[0]];
+    } else if (!isTTY && !opts.yes) {
       throw new CliError(
         "ARGS_INVALID",
         "Non-TTY deinit requires --local, --global, --all, or -y",
       );
-    }
-    if (opts.yes) {
+    } else if (opts.yes) {
       targets = ["local", "global"];
     } else {
       const response = (await prompts({
