@@ -1,15 +1,23 @@
-import * as fs from "node:fs";
 import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-const { execFileSyncMock } = vi.hoisted(() => ({
+const { execFileSyncMock, symlinkSyncMock } = vi.hoisted(() => ({
   execFileSyncMock: vi.fn(),
+  symlinkSyncMock: vi.fn(),
 }));
 
 vi.mock("node:child_process", () => ({
   execFileSync: execFileSyncMock,
 }));
+
+vi.mock("node:fs", async () => {
+  const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
+  return {
+    ...actual,
+    symlinkSync: symlinkSyncMock,
+  };
+});
 
 const { install } = await import("../commands/install.js");
 
@@ -100,12 +108,11 @@ describe("install codex (with stubbed execFileSync)", () => {
   });
 
   test("no symlink is created at ~/.agents/skills/freeflow and npx skills install is invoked twice", () => {
-    const symlinkSpy = vi.spyOn(fs, "symlinkSync").mockImplementation(() => {});
+    symlinkSyncMock.mockReset();
 
     install("codex");
 
-    expect(symlinkSpy).not.toHaveBeenCalled();
-    symlinkSpy.mockRestore();
+    expect(symlinkSyncMock).not.toHaveBeenCalled();
 
     const npxCalls = execFileSyncMock.mock.calls.filter(
       (c) =>
