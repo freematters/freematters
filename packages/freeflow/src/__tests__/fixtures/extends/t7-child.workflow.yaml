@@ -1,0 +1,9 @@
+version: 1.4
+extends: ./t7-parent.workflow.yaml
+states:
+  z:
+    prompt: |-
+      {{ super }}
+      hello
+    transitions:
+      to_a: a

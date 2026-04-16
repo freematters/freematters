@@ -9,6 +9,8 @@ describe("repo local workflow skills", () => {
     const expectedLinks = {
       "spec-gen": "../../packages/freeflow/workflows/spec-gen",
       "spec-to-code": "../../packages/freeflow/workflows/spec-to-code",
+      "issue-to-spec": "../../packages/freeflow/workflows/issue-to-spec",
+      "issue-to-pr": "../../packages/freeflow/workflows/issue-to-pr",
       "pr-lifecycle": "../../packages/freeflow/workflows/pr-lifecycle",
       release: "../../packages/freeflow/workflows/release",
       "spec-driven": "../../packages/freeflow/workflows/spec-driven",

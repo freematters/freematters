@@ -31,7 +31,7 @@ function tmpYaml(content: string): string {
 // --- Schema & Validation ---
 
 describe("workflow composition — schema validation", () => {
-  test("version 1.2 and 1.3 accepted, 1.4 rejected", () => {
+  test("versions 1.2, 1.3, 1.4 accepted, 1.5 rejected", () => {
     const fsm = loadFsm(fixture("compose-basic.workflow.yaml"));
     expect(fsm.version).toBe(1.2);
 
@@ -43,7 +43,12 @@ describe("workflow composition — schema validation", () => {
     const v14 = tmpYaml(
       "version: 1.4\ninitial: s\nstates:\n  s:\n    prompt: x\n    transitions:\n      n: done\n  done:\n    prompt: d\n    transitions: {}\n",
     );
-    expect(() => loadFsm(v14)).toThrow(FsmError);
+    expect(() => loadFsm(v14)).not.toThrow();
+
+    const v15 = tmpYaml(
+      "version: 1.5\ninitial: s\nstates:\n  s:\n    prompt: x\n    transitions:\n      n: done\n  done:\n    prompt: d\n    transitions: {}\n",
+    );
+    expect(() => loadFsm(v15)).toThrow(FsmError);
   });
 
   test("rejects forbidden field combinations on workflow states", () => {
@@ -51,7 +56,6 @@ describe("workflow composition — schema validation", () => {
       `version: 1.2\ninitial: build\nstates:\n  build:\n    workflow: ./child-simple.workflow.yaml\n${extra}    transitions:\n      completed: done\n  done:\n    prompt: d\n    transitions: {}\n`;
 
     const cases: [string, RegExp][] = [
-      [base('    from: "x#y"\n'), /mutually exclusive/],
       [base('    prompt: "no"\n'), /prompt/],
       // no transitions
       [
@@ -113,9 +117,10 @@ describe("workflow composition — basic expansion", () => {
     // Non-workflow state transitions rewritten to entry point
     expect(fsm.states.setup.transitions.ready).toBe("build/create");
 
-    // Child guide propagated to expanded states
+    // Child guide attached only to the expanded child initial state
     expect(fsm.states["build/create"].guide).toBe("Child guide for simple workflow.");
-    expect(fsm.states["build/done"].guide).toBe("Child guide for simple workflow.");
+    expect(fsm.states["build/review"].guide).toBeUndefined();
+    expect(fsm.states["build/done"].guide).toBeUndefined();
   });
 });
 
@@ -188,13 +193,20 @@ describe("workflow composition — guide scoping", () => {
     expect(fsm.states["build/step-one"].guide).toBeUndefined();
   });
 
-  test("child with extends_guide → merged guide on expanded states, separate from parent", () => {
-    const fsm = loadFsm(fixture("compose-extends-guide.workflow.yaml"));
+  test("T11: sub-workflow guide attached to child initial state only", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fflow-test-t11-"));
+    const childYaml =
+      'version: 1\nguide: "SUB GUIDE"\ninitial: inner_a\nstates:\n  inner_a:\n    prompt: "Inner A."\n    transitions:\n      next: done\n  done:\n    prompt: "Inner done."\n    transitions: {}\n';
+    writeFileSync(join(dir, "child.workflow.yaml"), childYaml);
+    const parentPath = join(dir, "parent.workflow.yaml");
+    writeFileSync(
+      parentPath,
+      "version: 1.2\ninitial: outer\nstates:\n  outer:\n    workflow: ./child.workflow.yaml\n    transitions:\n      completed: done\n  done:\n    prompt: d\n    transitions: {}\n",
+    );
 
-    expect(fsm.guide).toBe("Parent-level guide.");
-    expect(fsm.states["sub/step"].guide).toContain("Base guide content.");
-    expect(fsm.states["sub/step"].guide).toContain("Extra child rules for compose.");
-    expect(fsm.states.done.guide).toBeUndefined();
+    const fsm = loadFsm(parentPath);
+    expect(fsm.states["outer/inner_a"].guide).toBe("SUB GUIDE");
+    expect(fsm.states["outer/done"].guide).toBeUndefined();
   });
 });
 
@@ -219,19 +231,5 @@ describe("workflow composition — output guide precedence", () => {
 
     expect(card.guide).toBeUndefined();
     expect(formatReminder(card, "Fsm-level guide.")).toContain("Fsm-level guide.");
-  });
-});
-
-// --- Cross-cutting: from: inside composed children ---
-
-describe("workflow composition — from: in child states", () => {
-  test("from: resolution works within expanded child states", () => {
-    const fsm = loadFsm(fixture("compose-child-with-from.workflow.yaml"));
-
-    expect(fsm.states["phase/start"].prompt).toContain("Base child start.");
-    expect(fsm.states["phase/start"].prompt).toContain("Extended with from.");
-    expect(fsm.states["phase/start"].todos).toEqual(["Base todo A", "Appended todo B"]);
-    expect(fsm.states["phase/start"].transitions.next).toBe("phase/done");
-    expect(fsm.states["phase/done"].transitions.completed).toBe("done");
   });
 });

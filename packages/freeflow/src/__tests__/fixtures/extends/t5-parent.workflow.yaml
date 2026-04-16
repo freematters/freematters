@@ -1,0 +1,16 @@
+version: 1
+guide: "T5 parent"
+initial: a
+states:
+  a:
+    prompt: "A"
+    transitions:
+      next: b
+      skip: done
+  b:
+    prompt: "B"
+    transitions:
+      finish: done
+  done:
+    prompt: "Done"
+    transitions: {}

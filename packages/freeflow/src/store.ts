@@ -56,6 +56,7 @@ export interface Snapshot {
   last_seq: number;
   updated_at: string;
   visited_states?: string[];
+  shown_guides?: string[];
 }
 
 export interface EventInput {
@@ -72,6 +73,7 @@ export interface SnapshotInput {
   run_status: RunStatus;
   state: string;
   visited_states?: string[];
+  shown_guides?: string[];
 }
 
 // --- Helpers ---
@@ -216,6 +218,22 @@ export class Store {
     return JSON.parse(raw) as Snapshot;
   }
 
+  /**
+   * Overwrite a run's snapshot file with the given `Snapshot`. Event-less —
+   * does not append to the event log or bump `last_seq`. Intended for the
+   * narrow case where runtime tracking fields (e.g. `shown_guides`) need to
+   * be persisted without a user-visible state change. Callers must hold the
+   * lock (via `withLock`) if they need exclusion against concurrent writers.
+   */
+  writeSnapshot(snapshot: Snapshot): void {
+    const refreshed: Snapshot = { ...snapshot, updated_at: nowISO() };
+    writeFileSync(
+      this.snapshotPath(refreshed.run_id),
+      JSON.stringify(refreshed, null, 2),
+      "utf-8",
+    );
+  }
+
   readEvents(runId: string): StoreEvent[] {
     const p = this.eventsPath(runId);
     if (!existsSync(p)) {
@@ -278,6 +296,8 @@ export class Store {
 
       // Resolve visited_states: use input if provided, else carry forward from current snapshot
       const visitedStates = snapshotInput.visited_states ?? currentSnap?.visited_states;
+      // Resolve shown_guides: use input if provided, else carry forward from current snapshot
+      const shownGuides = snapshotInput.shown_guides ?? currentSnap?.shown_guides;
 
       // Write snapshot
       const snapshot: Snapshot = {
@@ -287,6 +307,7 @@ export class Store {
         last_seq: event.seq,
         updated_at: now,
         ...(visitedStates !== undefined && { visited_states: visitedStates }),
+        ...(shownGuides !== undefined && { shown_guides: shownGuides }),
       };
       writeFileSync(
         this.snapshotPath(runId),

@@ -1,0 +1,7 @@
+version: 1.4
+extends: ./t4-parent.workflow.yaml
+states:
+  a:
+    prompt: |-
+      {{ super }}
+      EXTRA

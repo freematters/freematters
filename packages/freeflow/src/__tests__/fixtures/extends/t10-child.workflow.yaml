@@ -1,0 +1,8 @@
+version: 1.4
+extends: ./t10-parent.workflow.yaml
+states:
+  x:
+    prompt: "X"
+    transitions:
+      go: missing_state
+      also: another_missing

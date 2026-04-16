@@ -3,7 +3,7 @@
 # Unified workflow supporting both GitHub and GitLab, with optional --lite mode.
 # Reuses spec-gen's guide (process rules, Q&A cycle, research structure) and
 # state definitions (requirements, research, design, plan, e2e-gen) via
-# extends_guide + from:.
+# top-level `extends:`.
 #
 # Lite mode:
 #   - design.md: 4 sections (Overview, Goal & Constraints, Architecture & Components, E2E Testing)
@@ -25,10 +25,10 @@
 #
 #   Fast forward: requirements -> design -> plan -> e2e-gen -> done (no intermediate approvals)
 
-version: 1.1
-extends_guide: ../spec-gen/workflow.yaml
+version: 1.4
+extends: ../spec-gen/workflow.yaml
 guide: |
-  {{base}}
+  {{ super }}
 
   ### Lite Mode
 
@@ -313,9 +313,8 @@ states:
       start with research: research
 
   requirements:
-    from: "../spec-gen/workflow.yaml#requirements"
     prompt: |
-      {{base}}
+      {{ super }}
 
       ### Issue Platform Adaptation
 
@@ -338,9 +337,8 @@ states:
       4. Poll for the user's choice via comment/note reply.
 
   research:
-    from: "../spec-gen/workflow.yaml#research"
     prompt: |
-      {{base}}
+      {{ super }}
 
       ### Issue Platform Adaptation
 
@@ -358,9 +356,8 @@ states:
       back to requirements: requirements
 
   design:
-    from: "../spec-gen/workflow.yaml#design"
     prompt: |
-      {{base}}
+      {{ super }}
 
       ### Issue Platform Adaptation
 
@@ -386,9 +383,8 @@ states:
       - Get user approval via issue comment/note (skip in fast-forward mode)
 
   plan:
-    from: "../spec-gen/workflow.yaml#plan"
     prompt: |
-      {{base}}
+      {{ super }}
 
       ### Issue Platform Adaptation
 
@@ -414,9 +410,8 @@ states:
       - Get user approval via issue comment/note (skip in fast-forward mode)
 
   e2e-gen:
-    from: "../spec-gen/workflow.yaml#e2e-gen"
     prompt: |
-      {{base}}
+      {{ super }}
 
       ### Issue Platform Adaptation
 

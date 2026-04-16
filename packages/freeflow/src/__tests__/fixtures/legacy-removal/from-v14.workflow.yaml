@@ -1,0 +1,11 @@
+version: 1.4
+initial: start
+states:
+  start:
+    from: "./base.workflow.yaml#start"
+    prompt: "Child prompt."
+    transitions:
+      next: done
+  done:
+    prompt: "Done."
+    transitions: {}

@@ -1,0 +1,11 @@
+version: 1.4
+extends_guide: ./base-guide.workflow.yaml
+initial: start
+states:
+  start:
+    prompt: "Start."
+    transitions:
+      next: done
+  done:
+    prompt: "Done."
+    transitions: {}

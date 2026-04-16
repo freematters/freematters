@@ -1,4 +1,4 @@
-import { appendFileSync } from "node:fs";
+import { appendFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { Store } from "../store.js";
@@ -271,6 +271,82 @@ describe("Store — lite mode data models", () => {
 
     const meta = s.readMeta("no-lite");
     expect(meta.lite).toBeUndefined();
+  });
+});
+
+describe("Store — shown_guides", () => {
+  test("round-trip: writing shown_guides preserves the array verbatim", () => {
+    const s = freshStore();
+    s.initRun("shown-rt", "/fake.yaml");
+    s.commit("shown-rt", startEvent("plan"), {
+      run_status: "active",
+      state: "plan",
+      shown_guides: ["a", "b"],
+    });
+
+    const snap = s.readSnapshot("shown-rt");
+    expect(snap).not.toBeNull();
+    expect(snap?.shown_guides).toEqual(["a", "b"]);
+  });
+
+  test("backward-compat: snapshot JSON without shown_guides reads as undefined", () => {
+    const s = freshStore();
+    s.initRun("shown-compat", "/fake.yaml");
+    // Manually write a snapshot JSON without shown_guides (simulating older runs)
+    const snapshotPath = join(s.getRunDir("shown-compat"), "snapshot.json");
+    const legacySnapshot = {
+      run_id: "shown-compat",
+      run_status: "active",
+      state: "plan",
+      last_seq: 1,
+      updated_at: new Date().toISOString(),
+    };
+    writeFileSync(snapshotPath, JSON.stringify(legacySnapshot, null, 2), "utf-8");
+
+    const snap = s.readSnapshot("shown-compat");
+    expect(snap).not.toBeNull();
+    expect(snap?.shown_guides).toBeUndefined();
+    expect(snap?.state).toBe("plan");
+  });
+
+  test("append semantics: starting without shown_guides then adding an entry persists it", () => {
+    const s = freshStore();
+    s.initRun("shown-append", "/fake.yaml");
+    // First commit has no shown_guides
+    s.commit("shown-append", startEvent("plan"), startSnapshot("plan"));
+
+    const first = s.readSnapshot("shown-append");
+    expect(first?.shown_guides).toBeUndefined();
+
+    // Second commit adds one entry
+    s.commit("shown-append", gotoEvent("plan", "coding", "approved"), {
+      run_status: "active",
+      state: "coding",
+      shown_guides: ["coding"],
+    });
+
+    const snap = s.readSnapshot("shown-append");
+    expect(snap?.shown_guides).toEqual(["coding"]);
+  });
+});
+
+describe("Store — writeSnapshot", () => {
+  test("refreshes updated_at on each write", async () => {
+    const s = freshStore();
+    s.initRun("ws-refresh", "/fake.yaml");
+    s.commit("ws-refresh", startEvent("plan"), startSnapshot("plan"));
+
+    const initial = s.readSnapshot("ws-refresh");
+    if (initial === null) throw new Error("initial snapshot missing");
+    const before = initial.updated_at;
+
+    // Wait long enough to guarantee a distinct ISO timestamp.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    s.writeSnapshot(initial);
+    const after = s.readSnapshot("ws-refresh");
+    if (after === null) throw new Error("snapshot missing after write");
+    expect(after.updated_at > before).toBe(true);
   });
 });
 

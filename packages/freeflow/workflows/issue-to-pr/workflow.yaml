@@ -2,9 +2,13 @@
 #
 # Platform-agnostic: supports both GitHub and GitLab. Supports --lite mode for simplified specs.
 #
+# Extends `spec-driven`, inheriting its spec (spec-gen), implement (spec-to-code), and
+# submit-pr (pr-lifecycle) sub-workflows. Adds issue-URL handling, an optional
+# fast-forward gate, and comment-posting orchestration on top.
+#
 # Flow:
 #
-#   start ──→ spec (issue-to-spec)
+#   start ──→ spec (spec-gen)
 #                  |
 #               decide
 #              /   |   \
@@ -23,20 +27,22 @@
 #             |
 #           done
 
-version: 1.2
-extends_guide: ../issue-to-spec/workflow.yaml
+version: 1.4
+extends: ../spec-driven/workflow.yaml
 guide: |
-  {{base}}
+  {{ super }}
 
   ### Issue-to-PR — Composition Guide
 
-  This workflow composes `issue-to-spec`, `spec-to-code`, and `pr-lifecycle` into a
-  single end-to-end pipeline driven entirely through an issue (GitHub or GitLab).
+  This workflow drives the full `spec → implement → submit-pr` pipeline from an
+  issue URL (GitHub or GitLab). It inherits the spec-driven state shape and
+  overlays issue-comment polling and posting.
 
   #### Input
 
   The user provides a **full issue URL** to an existing issue (GitHub or GitLab), optionally with `--lite`.
-  Pass that URL through to `issue-to-spec`; do not expect `owner/repo#N`, project paths, or free-form ideas here.
+  Read the issue body in the `start` state and use it as the seed for spec generation.
+  Do not expect `owner/repo#N`, project paths, or free-form ideas here.
 
   #### Execution Modes
 
@@ -54,19 +60,14 @@ guide: |
   - The user's arguments (e.g., `--lite` flag)
   - A parent workflow propagating the flag
 
-  When lite mode is active, it is propagated to the `issue-to-spec` sub-workflow, which
-  produces simplified design (4 sections) and plan (1 step) artifacts.
-
   #### Fast-Forward Propagation
 
   When the user chose **fast-forward** mode:
-  - `issue-to-spec` runs in fast-forward mode (user chose "fast forward" at requirements)
   - Gate states (`confirm-implement`, `confirm-pr`) poll the issue for confirmation at 20s intervals
 
   #### Full-Auto Propagation
 
   When the user chose **full auto** mode:
-  - `issue-to-spec` runs in fast-forward mode
   - Gate states are skipped entirely (no polling)
   - In `spec-to-code`'s setup state, select "fast forward" when prompted
   - `confirm-pr` transitions directly to `submit-pr` without asking
@@ -76,7 +77,6 @@ initial: start
 states:
   start:
     prompt: |
-      
       ## Issue URL and lite mode
 
       The user must supply a **full issue URL** (GitHub or GitLab) to an existing issue.
@@ -86,16 +86,15 @@ states:
       Check if the user specified `--lite` or if a parent workflow propagated the lite flag.
       Remember `lite = true` or `lite = false`.
 
-      Pass the issue URL (and lite flag) to the `spec` sub-workflow.
+      ### Read the issue
+
+      Fetch the issue body and summary from the hosting platform and use it as the
+      seed for the spec phase. Pass the issue context (and lite flag) through to
+      the `spec` sub-workflow when prompted in `create-structure`.
 
       Transition to `proceed`.
     transitions:
-      proceed: spec
-
-  spec:
-    workflow: ../issue-to-spec/workflow.yaml
-    transitions:
-      completed: decide
+      proceed: spec/create-structure
 
   decide:
     prompt: |
@@ -133,7 +132,7 @@ states:
 
       You MUST NOT proceed without the user's explicit choice via an issue comment/note.
     transitions:
-      full auto: implement
+      full auto: implement/setup
       fast forward: confirm-implement
       stop here: done
 
@@ -161,13 +160,8 @@ states:
       - If they approve (e.g., "go", "yes", "proceed"): transition to `approved`
       - If they want to stop (e.g., "stop", "no"): transition to `stop here`
     transitions:
-      approved: implement
+      approved: implement/setup
       stop here: done
-
-  implement:
-    workflow: ../spec-to-code/workflow.yaml
-    transitions:
-      completed: confirm-pr
 
   confirm-pr:
     prompt: |
@@ -203,14 +197,6 @@ states:
       When you receive a reply from the issue creator:
       - If they approve (e.g., "submit", "yes", "go"): transition to `submit pr`
       - If they want to stop (e.g., "stop", "no"): transition to `stop here`
-    transitions:
-      submit pr: submit-pr
-      stop here: done
-
-  submit-pr:
-    workflow: ../pr-lifecycle/workflow.yaml
-    transitions:
-      completed: done
 
   done:
     prompt: |

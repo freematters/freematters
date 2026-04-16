@@ -1,0 +1,10 @@
+version: 1.4
+extends: ./t7b-parent.workflow.yaml
+states:
+  z:
+    prompt: "Z"
+    guide: |-
+      {{ super }}
+      new stuff
+    transitions:
+      to_a: a

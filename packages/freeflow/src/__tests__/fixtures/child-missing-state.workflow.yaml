@@ -1,9 +1,0 @@
-version: 1.1
-guide: "Missing state ref"
-initial: start
-states:
-  start:
-    from: "./base.workflow.yaml#nonexistent"
-  done:
-    prompt: "Done."
-    transitions: {}

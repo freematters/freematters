@@ -156,11 +156,11 @@ This ensures the markdown renders correctly when the workflow is converted to `.
 
 When the user wants to build on an existing workflow or share structure across workflows,
 read `composability.md` (in this skill directory) for full syntax
-and merge rules for `from:`, `extends_guide`, `workflow:`, and `subagent:`.
+and merge rules for `extends:`, `workflow:`, and `subagent:`.
 
 ## Internal Validation Checklist (do not expose unless asked)
 
-- `version: 1.3` (always use latest version)
+- `version: 1.4` (always use latest version)
 - `guide` is present and contains cross-cutting rules
 - one valid `initial` state exists
 - terminal `done` state exists with `transitions: {}`
@@ -170,6 +170,5 @@ and merge rules for `from:`, `extends_guide`, `workflow:`, and `subagent:`.
 - state names match `[A-Za-z_-][A-Za-z0-9_-]*`
 - if `todos` are used, they are non-empty unique strings
 - no state prompt repeats rules already in `guide`
-- if `from:` is used, the referenced workflow and state exist
-- if `extends_guide:` is used, the referenced workflow exists and has a `guide` field
+- if `extends:` is used, the referenced workflow resolves (relative path first, then registered name) and transition targets close after the merge
 - SKILL.md exists alongside workflow.yaml with correct `name` (matching directory name) and `description` (derived from guide)

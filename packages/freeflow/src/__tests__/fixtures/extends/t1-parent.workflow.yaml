@@ -1,0 +1,15 @@
+version: 1
+guide: "T1 parent"
+initial: a
+states:
+  a:
+    prompt: "A"
+    transitions:
+      next: b
+  b:
+    prompt: "B"
+    transitions:
+      finish: done
+  done:
+    prompt: "Done"
+    transitions: {}

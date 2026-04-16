@@ -282,7 +282,7 @@ export function extractMarkdownTitle(content: string): string | undefined {
 /**
  * Parse a markdown workflow string into a raw document object.
  * The returned object has the same shape as yamlLoad() output,
- * ready for resolveWorkflowStates/resolveRefs/validation.
+ * ready for resolveExtends/resolveWorkflowStates/validation.
  */
 export function parseMarkdownWorkflow(content: string): Record<string, unknown> {
   const tree = unified()

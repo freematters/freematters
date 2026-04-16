@@ -4,13 +4,13 @@ import { CliError } from "../errors.js";
 import { type Fsm, loadFsm } from "../fsm.js";
 import { serializeMarkdown } from "../markdown-serializer.js";
 import {
+  buildStateCardForEmit,
   formatStateCard,
   formatSubagentDispatch,
   fsmToMermaid,
   handleError,
   jsonSuccess,
   printJson,
-  stateCardFromFsm,
   substituteCard,
   substituteVars,
 } from "../output.js";
@@ -98,6 +98,21 @@ ${markdown}
       return;
     }
 
+    // Build the state card first so we know whether to record a new
+    // shown_guides entry as part of this snapshot write.
+    const emptySnapshot = {
+      run_id: runId,
+      run_status: "active" as const,
+      state: fsm.initial,
+      last_seq: 0,
+      updated_at: "",
+    };
+    const { card: rawCard, updatedShownGuides } = buildStateCardForEmit(
+      fsm,
+      fsm.initial,
+      emptySnapshot,
+    );
+
     store.commit(
       runId,
       {
@@ -112,6 +127,7 @@ ${markdown}
         run_status: "active",
         state: fsm.initial,
         ...(args.lite && { visited_states: [fsm.initial] }),
+        ...(updatedShownGuides !== undefined && { shown_guides: updatedShownGuides }),
       },
     );
 
@@ -121,10 +137,7 @@ ${markdown}
       workflow_dir: stateSourceDir,
       run_dir: runDir,
     };
-    const card = substituteCard(
-      stateCardFromFsm(fsm.initial, fsm.states[fsm.initial]),
-      vars,
-    );
+    const card = substituteCard(rawCard, vars);
 
     const mermaid = fsmToMermaid(fsm.states, fsm.initial);
 
