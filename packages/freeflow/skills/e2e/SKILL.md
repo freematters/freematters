@@ -1,11 +1,25 @@
 ---
-name: e2e-gen
-description: Use when writing or generating e2e agent test plans for fflow verify — covers test plan format, parser rules, setup configuration, and how to describe agent interactions.
+name: e2e
+description: E2E agent testing with fflow verify — write test plans (gen), run them (run), or diagnose failures (fix). Dispatch via positional arg.
 ---
 
-# Writing E2E Agent Test Plans
+# E2E Agent Testing
 
-## Overview
+Dispatch on the first positional arg:
+
+- `gen [target]` — write a new e2e test plan to `./e2e/` (see [§ gen](#gen))
+- `run <plan.md> [--test-dir <path>] [--model <m>] [--verbose]` — execute a plan with `fflow verify` (see [§ run](#run))
+- `fix [run-dir]` — diagnose a failed run and fix the code (see [§ fix](#fix))
+
+If the user did not provide a subcommand, ask which mode they want before proceeding.
+
+---
+
+## gen
+
+Write an e2e agent test plan for `fflow verify`.
+
+### Overview
 
 `fflow verify` is a generic e2e testing framework built on the **verifier–executor model**
 (see `packages/freeflow/docs/e2e-testing-design.md`):
@@ -20,7 +34,7 @@ Everything is agent. The executor IS the user of the software.
 Test plans should be written to `./e2e/` by convention (e.g. `./e2e/my-feature.md`),
 or to `./specs/<slug>/e2e.md` when part of a spec-gen/spec-to-code workflow.
 
-## Before Writing: Explore the Codebase
+### Before Writing: Explore the Codebase
 
 Before generating a test plan, you MUST explore the project for:
 
@@ -34,7 +48,7 @@ Before generating a test plan, you MUST explore the project for:
 This exploration informs the Setup section and ensures the executor knows how to operate
 the software correctly.
 
-## Test Plan Format
+### Test Plan Format
 
 The parser enforces this structure:
 
@@ -90,7 +104,7 @@ Cleanup MUST ensure no leftover side effects:
 - Remove any database entries or state created during the test
 ```
 
-### Parser Rules
+#### Parser Rules
 
 - `## Steps` and `## Expected Outcomes` are **required**
 - Steps must be numbered (`1.`, `2.`, etc.)
@@ -98,13 +112,13 @@ Cleanup MUST ensure no leftover side effects:
 - Each step needs `- Expected:` on the next line
 - `## Background`, `## Timeout Strategy`, `## Cleanup` are optional but recommended
 
-## Setup Section: Configuring the Executor
+### Setup Section: Configuring the Executor
 
 The Setup section tells the verifier how to prepare the environment and launch the executor.
 The executor prompt is the single most important element — it determines whether the executor
 can successfully operate the software.
 
-### Executor Prompt Best Practices
+#### Executor Prompt Best Practices
 
 The executor is a full Claude Code session with no prior context. The prompt must be
 self-contained:
@@ -123,7 +137,7 @@ self-contained:
 For simple cases (skills, slash commands) a short prompt is fine. For complex software,
 include operating instructions.
 
-### Prerequisites
+#### Prerequisites
 
 List anything the verifier needs to prepare before launching the executor:
 
@@ -133,9 +147,9 @@ List anything the verifier needs to prepare before launching the executor:
 - **Environment**: env vars to set, working directory requirements
 - **Dependencies**: tools that must be installed, packages to verify
 
-### Examples by Software Type
+#### Examples by Software Type
 
-#### Workflow Tests
+##### Workflow Tests
 
 ```markdown
 ## Setup
@@ -143,7 +157,7 @@ List anything the verifier needs to prepare before launching the executor:
 - Executor prompt: `/fflow path/to/workflow.workflow.yaml`
 ```
 
-#### CLI Tool Tests
+##### CLI Tool Tests
 
 ```markdown
 ## Setup
@@ -154,7 +168,7 @@ List anything the verifier needs to prepare before launching the executor:
     Report the output and exit code.
 ```
 
-#### Web Application Tests
+##### Web Application Tests
 
 ```markdown
 ## Setup
@@ -170,7 +184,7 @@ List anything the verifier needs to prepare before launching the executor:
 - Remove any test database entries
 ```
 
-#### Multi-Turn Conversation Tests
+##### Multi-Turn Conversation Tests
 
 Start with an initial prompt, then use `send()` in steps to continue:
 
@@ -186,9 +200,9 @@ Start with an initial prompt, then use `send()` in steps to continue:
    - Expected: Executor applies the refactoring and shows the diff
 ```
 
-## Writing Good Test Plans
+### Writing Good Test Plans
 
-### Background Section
+#### Background Section
 
 The most important section. The verifier has no prior knowledge. Explain:
 
@@ -197,7 +211,7 @@ The most important section. The verifier has no prior knowledge. Explain:
 - What output the executor produces at each stage
 - For workflows: states, transitions, and expected behavior per state
 
-### Steps Describe Interactions, Not CLI Commands
+#### Steps Describe Interactions, Not CLI Commands
 
 Steps tell the verifier how to interact with the executor via `wait()` and `send()`:
 
@@ -213,7 +227,7 @@ Steps tell the verifier how to interact with the executor via `wait()` and `send
    - Expected: Exit code 0
 ```
 
-### Expected Should Be Specific
+#### Expected Should Be Specific
 
 ```markdown
 # Good
@@ -223,7 +237,7 @@ Steps tell the verifier how to interact with the executor via `wait()` and `send
 - Expected: Should work correctly
 ```
 
-### Cleanup Should Be Thorough
+#### Cleanup Should Be Thorough
 
 The shared sandbox persists across tests. Leftover processes, files, or state from one
 test can cause the next test to fail or behave unexpectedly.
@@ -240,9 +254,9 @@ test can cause the next test to fail or behave unexpectedly.
 - Clean up test files
 ```
 
-## Examples
+### Examples
 
-### Workflow Test
+#### Workflow Test
 
 ```markdown
 # Test: Simple workflow lifecycle
@@ -267,7 +281,7 @@ The workflow completes when reaching "done" (terminal state with no transitions)
 - The full lifecycle works end-to-end
 ```
 
-### General Agent Behavior (Non-Workflow)
+#### General Agent Behavior (Non-Workflow)
 
 ```markdown
 # Test: Agent creates a file with correct content
@@ -295,7 +309,7 @@ agent file creation behavior, not a workflow.
 - Remove src/greet.ts
 ```
 
-## Common Mistakes
+### Common Mistakes
 
 | Mistake | Fix |
 |---------|-----|
@@ -311,3 +325,37 @@ agent file creation behavior, not a workflow.
 | Assuming verifier knows the executor | Background must explain what the executor does |
 | No cleanup or vague cleanup | List every process, file, and service to tear down |
 | Leftover processes after test | Always kill servers/watchers started in Setup |
+
+---
+
+## run
+
+Run an existing e2e test plan through the `fflow verify` workflow.
+
+Shell out to:
+
+```bash
+fflow verify <plan.md> --test-dir <path> [--model <model>] [--verbose]
+```
+
+If no test plan is specified, invoke `/e2e gen` first to write one to `./e2e/`, then run it.
+
+Exit codes: `0` pass, `2` fail. Report written to `<test-dir>/test-report.md`.
+
+---
+
+## fix
+
+Diagnose a failed `fflow verify` run and repair the code.
+
+### Process
+
+1. If the user specifies a failed run directory or test-dir, go directly to step 2.
+2. If no failed run is specified, the user should describe what to test. Invoke `/e2e run` first
+   to generate (via `/e2e gen`) and execute a test plan. If it fails, use the resulting
+   run directory for step 2.
+3. Read the run-dir artifacts (`test-report.md`, `verifier-session.jsonl`,
+   `executor-session.jsonl`, the copied test plan) and diagnose the failure.
+4. Write a deterministic shell script that reproduces the failure from the session logs.
+5. Fix the code so the reproduction passes.
+6. Re-run via `/e2e run` with the original plan to confirm the fix.
