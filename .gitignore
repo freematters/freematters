@@ -1,8 +1,17 @@
 node_modules/
 dist/
 *.tsbuildinfo
+*.swp
 .claude/worktrees/
 .fc-worktrees/
 .worktrees/
 docs/plans/
 specs/
+
+# pr-lifecycle poll script state
+/pr_status.json
+/mr_status.json
+
+# skills CLI runtime state (lockfile, local skills install dir)
+/skills/
+/skills-lock.json

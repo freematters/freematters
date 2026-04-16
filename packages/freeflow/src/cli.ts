@@ -11,7 +11,12 @@ import { abort } from "./commands/abort.js";
 import { current } from "./commands/current.js";
 import { goto } from "./commands/goto.js";
 import { history } from "./commands/history.js";
-import { install } from "./commands/install.js";
+import {
+  normalizeInitOpts,
+  normalizeInstallWorkflowOpts,
+} from "./commands/init-opts.js";
+import { runInit } from "./commands/init.js";
+import { runInstallWorkflow } from "./commands/install-workflow.js";
 import { list } from "./commands/list.js";
 import { render } from "./commands/render.js";
 import { start } from "./commands/start.js";
@@ -240,10 +245,36 @@ program
   });
 
 program
-  .command("install")
-  .description("register freeflow with Claude Code")
-  .action(() => {
-    install();
+  .command("init")
+  .description("install the FreeFlow Claude Code plugin (skills + hooks bundled)")
+  .option(
+    "--uninstall",
+    "remove the FreeFlow Claude plugin and the global Codex skills",
+  )
+  .action(async (opts: Record<string, unknown>, cmd: Command) => {
+    const { json } = getGlobalOpts(cmd);
+    try {
+      await runInit(normalizeInitOpts(opts));
+    } catch (err: unknown) {
+      handleError(err, json ?? false);
+    }
+  });
+
+program
+  .command("install-workflow")
+  .description(
+    "install FreeFlow workflows (all skills + all agents pre-selected; -y to skip confirmation)",
+  )
+  .option("--local", "install at project scope")
+  .option("--global", "install at user scope")
+  .option("-y, --yes", "skip all interactive prompts (defaults: local scope)")
+  .action(async (opts: Record<string, unknown>, cmd: Command) => {
+    const { json } = getGlobalOpts(cmd);
+    try {
+      await runInstallWorkflow(normalizeInstallWorkflowOpts(opts));
+    } catch (err: unknown) {
+      handleError(err, json ?? false);
+    }
   });
 
 program

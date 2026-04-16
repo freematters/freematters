@@ -13,24 +13,64 @@ AI coding agents are powerful but unreliable at following multi-step workflows. 
 
 FreeFlow resolves this by separating **what the agent does** (flexible, LLM-driven) from **where the agent goes** (deterministic, workflow-enforced). The agent stays in control of reasoning and tool use within each state, but the workflow engine governs which states exist and which transitions are legal.
 
-## Install
+## Getting Started
 
-Tell this to your coding agent:
+### Prerequisites
 
-```
-Read https://github.com/freematters/freematters/blob/main/packages/freeflow/README.md to install freeflow
-```
+- Node.js 18 or newer
+- [Claude Code](https://claude.com/claude-code) installed and signed in
+- (Optional) [Codex](https://github.com/openai/codex) — `fflow init` lays down the same skills globally for Codex users
 
-Or install manually:
+### Install
+
+FreeFlow installs in two steps: the Claude Code plugin (skills + hooks), then
+the workflow templates you'll actually run.
 
 ```bash
-npm install -g @freematters/freeflow
+# 1. Install the FreeFlow plugin into Claude Code (skills + hooks bundled)
+npx fflow init
 
-fflow install
+# 2. Install workflow templates (every workflow + every agent pre-selected)
+npx fflow install-workflow [--local | --global] [-y]
 ```
 
-This registers the bundled skills and workflows into Claude Code, along with
-the PostToolUse hook.
+`init` registers the plugin with Claude Code (skills + hooks ship inside it)
+and also lays down the same skills globally for Codex via
+`npx skills add -g --agent codex`. **Restart Claude Code** afterwards so the
+PostToolUse hook activates.
+
+`install-workflow` shells out to `npx skills add` with every workflow and
+every agent pre-selected (`--skill '*' --agent '*'`); the skills CLI still
+shows its confirmation picker so you can review what will be installed. Pass
+`-y` to skip the confirmation for non-interactive runs. Use `--local` to
+install workflows into the current repo (default in `-y` mode) or `--global`
+to make them available everywhere.
+
+### Your first workflow
+
+Once installed, open a project in Claude Code and try a bundled workflow:
+
+```
+/fflow spec-gen
+```
+
+The agent enters the workflow's first state, follows the instructions in the
+state card, and transitions forward only where the YAML allows. Two other
+skills are useful from day one:
+
+- `/fflow-author` — guided Q&A to create or edit a workflow YAML
+- `/fflow <path>` — start any workflow (searches `./workflows/` by name, or
+  takes an absolute path)
+
+### Uninstall
+
+```bash
+npx fflow init --uninstall
+```
+
+Removes the Claude plugin + the `freeflow-local` marketplace entry and
+deletes the bundled skills from the global Codex skills dir. Best-effort
+cleanup — missing pieces are skipped rather than fatal.
 
 ### For Contributors
 
@@ -40,16 +80,9 @@ cd freematters
 npm install && npm run build
 npm link -w packages/freeflow
 
-fflow install
+fflow init
+fflow install-workflow
 ```
-
-## Usage
-
-FreeFlow is typically used through these skills:
-
-- `/fflow-author` — guided Q&A to create or edit a workflow YAML
-- `/fflow <path>` — start a workflow run (also searches `./workflows/` by name)
-- `/fflow:e2e-run` — run e2e agent tests
 
 ## Bundled Workflows
 
@@ -57,11 +90,8 @@ FreeFlow is typically used through these skills:
 - `spec-to-code` — implements a spec directory (from spec-gen) into working code via TDD
 - `mr-lifecycle` — merge request lifecycle management
 
-Start a bundled workflow by name:
-
-```
-/fflow spec-gen
-```
+Each workflow is a YAML file — inspect or edit them in `skills/` after
+running `install-workflow`, or run `/fflow-author` to build your own.
 
 ## How It Works
 

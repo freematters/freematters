@@ -8,4 +8,4 @@ npm run build
 npm install -g .
 
 # Register as Claude plugin
-fflow install
+fflow init
