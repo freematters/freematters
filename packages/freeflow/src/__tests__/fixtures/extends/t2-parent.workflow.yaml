@@ -1,0 +1,13 @@
+version: 1
+guide: |-
+  P1
+  P2
+initial: a
+states:
+  a:
+    prompt: "A"
+    transitions:
+      next: done
+  done:
+    prompt: "Done"
+    transitions: {}

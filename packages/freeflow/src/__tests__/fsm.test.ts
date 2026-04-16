@@ -560,7 +560,7 @@ states:
     transitions: {}
 `,
       "invalid-unknown-target.yaml",
-      /unknown state.*nowhere/,
+      /invalid transition targets.*"nowhere"/,
     );
   });
 

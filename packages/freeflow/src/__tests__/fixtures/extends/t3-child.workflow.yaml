@@ -1,0 +1,3 @@
+version: 1.4
+extends: ./t3-parent.workflow.yaml
+guide: "CHILD ONLY"

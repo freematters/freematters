@@ -1,0 +1,8 @@
+version: 1.4
+extends: ./t6-parent.workflow.yaml
+initial: x
+states:
+  x:
+    prompt: "X"
+    transitions:
+      enter: a
