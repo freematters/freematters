@@ -2,22 +2,13 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-const { execFileSyncMock, symlinkSyncMock } = vi.hoisted(() => ({
+const { execFileSyncMock } = vi.hoisted(() => ({
   execFileSyncMock: vi.fn(),
-  symlinkSyncMock: vi.fn(),
 }));
 
 vi.mock("node:child_process", () => ({
   execFileSync: execFileSyncMock,
 }));
-
-vi.mock("node:fs", async () => {
-  const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
-  return {
-    ...actual,
-    symlinkSync: symlinkSyncMock,
-  };
-});
 
 const { install } = await import("../commands/install.js");
 
@@ -38,7 +29,7 @@ describe("install claude (with stubbed execFileSync)", () => {
   });
 
   test("plugin install is invoked, then npx skills install twice (in order)", () => {
-    install("claude");
+    install();
 
     const calls = execFileSyncMock.mock.calls;
 
@@ -80,7 +71,7 @@ describe("install claude (with stubbed execFileSync)", () => {
       return Buffer.from("");
     });
 
-    expect(() => install("claude")).toThrow();
+    expect(() => install()).toThrow();
 
     const calls = execFileSyncMock.mock.calls;
     const uninstallCall = calls.find(
@@ -92,58 +83,6 @@ describe("install claude (with stubbed execFileSync)", () => {
         c[1][2] === "freeflow@freeflow-local",
     );
     expect(uninstallCall).toBeDefined();
-  });
-});
-
-// ─── Install: codex backend ─────────────────────────────────────
-
-describe("install codex (with stubbed execFileSync)", () => {
-  beforeEach(() => {
-    execFileSyncMock.mockReset();
-    execFileSyncMock.mockImplementation(() => Buffer.from(""));
-  });
-
-  afterEach(() => {
-    execFileSyncMock.mockReset();
-  });
-
-  test("no symlink is created at ~/.agents/skills/freeflow and npx skills install is invoked twice", () => {
-    symlinkSyncMock.mockReset();
-
-    install("codex");
-
-    expect(symlinkSyncMock).not.toHaveBeenCalled();
-
-    const npxCalls = execFileSyncMock.mock.calls.filter(
-      (c) =>
-        c[0] === "npx" &&
-        Array.isArray(c[1]) &&
-        c[1][0] === "skills" &&
-        c[1][1] === "install",
-    );
-    expect(npxCalls).toHaveLength(2);
-    expect(npxCalls[0][1]).toEqual(["skills", "install", SKILLS_DIR]);
-    expect(npxCalls[1][1]).toEqual(["skills", "install", WORKFLOWS_DIR]);
-  });
-
-  test("on npx skills install failure, exits non-zero and no plugin rollback is attempted", () => {
-    execFileSyncMock.mockImplementation((cmd: string, args: string[]) => {
-      if (cmd === "npx" && args[0] === "skills" && args[1] === "install") {
-        throw new Error("npx skills install failed");
-      }
-      return Buffer.from("");
-    });
-
-    expect(() => install("codex")).toThrow();
-
-    const uninstallCall = execFileSyncMock.mock.calls.find(
-      (c) =>
-        c[0] === "claude" &&
-        Array.isArray(c[1]) &&
-        c[1][0] === "plugin" &&
-        c[1][1] === "uninstall",
-    );
-    expect(uninstallCall).toBeUndefined();
   });
 });
 

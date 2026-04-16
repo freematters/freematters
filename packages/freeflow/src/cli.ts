@@ -241,14 +241,9 @@ program
 
 program
   .command("install")
-  .description("register freeflow with an agent platform")
-  .argument("<platform>", "target platform: claude or codex")
-  .action((platform: string) => {
-    if (platform !== "claude" && platform !== "codex") {
-      console.error(`Unknown platform "${platform}". Use "claude" or "codex".`);
-      process.exit(2);
-    }
-    install(platform as "claude" | "codex");
+  .description("register freeflow with Claude Code")
+  .action(() => {
+    install();
   });
 
 program

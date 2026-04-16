@@ -15,7 +15,7 @@ Monorepo for FreeMatters — agent-native developer tools.
 
 ```bash
 npm install -g @freematters/freeflow
-fflow install claude    # or: fflow install codex
+fflow install
 ```
 
 See [packages/freeflow/README.md](packages/freeflow/README.md) for full documentation.
