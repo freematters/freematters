@@ -33,12 +33,13 @@ fflow install claude
 fflow install codex
 ```
 
-Both commands delegate skill and workflow registration to
-[`npx skills install`](https://www.npmjs.com/package/skills) under the hood — one call for
-`packages/freeflow/skills/` and one for `packages/freeflow/workflows/`. `npx` must be
-available on `PATH` (it ships with Node.js). If `npx skills install` fails during
-`fflow install claude`, the plugin install is rolled back automatically so the operation
-is atomic.
+Both commands delegate skill and workflow registration to the
+[`skills`](https://www.npmjs.com/package/skills) CLI under the hood — one call for
+`packages/freeflow/skills/` and one for `packages/freeflow/workflows/`. `skills` ships as
+a direct dependency of `@freematters/freeflow`, so no extra install step is needed;
+`npx` resolves it from the freeflow package's own `node_modules`. If `npx skills install`
+fails during `fflow install claude`, the plugin install is rolled back automatically so
+the operation is atomic.
 
 ### For Contributors
 
