@@ -1,8 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 
-type Platform = "claude" | "codex";
-
 const MARKETPLACE_NAME = "freeflow-local";
 const PLUGIN_NAME = "freeflow";
 
@@ -12,21 +10,16 @@ function getPackageRoot(): string {
   return resolve(thisDir, "..", "..");
 }
 
-export function install(platform: Platform): void {
+export function install(): void {
   const packageRoot = getPackageRoot();
-
-  if (platform === "claude") {
-    installClaude(packageRoot);
-  } else {
-    installCodex(packageRoot);
-  }
+  installClaude(packageRoot);
 }
 
 function run(cmd: string, args: string[]): void {
   execFileSync(cmd, args, { stdio: "inherit" });
 }
 
-function runNpxSkills(packageRoot: string, onFailure?: () => void): void {
+function runNpxSkills(packageRoot: string, onFailure: () => void): void {
   const dirs = [join(packageRoot, "skills"), join(packageRoot, "workflows")];
   try {
     for (const dir of dirs) {
@@ -34,7 +27,7 @@ function runNpxSkills(packageRoot: string, onFailure?: () => void): void {
       run("npx", ["skills", "install", dir]);
     }
   } catch (err) {
-    onFailure?.();
+    onFailure();
     throw err;
   }
 }
@@ -69,13 +62,4 @@ function installClaude(packageRoot: string): void {
   console.log("\nSkills: /fflow-author, /fflow, /e2e-run");
   console.log("Hook: PostToolUse state reminder (every 5 tool calls)");
   console.log("\nRestart Claude Code to activate the plugin.");
-}
-
-function installCodex(packageRoot: string): void {
-  runNpxSkills(packageRoot);
-
-  console.log("\nFreeFlow skills installed for Codex.");
-  console.log(
-    `\nNote: Codex does not support hooks. The agent won't get periodic state reminders.`,
-  );
 }

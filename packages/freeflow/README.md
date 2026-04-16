@@ -2,7 +2,7 @@
 
 CLI-first workflow runtime for agent workflows. Define states and transitions in YAML; the CLI enforces valid paths while leaving in-state reasoning to the LLM.
 
-Works with **Claude Code** and **Codex**.
+Works with **Claude Code**.
 
 ## Why
 
@@ -26,15 +26,11 @@ Or install manually:
 ```bash
 npm install -g @freematters/freeflow
 
-# Claude Code — registers the PostToolUse hook + installs skills and workflows
-fflow install claude
-
-# Codex — installs skills and workflows (no hook support)
-fflow install codex
+fflow install
 ```
 
-Both commands register the bundled skills and workflows into the agent's skill
-directories.
+This registers the bundled skills and workflows into Claude Code, along with
+the PostToolUse hook.
 
 ### For Contributors
 
@@ -44,7 +40,7 @@ cd freematters
 npm install && npm run build
 npm link -w packages/freeflow
 
-fflow install claude
+fflow install
 ```
 
 ## Usage
@@ -54,8 +50,6 @@ FreeFlow is typically used through these skills:
 - `/fflow-author` — guided Q&A to create or edit a workflow YAML
 - `/fflow <path>` — start a workflow run (also searches `./workflows/` by name)
 - `/fflow:e2e-run` — run e2e agent tests
-
-Codex skill names use `$` instead of `/`.
 
 ## Bundled Workflows
 
