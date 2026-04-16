@@ -34,9 +34,7 @@ fflow install codex
 ```
 
 Both commands register the bundled skills and workflows into the agent's skill
-directories. `fflow install claude` additionally installs the Claude Code plugin
-(for the PostToolUse hook) and rolls it back automatically if skill or workflow
-registration fails, so the install is atomic.
+directories.
 
 ### For Contributors
 
