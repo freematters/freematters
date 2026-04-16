@@ -62,7 +62,10 @@ async function shouldInstallHooks(opts: InitOptions): Promise<boolean> {
     return response.installHook === true;
   }
 
-  return false;
+  throw new CliError(
+    "ARGS_INVALID",
+    "Non-TTY init requires -y or --no-hooks when claude is on PATH",
+  );
 }
 
 export async function runInit(opts: InitOptions): Promise<void> {
@@ -85,7 +88,7 @@ export async function runInit(opts: InitOptions): Promise<void> {
     } else {
       throw new CliError(
         "ARGS_INVALID",
-        "Non-TTY init requires --local, --global, or -y",
+        `FreeFlow is already installed in ${scope}; non-TTY reinstall requires -y to confirm`,
       );
     }
 

@@ -30,14 +30,14 @@ describe("runners", () => {
     expect(execFileSyncMock).toHaveBeenCalledTimes(1);
     const [cmd, args] = execFileSyncMock.mock.calls[0];
     expect(cmd).toBe("npx");
-    expect(args).toEqual(["skills", "add", "/some/dir", "--skill", "*"]);
+    expect(args).toEqual(["--yes", "skills", "add", "/some/dir", "--skill", "*"]);
   });
 
   test("skillsAdd global scope includes -g", () => {
     skillsAdd("/some/dir", { scope: "global" });
 
     const [, args] = execFileSyncMock.mock.calls[0];
-    expect(args).toEqual(["skills", "add", "/some/dir", "--skill", "*", "-g"]);
+    expect(args).toEqual(["--yes", "skills", "add", "/some/dir", "--skill", "*", "-g"]);
   });
 
   test("skillsAdd with agent appends --agent <list> verbatim", () => {
@@ -45,6 +45,7 @@ describe("runners", () => {
 
     const [, args] = execFileSyncMock.mock.calls[0];
     expect(args).toEqual([
+      "--yes",
       "skills",
       "add",
       "/some/dir",
@@ -62,6 +63,7 @@ describe("runners", () => {
     const [cmd, args] = execFileSyncMock.mock.calls[0];
     expect(cmd).toBe("npx");
     expect(args).toEqual([
+      "--yes",
       "skills",
       "remove",
       "/some/dir",

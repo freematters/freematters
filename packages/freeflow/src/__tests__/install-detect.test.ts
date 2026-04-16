@@ -56,7 +56,12 @@ describe("detectInstalled", () => {
   test("returns true when a skill's source resolves under packageRoot", () => {
     const underPkg = join(PACKAGE_ROOT, "skills/fflow");
     execFileSyncMock.mockImplementation((cmd: string, args: string[]) => {
-      if (cmd === "npx" && args[0] === "skills" && args[1] === "ls") {
+      if (
+        cmd === "npx" &&
+        args[0] === "--yes" &&
+        args[1] === "skills" &&
+        args[2] === "ls"
+      ) {
         return Buffer.from(JSON.stringify([{ name: "fflow", source: underPkg }]));
       }
       return Buffer.from("");
@@ -67,7 +72,12 @@ describe("detectInstalled", () => {
 
   test("returns false when no skill source resolves under packageRoot", () => {
     execFileSyncMock.mockImplementation((cmd: string, args: string[]) => {
-      if (cmd === "npx" && args[0] === "skills" && args[1] === "ls") {
+      if (
+        cmd === "npx" &&
+        args[0] === "--yes" &&
+        args[1] === "skills" &&
+        args[2] === "ls"
+      ) {
         return Buffer.from(
           JSON.stringify([
             { name: "unrelated", source: "/tmp/unrelated/skills/fflow" },
@@ -89,7 +99,12 @@ describe("detectAllInstalledScopes", () => {
   test("composes both scope probes and returns the populated set", () => {
     const underPkg = join(PACKAGE_ROOT, "skills/fflow");
     execFileSyncMock.mockImplementation((cmd: string, args: string[]) => {
-      if (cmd === "npx" && args[0] === "skills" && args[1] === "ls") {
+      if (
+        cmd === "npx" &&
+        args[0] === "--yes" &&
+        args[1] === "skills" &&
+        args[2] === "ls"
+      ) {
         // global invocation carries -g; local does not
         const isGlobal = args.includes("-g");
         if (isGlobal) {

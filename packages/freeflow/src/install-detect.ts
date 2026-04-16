@@ -35,7 +35,7 @@ export function detectInstalled(scope: Scope): boolean {
   const packageRoot = safeRealpath(getPackageRoot());
 
   try {
-    const argv: string[] = ["skills", "ls", "--json"];
+    const argv: string[] = ["--yes", "skills", "ls", "--json"];
     if (scope === "global") argv.push("-g");
 
     const out = execFileSync("npx", argv, { stdio: "pipe" }).toString();

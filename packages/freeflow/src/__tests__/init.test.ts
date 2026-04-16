@@ -47,8 +47,9 @@ function findSkillsAddCalls(): readonly (readonly unknown[])[] {
     (c) =>
       c[0] === "npx" &&
       Array.isArray(c[1]) &&
-      c[1][0] === "skills" &&
-      c[1][1] === "add",
+      c[1][0] === "--yes" &&
+      c[1][1] === "skills" &&
+      c[1][2] === "add",
   );
 }
 
@@ -99,8 +100,8 @@ describe("runInit", () => {
     const firstArgs = skillsAddCalls[0][1] as string[];
     const secondArgs = skillsAddCalls[1][1] as string[];
 
-    expect(firstArgs[2]).toBe(SKILLS_DIR);
-    expect(secondArgs[2]).toBe(WORKFLOWS_DIR);
+    expect(firstArgs[3]).toBe(SKILLS_DIR);
+    expect(secondArgs[3]).toBe(WORKFLOWS_DIR);
 
     expect(firstArgs).not.toContain("-g");
     expect(secondArgs).not.toContain("-g");
@@ -186,6 +187,25 @@ describe("runInit", () => {
     expect(msg.includes("--local") || msg.includes("--global")).toBe(true);
   });
 
+  test("non-TTY + claude available + no -y + no --no-hooks → throws", async () => {
+    Object.defineProperty(process.stdin, "isTTY", {
+      value: false,
+      configurable: true,
+    });
+    claudeAvailableMock.mockReturnValue(true);
+    detectInstalledMock.mockReturnValue(false);
+
+    await expect(runInit({ scope: "local" })).rejects.toBeInstanceOf(CliError);
+
+    const err = await runInit({ scope: "local" }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(CliError);
+    const cliErr = err as InstanceType<typeof CliError>;
+    expect(cliErr.code).toBe("ARGS_INVALID");
+    expect(cliErr.message.includes("-y") || cliErr.message.includes("--no-hooks")).toBe(
+      true,
+    );
+  });
+
   test("reinstall path — already installed, user confirms", async () => {
     detectInstalledMock.mockReturnValue(true);
     claudeAvailableMock.mockReturnValue(true);
@@ -203,8 +223,9 @@ describe("runInit", () => {
       (c) =>
         c[0] === "npx" &&
         Array.isArray(c[1]) &&
-        c[1][0] === "skills" &&
-        c[1][1] === "add",
+        c[1][0] === "--yes" &&
+        c[1][1] === "skills" &&
+        c[1][2] === "add",
     );
     expect(firstSkillsAddIdx).toBeGreaterThanOrEqual(0);
 
@@ -212,8 +233,9 @@ describe("runInit", () => {
       (c) =>
         c[0] === "npx" &&
         Array.isArray(c[1]) &&
-        c[1][0] === "skills" &&
-        c[1][1] === "remove",
+        c[1][0] === "--yes" &&
+        c[1][1] === "skills" &&
+        c[1][2] === "remove",
     );
     const pluginUninstallIdx = calls.findIndex(
       (c) =>
@@ -257,8 +279,9 @@ describe("runInit", () => {
     execFileSyncMock.mockImplementation((cmd: string, args: readonly string[]) => {
       if (
         cmd === "npx" &&
-        args[0] === "skills" &&
-        args[1] === "add" &&
+        args[0] === "--yes" &&
+        args[1] === "skills" &&
+        args[2] === "add" &&
         ++skillsAddCount === 1
       ) {
         throw skillsAddError;
@@ -310,8 +333,9 @@ describe("runInit", () => {
       (c) =>
         c[0] === "npx" &&
         Array.isArray(c[1]) &&
-        c[1][0] === "skills" &&
-        c[1][1] === "remove",
+        c[1][0] === "--yes" &&
+        c[1][1] === "skills" &&
+        c[1][2] === "remove",
     );
     expect(skillsRemoveCalls).toHaveLength(0);
 

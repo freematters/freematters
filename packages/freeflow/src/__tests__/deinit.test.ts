@@ -45,9 +45,10 @@ function findSkillsRemoveCall(
     (c) =>
       c[0] === "npx" &&
       Array.isArray(c[1]) &&
-      c[1][0] === "skills" &&
-      c[1][1] === "remove" &&
-      c[1][2] === dir &&
+      c[1][0] === "--yes" &&
+      c[1][1] === "skills" &&
+      c[1][2] === "remove" &&
+      c[1][3] === dir &&
       (global ? c[1].includes("-g") : !c[1].includes("-g")),
   );
 }
@@ -86,6 +87,7 @@ describe("runDeinit", () => {
 
     const skillsCall = findSkillsRemoveCall(SKILLS_DIR, false);
     expect(skillsCall?.[1]).toEqual([
+      "--yes",
       "skills",
       "remove",
       SKILLS_DIR,
@@ -98,6 +100,7 @@ describe("runDeinit", () => {
 
     const workflowsCall = findSkillsRemoveCall(WORKFLOWS_DIR, false);
     expect(workflowsCall?.[1]).toEqual([
+      "--yes",
       "skills",
       "remove",
       WORKFLOWS_DIR,
@@ -121,6 +124,7 @@ describe("runDeinit", () => {
 
     const skillsCall = findSkillsRemoveCall(SKILLS_DIR, true);
     expect(skillsCall?.[1]).toEqual([
+      "--yes",
       "skills",
       "remove",
       SKILLS_DIR,
@@ -134,6 +138,7 @@ describe("runDeinit", () => {
 
     const workflowsCall = findSkillsRemoveCall(WORKFLOWS_DIR, true);
     expect(workflowsCall?.[1]).toEqual([
+      "--yes",
       "skills",
       "remove",
       WORKFLOWS_DIR,
@@ -174,8 +179,9 @@ describe("runDeinit", () => {
       (c) =>
         c[0] === "npx" &&
         Array.isArray(c[1]) &&
-        c[1][0] === "skills" &&
-        c[1][1] === "remove",
+        c[1][0] === "--yes" &&
+        c[1][1] === "skills" &&
+        c[1][2] === "remove",
     );
     expect(removalCalls).toHaveLength(0);
 
@@ -216,9 +222,10 @@ describe("runDeinit", () => {
     execFileSyncMock.mockImplementation((cmd: string, args: readonly string[]) => {
       if (
         cmd === "npx" &&
-        args[0] === "skills" &&
-        args[1] === "remove" &&
-        args[2] === WORKFLOWS_DIR
+        args[0] === "--yes" &&
+        args[1] === "skills" &&
+        args[2] === "remove" &&
+        args[3] === WORKFLOWS_DIR
       ) {
         throw new Error("workflows remove failed");
       }

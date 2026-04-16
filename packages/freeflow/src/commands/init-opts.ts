@@ -13,7 +13,7 @@ export function normalizeInitOpts(raw: Record<string, unknown>): InitOptions {
     : global
       ? "global"
       : undefined;
-  const noHooks = raw.noHooks === true || raw.hooks === false;
+  const noHooks = raw.hooks === false;
   return {
     scope,
     noHooks,

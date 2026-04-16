@@ -29,7 +29,7 @@ export function getPackageRoot(): string {
 }
 
 export function skillsAdd(dir: string, opts: SkillsAddOptions): void {
-  const argv: string[] = ["skills", "add", dir, "--skill", "*"];
+  const argv: string[] = ["--yes", "skills", "add", dir, "--skill", "*"];
   if (opts.agent) {
     argv.push("--agent", opts.agent);
   }
@@ -41,6 +41,7 @@ export function skillsAdd(dir: string, opts: SkillsAddOptions): void {
 
 export function skillsRemove(dir: string, opts: SkillsRemoveOptions): void {
   const argv: string[] = [
+    "--yes",
     "skills",
     "remove",
     dir,
