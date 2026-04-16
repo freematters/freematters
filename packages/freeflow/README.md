@@ -26,12 +26,19 @@ Or install manually:
 ```bash
 npm install -g @freematters/freeflow
 
-# Claude Code — registers skills + PostToolUse hook
+# Claude Code — registers the PostToolUse hook + installs skills and workflows
 fflow install claude
 
-# Codex — links skills (no hook support)
+# Codex — installs skills and workflows (no hook support)
 fflow install codex
 ```
+
+Both commands delegate skill and workflow registration to
+[`npx skills install`](https://www.npmjs.com/package/skills) under the hood — one call for
+`packages/freeflow/skills/` and one for `packages/freeflow/workflows/`. `npx` must be
+available on `PATH` (it ships with Node.js). If `npx skills install` fails during
+`fflow install claude`, the plugin install is rolled back automatically so the operation
+is atomic.
 
 ### For Contributors
 

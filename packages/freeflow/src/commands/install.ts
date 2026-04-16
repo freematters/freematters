@@ -1,13 +1,4 @@
 import { execFileSync } from "node:child_process";
-import {
-  existsSync,
-  mkdirSync,
-  readlinkSync,
-  renameSync,
-  symlinkSync,
-  unlinkSync,
-} from "node:fs";
-import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 type Platform = "claude" | "codex";
@@ -35,6 +26,36 @@ function run(cmd: string, args: string[]): void {
   execFileSync(cmd, args, { stdio: "inherit" });
 }
 
+function runNpxSkills(packageRoot: string, opts?: { onFailure?: () => void }): void {
+  const dirs = [join(packageRoot, "skills"), join(packageRoot, "workflows")];
+  try {
+    for (const dir of dirs) {
+      console.log(`\nInstalling via npx skills install ${dir}`);
+      execFileSync("npx", ["skills", "install", dir], { stdio: "inherit" });
+    }
+  } catch (err) {
+    opts?.onFailure?.();
+    throw err;
+  }
+}
+
+function rollbackClaudeHook(): void {
+  try {
+    console.warn("\nRolling back Claude plugin install...");
+    execFileSync(
+      "claude",
+      ["plugin", "uninstall", `${PLUGIN_NAME}@${MARKETPLACE_NAME}`],
+      { stdio: "inherit" },
+    );
+  } catch (err) {
+    console.warn(
+      `Warning: failed to roll back Claude plugin install: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
+}
+
 function installClaude(packageRoot: string): void {
   const pluginKey = `${PLUGIN_NAME}@${MARKETPLACE_NAME}`;
 
@@ -46,6 +67,9 @@ function installClaude(packageRoot: string): void {
   console.log(`\nInstalling plugin ${pluginKey}`);
   run("claude", ["plugin", "install", pluginKey]);
 
+  // Register skills and workflows via npx skills install
+  runNpxSkills(packageRoot, { onFailure: rollbackClaudeHook });
+
   console.log("\nFreeFlow plugin installed for Claude Code.");
   console.log("\nSkills: /fflow-author, /fflow, /e2e-run");
   console.log("Hook: PostToolUse state reminder (every 5 tool calls)");
@@ -53,34 +77,9 @@ function installClaude(packageRoot: string): void {
 }
 
 function installCodex(packageRoot: string): void {
-  const skillsSource = join(packageRoot, "skills");
-  const agentsDir = join(homedir(), ".agents", "skills");
-  const target = join(agentsDir, PLUGIN_NAME);
+  runNpxSkills(packageRoot);
 
-  if (!existsSync(skillsSource)) {
-    console.error(`Skills directory not found: ${skillsSource}`);
-    process.exit(2);
-  }
-
-  mkdirSync(agentsDir, { recursive: true });
-
-  // Replace existing target, backing up if it's not a symlink
-  if (existsSync(target)) {
-    try {
-      readlinkSync(target);
-      // It's a symlink — safe to remove and update
-      unlinkSync(target);
-      console.log(`Updating existing symlink: ${target}`);
-    } catch {
-      // Not a symlink — back it up
-      const backup = `${target}.bak`;
-      renameSync(target, backup);
-      console.log(`Backed up ${target} -> ${backup}`);
-    }
-  }
-
-  symlinkSync(skillsSource, target);
-  console.log(`FreeFlow skills linked for Codex: ${target} -> ${skillsSource}`);
+  console.log("\nFreeFlow skills installed for Codex.");
   console.log(
     `\nNote: Codex does not support hooks. The agent won't get periodic state reminders.`,
   );

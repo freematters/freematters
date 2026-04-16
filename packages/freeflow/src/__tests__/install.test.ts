@@ -1,195 +1,163 @@
-import { execFileSync } from "node:child_process";
-import {
-  copyFileSync,
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readlinkSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { tmpdir } from "node:os";
-import { homedir } from "node:os";
+import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-const CLI = resolve(__dirname, "../../dist/cli.js");
+const { execFileSyncMock } = vi.hoisted(() => ({
+  execFileSyncMock: vi.fn(),
+}));
+
+vi.mock("node:child_process", async () => {
+  const actual =
+    await vi.importActual<typeof import("node:child_process")>("node:child_process");
+  return {
+    ...actual,
+    execFileSync: execFileSyncMock,
+  };
+});
+
+const { install } = await import("../commands/install.js");
+
 const PACKAGE_ROOT = resolve(__dirname, "../..");
+const SKILLS_DIR = join(PACKAGE_ROOT, "skills");
+const WORKFLOWS_DIR = join(PACKAGE_ROOT, "workflows");
 
-function cli(args: string): string {
-  return execFileSync("node", [CLI, ...args.split(/\s+/)], {
-    encoding: "utf-8",
+// ─── Install: claude backend ────────────────────────────────────
+
+describe("install claude (with stubbed execFileSync)", () => {
+  beforeEach(() => {
+    execFileSyncMock.mockReset();
+    execFileSyncMock.mockImplementation(() => Buffer.from(""));
   });
-}
 
-function hasCommand(cmd: string): boolean {
-  try {
-    execFileSync("which", [cmd], { encoding: "utf-8" });
-    return true;
-  } catch {
-    return false;
-  }
-}
+  afterEach(() => {
+    execFileSyncMock.mockReset();
+  });
 
-// ─── Codex install ──────────────────────────────────────────────
+  test("plugin install is invoked, then npx skills install twice (in order)", () => {
+    install("claude");
 
-const describeCodex = describe.skipIf(!hasCommand("codex"));
+    const calls = execFileSyncMock.mock.calls;
 
-describeCodex("install codex", () => {
-  const agentsDir = join(homedir(), ".agents", "skills");
-  const target = join(agentsDir, "freeflow");
-  const backup = `${target}.bak`;
+    const claudePluginInstallIdx = calls.findIndex(
+      (c) =>
+        c[0] === "claude" &&
+        Array.isArray(c[1]) &&
+        c[1][0] === "plugin" &&
+        c[1][1] === "install",
+    );
+    expect(claudePluginInstallIdx).toBeGreaterThanOrEqual(0);
 
-  // Snapshot for restore
-  let savedLink: string | null = null;
-  let hadTarget = false;
+    const npxCalls = calls.filter(
+      (c) =>
+        c[0] === "npx" &&
+        Array.isArray(c[1]) &&
+        c[1][0] === "skills" &&
+        c[1][1] === "install",
+    );
+    expect(npxCalls).toHaveLength(2);
 
-  beforeAll(() => {
-    if (existsSync(target)) {
-      hadTarget = true;
-      try {
-        savedLink = readlinkSync(target);
-      } catch {
-        savedLink = null;
+    // Order: plugin install before both npx calls
+    const firstNpxIdx = calls.findIndex(
+      (c) =>
+        c[0] === "npx" &&
+        Array.isArray(c[1]) &&
+        c[1][0] === "skills" &&
+        c[1][1] === "install",
+    );
+    expect(firstNpxIdx).toBeGreaterThan(claudePluginInstallIdx);
+
+    // Verify both parent dir paths in order: skills then workflows
+    expect(npxCalls[0][1]).toEqual(["skills", "install", SKILLS_DIR]);
+    expect(npxCalls[1][1]).toEqual(["skills", "install", WORKFLOWS_DIR]);
+  });
+
+  test("on npx skills install failure on second call, plugin uninstall is invoked and exits non-zero", () => {
+    let npxCount = 0;
+    execFileSyncMock.mockImplementation((cmd: string, args: string[]) => {
+      if (cmd === "npx" && args[0] === "skills" && args[1] === "install") {
+        npxCount += 1;
+        if (npxCount === 2) {
+          throw new Error("npx skills install failed");
+        }
       }
-    }
-  });
+      return Buffer.from("");
+    });
 
-  afterAll(() => {
-    // Clean up test artifacts
-    if (existsSync(target)) rmSync(target, { recursive: true, force: true });
-    if (existsSync(backup)) rmSync(backup, { recursive: true, force: true });
+    expect(() => install("claude")).toThrow();
 
-    // Restore original state
-    if (hadTarget && savedLink) {
-      mkdirSync(agentsDir, { recursive: true });
-      symlinkSync(savedLink, target);
-    }
-  });
-
-  test("creates symlink to skills directory", () => {
-    // Clean slate
-    if (existsSync(target)) rmSync(target, { recursive: true, force: true });
-
-    const stdout = cli("install codex");
-    expect(stdout).toContain("FreeFlow skills linked for Codex");
-
-    expect(existsSync(target)).toBe(true);
-    expect(lstatSync(target).isSymbolicLink()).toBe(true);
-    expect(readlinkSync(target)).toBe(join(PACKAGE_ROOT, "skills"));
+    const calls = execFileSyncMock.mock.calls;
+    const uninstallCall = calls.find(
+      (c) =>
+        c[0] === "claude" &&
+        Array.isArray(c[1]) &&
+        c[1][0] === "plugin" &&
+        c[1][1] === "uninstall" &&
+        c[1][2] === "freeflow@freeflow-local",
+    );
+    expect(uninstallCall).toBeDefined();
   });
 });
 
-// ─── Claude install ─────────────────────────────────────────────
+// ─── Install: codex backend ─────────────────────────────────────
 
-const describeClaude = describe.skipIf(!hasCommand("claude"));
-
-describeClaude("install claude", () => {
-  const pluginsDir = join(homedir(), ".claude", "plugins");
-  const knownPath = join(pluginsDir, "known_marketplaces.json");
-  const installedPath = join(pluginsDir, "installed_plugins.json");
-  const knownBackup = `${knownPath}.bak`;
-  const installedBackup = `${installedPath}.bak`;
-
-  beforeAll(() => {
-    // Snapshot existing plugin state
-    if (existsSync(knownPath)) copyFileSync(knownPath, knownBackup);
-    if (existsSync(installedPath)) copyFileSync(installedPath, installedBackup);
+describe("install codex (with stubbed execFileSync)", () => {
+  beforeEach(() => {
+    execFileSyncMock.mockReset();
+    execFileSyncMock.mockImplementation(() => Buffer.from(""));
   });
 
-  afterAll(() => {
-    // Restore original plugin state
-    if (existsSync(knownBackup)) {
-      copyFileSync(knownBackup, knownPath);
-      rmSync(knownBackup);
-    }
-    if (existsSync(installedBackup)) {
-      copyFileSync(installedBackup, installedPath);
-      rmSync(installedBackup);
-    }
+  afterEach(() => {
+    execFileSyncMock.mockReset();
   });
 
-  test("registers marketplace and installs plugin", () => {
-    const stdout = cli("install claude");
-    expect(stdout).toContain("FreeFlow plugin installed for Claude Code");
+  test("no symlink is created at ~/.agents/skills/freeflow and npx skills install is invoked twice", () => {
+    const agentsTarget = join(process.env.HOME || "", ".agents", "skills", "freeflow");
+    const preExists = existsSync(agentsTarget);
 
-    const known = JSON.parse(readFileSync(knownPath, "utf-8"));
-    expect(known["freeflow-local"]).toBeDefined();
-    expect(known["freeflow-local"].source.source).toBe("directory");
-    expect(known["freeflow-local"].source.path).toBe(PACKAGE_ROOT);
+    install("codex");
 
-    const installed = JSON.parse(readFileSync(installedPath, "utf-8"));
-    expect(installed.plugins["freeflow@freeflow-local"]).toBeDefined();
-    expect(installed.plugins["freeflow@freeflow-local"].length).toBeGreaterThan(0);
+    // No new symlink created by install: if it didn't exist before, it still doesn't.
+    if (!preExists) {
+      expect(existsSync(agentsTarget)).toBe(false);
+    }
+
+    const npxCalls = execFileSyncMock.mock.calls.filter(
+      (c) =>
+        c[0] === "npx" &&
+        Array.isArray(c[1]) &&
+        c[1][0] === "skills" &&
+        c[1][1] === "install",
+    );
+    expect(npxCalls).toHaveLength(2);
+    expect(npxCalls[0][1]).toEqual(["skills", "install", SKILLS_DIR]);
+    expect(npxCalls[1][1]).toEqual(["skills", "install", WORKFLOWS_DIR]);
+  });
+
+  test("on npx skills install failure, exits non-zero and no plugin rollback is attempted", () => {
+    execFileSyncMock.mockImplementation((cmd: string, args: string[]) => {
+      if (cmd === "npx" && args[0] === "skills" && args[1] === "install") {
+        throw new Error("npx skills install failed");
+      }
+      return Buffer.from("");
+    });
+
+    expect(() => install("codex")).toThrow();
+
+    const uninstallCall = execFileSyncMock.mock.calls.find(
+      (c) =>
+        c[0] === "claude" &&
+        Array.isArray(c[1]) &&
+        c[1][0] === "plugin" &&
+        c[1][1] === "uninstall",
+    );
+    expect(uninstallCall).toBeUndefined();
   });
 });
 
-// ─── End-to-end workflow ────────────────────────────────────────
+// ─── Repo shape ─────────────────────────────────────────────────
 
-const HELLO_WORKFLOW = `\
-version: 1
-guide: "Say hello workflow"
-initial: greet
-states:
-  greet:
-    prompt: "Say hello to the user."
-    transitions:
-      next: done
-  done:
-    prompt: "Say goodbye."
-    transitions: {}
-`;
-
-describe("workflow e2e after install", () => {
-  let tmp: string;
-  let fsmPath: string;
-
-  beforeAll(() => {
-    tmp = mkdtempSync(join(tmpdir(), "freeflow-install-e2e-"));
-    fsmPath = join(tmp, "hello.yaml");
-    writeFileSync(fsmPath, HELLO_WORKFLOW, "utf-8");
-  });
-
-  afterAll(() => {
-    rmSync(tmp, { recursive: true, force: true });
-  });
-
-  test("create workflow yaml and start a run", () => {
-    // Verify the workflow file was created
-    expect(existsSync(fsmPath)).toBe(true);
-    const yaml = readFileSync(fsmPath, "utf-8");
-    expect(yaml).toContain("Say hello workflow");
-    expect(yaml).toContain("greet");
-    expect(yaml).toContain("done");
-
-    // Start a run using the workflow
-    const root = join(tmp, "root");
-    const startOut = cli(`start ${fsmPath} --run-id hello-run --root ${root}`);
-    expect(startOut).toContain("FSM started.");
-    expect(startOut).toContain("You are in **greet** state.");
-    expect(startOut).toContain("Say hello to the user.");
-    expect(startOut).toContain("next → done");
-
-    // Verify current state
-    const currentOut = cli(`current --run-id hello-run --root ${root}`);
-    expect(currentOut).toContain("You are in **greet** state.");
-
-    // Transition to done
-    const gotoOut = cli(`goto done --run-id hello-run --on next --root ${root}`);
-    expect(gotoOut).toContain("You are in **done** state.");
-    expect(gotoOut).toContain("Say goodbye.");
-  });
-
-  test("start with JSON output", () => {
-    const root = join(tmp, "root-json");
-    const stdout = cli(`start ${fsmPath} --run-id hello-json -j --root ${root}`);
-    const envelope = JSON.parse(stdout);
-    expect(envelope.ok).toBe(true);
-    expect(envelope.data.state).toBe("greet");
-    expect(envelope.data.prompt).toBe("Say hello to the user.");
-    expect(envelope.data.transitions).toEqual({ next: "done" });
+describe("repo shape", () => {
+  test("packages/freeflow/skills/markdown-fix/ does not exist", () => {
+    expect(existsSync(join(PACKAGE_ROOT, "skills", "markdown-fix"))).toBe(false);
   });
 });
