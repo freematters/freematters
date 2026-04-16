@@ -46,7 +46,7 @@ export function render(args: RenderArgs): void {
     );
   }
 
-  // Load and resolve the FSM (handles from:, workflow:, extends_guide:)
+  // Load and resolve the FSM (handles extends:, workflow:)
   const fsm: Fsm = loadFsm(args.fsmPath);
   const workflowDir = dirname(resolve(args.fsmPath));
 

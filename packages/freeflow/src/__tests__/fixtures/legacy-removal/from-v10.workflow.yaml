@@ -2,11 +2,10 @@ version: 1
 initial: start
 states:
   start:
-    prompt: "Base child start."
-    todos:
-      - "Base todo A"
+    from: "./base.workflow.yaml#start"
+    prompt: "Child prompt."
     transitions:
       next: done
   done:
-    prompt: "Base child done."
+    prompt: "Done."
     transitions: {}

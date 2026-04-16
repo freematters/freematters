@@ -41,37 +41,19 @@ function fail(message: string): never {
   throw new FsmError("SCHEMA_INVALID", message);
 }
 
-// --- Ref Resolution ---
+// --- Legacy-syntax hard-error guards ---
 
 /**
- * Parse a `from` reference string into workflow name and state name.
- * Format: "workflow-name#state-name"
+ * Fail loudly if the document uses the retired `from:` or `extends_guide:`
+ * composability fields. Runs early in the loader, before any resolution, and
+ * is version-agnostic — these fields now error at any declared `version:`,
+ * because we no longer ship loader code that can interpret them.
  */
-function parseFromRef(
-  stateName: string,
-  from: string,
-): { workflowRef: string; stateRef: string } {
-  const hashIdx = from.indexOf("#");
-  if (hashIdx === -1 || hashIdx === 0 || hashIdx === from.length - 1) {
-    fail(
-      `state "${stateName}": "from" must be in format "workflow#state", got "${from}"`,
-    );
+function assertNoLegacyComposability(doc: Record<string, unknown>): void {
+  if (doc.extends_guide !== undefined) {
+    fail(`"extends_guide" is no longer supported; use top-level "extends" instead`);
   }
-  return {
-    workflowRef: from.slice(0, hashIdx),
-    stateRef: from.slice(hashIdx + 1),
-  };
-}
 
-/**
- * Resolve all `from:` references in a raw workflow document.
- * Mutates the doc in place — replaces `from:` states with merged content.
- */
-function resolveRefs(
-  doc: Record<string, unknown>,
-  currentPath: string,
-  visited: Set<string>,
-): void {
   const rawStates = doc.states;
   if (
     rawStates === null ||
@@ -79,158 +61,24 @@ function resolveRefs(
     typeof rawStates !== "object" ||
     Array.isArray(rawStates)
   ) {
-    return; // let downstream validation handle this
+    return; // let downstream validation produce the right error
   }
 
-  const states = rawStates as Record<string, unknown>;
-  const currentDir = dirname(currentPath);
-
-  for (const [name, rawState] of Object.entries(states)) {
+  for (const [name, rawState] of Object.entries(rawStates as Record<string, unknown>)) {
     if (
       rawState === null ||
       rawState === undefined ||
       typeof rawState !== "object" ||
       Array.isArray(rawState)
     ) {
-      continue; // let downstream validation handle this
+      continue;
     }
-
-    const state = rawState as Record<string, unknown>;
-    if (state.from === undefined) continue;
-
-    if (typeof state.from !== "string" || state.from.length === 0) {
-      fail(`state "${name}": "from" must be a non-empty string`);
-    }
-
-    if (doc.version !== 1.1 && doc.version !== 1.2 && doc.version !== 1.3) {
-      fail(`state "${name}": "from" requires version 1.1 or higher`);
-    }
-
-    const { workflowRef, stateRef } = parseFromRef(name, state.from);
-
-    // Resolve the workflow path, handling relative paths from the current file's directory
-    const resolvedRef = workflowRef.startsWith(".")
-      ? resolve(currentDir, workflowRef)
-      : workflowRef;
-    const basePath = resolveWorkflow(resolvedRef);
-
-    // Cycle detection
-    if (visited.has(basePath)) {
-      const chain = [...visited, basePath].join(" → ");
-      fail(`circular reference detected: ${chain}`);
-    }
-
-    // Recursively load base workflow
-    const baseFsm = loadFsmInternal(basePath, new Set([...visited]));
-
-    // Extract the target state from base
-    const baseState = baseFsm.states[stateRef];
-    if (!baseState) {
+    if ((rawState as Record<string, unknown>).from !== undefined) {
       fail(
-        `state "${name}": referenced state "${stateRef}" not found in workflow "${workflowRef}"`,
+        `"from" is no longer supported; use top-level "extends" instead (state: ${name})`,
       );
     }
-
-    // Merge prompt
-    if (state.prompt === undefined) {
-      state.prompt = baseState.prompt;
-    } else if (typeof state.prompt === "string" && state.prompt.includes("{{base}}")) {
-      state.prompt = state.prompt.replace("{{base}}", baseState.prompt);
-    }
-    // else: local prompt fully replaces base (no action needed)
-
-    // Merge transitions
-    if (state.transitions === undefined) {
-      state.transitions = { ...baseState.transitions };
-    } else if (
-      typeof state.transitions === "object" &&
-      state.transitions !== null &&
-      !Array.isArray(state.transitions)
-    ) {
-      state.transitions = {
-        ...baseState.transitions,
-        ...(state.transitions as Record<string, unknown>),
-      };
-    }
-
-    // Merge todos: child overrides base; append_todos appends to inherited
-    if (state.todos === undefined) {
-      if (baseState.todos !== undefined) {
-        state.todos = [...baseState.todos];
-      }
-    }
-    // If child defines todos explicitly (even empty), it replaces base todos entirely
-
-    // append_todos: append items after resolved todos (base or overridden)
-    if (state.append_todos !== undefined && Array.isArray(state.append_todos)) {
-      const base = Array.isArray(state.todos) ? state.todos : [];
-      state.todos = [...base, ...(state.append_todos as unknown[])];
-      state.append_todos = undefined;
-    }
-
-    // Merge subagent: inherit from base if not overridden locally
-    if (state.subagent === undefined && baseState.subagent !== undefined) {
-      state.subagent = baseState.subagent;
-    }
-
-    // Track source path for variable substitution
-    state.source_path = basePath;
-
-    // Remove from field after merge
-    state.from = undefined;
   }
-}
-
-/**
- * Resolve `extends_guide` field: load base workflow's guide and merge with local guide.
- * Mutates doc in place. Deletes `extends_guide` after processing.
- */
-function resolveExtendsGuide(
-  doc: Record<string, unknown>,
-  currentPath: string,
-  visited: Set<string>,
-): void {
-  if (doc.extends_guide === undefined) return;
-
-  if (typeof doc.extends_guide !== "string" || doc.extends_guide.length === 0) {
-    fail(`"extends_guide" must be a non-empty string`);
-  }
-
-  if (doc.version !== 1.1 && doc.version !== 1.2 && doc.version !== 1.3) {
-    fail(`"extends_guide" requires version 1.1 or higher`);
-  }
-
-  const workflowRef = doc.extends_guide as string;
-  const currentDir = dirname(currentPath);
-
-  // Resolve the base workflow path
-  const resolvedRef = workflowRef.startsWith(".")
-    ? resolve(currentDir, workflowRef)
-    : workflowRef;
-  const basePath = resolveWorkflow(resolvedRef);
-
-  // Load base workflow (reuse visited set for cycle detection)
-  const baseFsm = loadFsmInternal(basePath, new Set([...visited]));
-
-  // Base must have a guide
-  if (!baseFsm.guide) {
-    fail(`extends_guide: workflow "${workflowRef}" has no guide`);
-  }
-
-  const baseGuide = baseFsm.guide;
-
-  // Merge guide
-  if (doc.guide === undefined) {
-    // No local guide → inherit base guide
-    doc.guide = baseGuide;
-  } else if (typeof doc.guide === "string" && doc.guide.includes("{{base}}")) {
-    // Local guide has {{base}} → insert base guide at placeholder
-    doc.guide = doc.guide.replace("{{base}}", baseGuide);
-  }
-  // else: local guide without {{base}} → fully replace (no action needed)
-
-  // Remove extends_guide field before validation
-  doc.extends_guide = undefined;
 }
 
 // --- resolveExtends (v1.4 top-level inheritance) ---
@@ -501,9 +349,6 @@ function resolveWorkflowStates(
     const state = states[stateName] as Record<string, unknown>;
 
     // Pre-validation
-    if (state.from !== undefined) {
-      fail(`state "${stateName}": "workflow" and "from" are mutually exclusive`);
-    }
     if (state.prompt !== undefined) {
       fail(`state "${stateName}": "workflow" states cannot have "prompt"`);
     }
@@ -665,14 +510,16 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
     );
   }
 
+  // Fail fast on retired composability syntax (`from:`, `extends_guide:`) so
+  // stale workflows get pointed at `extends:` instead of silently mis-loading.
+  assertNoLegacyComposability(obj);
+
   // Resolve top-level `extends:` inheritance before any other composition
   // so downstream passes see the merged state set.
   resolveExtends(obj, absPath, visited);
 
-  // Resolve workflow: states, from: refs, and extends_guide before field validation
+  // Resolve workflow: states before field validation.
   resolveWorkflowStates(obj, absPath, visited);
-  resolveRefs(obj, absPath, visited);
-  resolveExtendsGuide(obj, absPath, visited);
 
   if (
     obj.guide !== undefined &&

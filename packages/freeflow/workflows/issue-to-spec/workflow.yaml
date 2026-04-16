@@ -3,7 +3,7 @@
 # Unified workflow supporting both GitHub and GitLab, with optional --lite mode.
 # Reuses spec-gen's guide (process rules, Q&A cycle, research structure) and
 # state definitions (requirements, research, design, plan, e2e-gen) via
-# extends_guide + from:.
+# top-level `extends:`.
 #
 # Lite mode:
 #   - design.md: 4 sections (Overview, Goal & Constraints, Architecture & Components, E2E Testing)

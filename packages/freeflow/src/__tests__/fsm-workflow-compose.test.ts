@@ -56,7 +56,6 @@ describe("workflow composition — schema validation", () => {
       `version: 1.2\ninitial: build\nstates:\n  build:\n    workflow: ./child-simple.workflow.yaml\n${extra}    transitions:\n      completed: done\n  done:\n    prompt: d\n    transitions: {}\n`;
 
     const cases: [string, RegExp][] = [
-      [base('    from: "x#y"\n'), /mutually exclusive/],
       [base('    prompt: "no"\n'), /prompt/],
       // no transitions
       [
@@ -194,15 +193,6 @@ describe("workflow composition — guide scoping", () => {
     expect(fsm.states["build/step-one"].guide).toBeUndefined();
   });
 
-  test("child with extends_guide → merged guide on expanded states, separate from parent", () => {
-    const fsm = loadFsm(fixture("compose-extends-guide.workflow.yaml"));
-
-    expect(fsm.guide).toBe("Parent-level guide.");
-    expect(fsm.states["sub/step"].guide).toContain("Base guide content.");
-    expect(fsm.states["sub/step"].guide).toContain("Extra child rules for compose.");
-    expect(fsm.states.done.guide).toBeUndefined();
-  });
-
   test("T11: sub-workflow guide attached to child initial state only", () => {
     const dir = mkdtempSync(join(tmpdir(), "fflow-test-t11-"));
     const childYaml =
@@ -241,19 +231,5 @@ describe("workflow composition — output guide precedence", () => {
 
     expect(card.guide).toBeUndefined();
     expect(formatReminder(card, "Fsm-level guide.")).toContain("Fsm-level guide.");
-  });
-});
-
-// --- Cross-cutting: from: inside composed children ---
-
-describe("workflow composition — from: in child states", () => {
-  test("from: resolution works within expanded child states", () => {
-    const fsm = loadFsm(fixture("compose-child-with-from.workflow.yaml"));
-
-    expect(fsm.states["phase/start"].prompt).toContain("Base child start.");
-    expect(fsm.states["phase/start"].prompt).toContain("Extended with from.");
-    expect(fsm.states["phase/start"].todos).toEqual(["Base todo A", "Appended todo B"]);
-    expect(fsm.states["phase/start"].transitions.next).toBe("phase/done");
-    expect(fsm.states["phase/done"].transitions.completed).toBe("done");
   });
 });
