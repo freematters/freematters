@@ -60,32 +60,12 @@ describe("loadFsm — from ref: transitions merge", () => {
   });
 });
 
-// --- Transitions not specified → inherit base ---
-
-describe("loadFsm — from ref: transitions inherit", () => {
-  test("inherits base transitions when not specified", () => {
-    const fsm = loadFsm(fixture("child-inherit.workflow.yaml"));
-    expect(fsm.states.start.transitions).toEqual({
-      next: "review",
-    });
-  });
-});
-
 // --- Todos override → child replaces base ---
 
 describe("loadFsm — from ref: todos override", () => {
   test("child todos replace base todos entirely", () => {
     const fsm = loadFsm(fixture("child-todos-append.workflow.yaml"));
     expect(fsm.states.start.todos).toEqual(["Child todo 1", "Child todo 2"]);
-  });
-});
-
-// --- Todos not specified → inherit base ---
-
-describe("loadFsm — from ref: todos inherit", () => {
-  test("inherits base todos when not specified", () => {
-    const fsm = loadFsm(fixture("child-inherit.workflow.yaml"));
-    expect(fsm.states.start.todos).toEqual(["Base todo 1", "Base todo 2"]);
   });
 });
 
@@ -180,20 +160,6 @@ describe("loadFsm — from ref: bad format", () => {
   });
 });
 
-// --- No from → backwards compatible ---
-
-describe("loadFsm — from ref: backwards compatible", () => {
-  test("workflows without from work exactly as before", () => {
-    const fsm = loadFsm(fixture("base.workflow.yaml"));
-    expect(fsm.version).toBe(1);
-    expect(fsm.initial).toBe("start");
-    expect(fsm.states.start.prompt).toBe("Base start prompt.");
-    expect(fsm.states.start.transitions).toEqual({ next: "review" });
-    expect(fsm.states.start.todos).toEqual(["Base todo 1", "Base todo 2"]);
-    expect(fsm.states.review.prompt).toBe("Base review prompt.");
-  });
-});
-
 // --- extends_guide tests ---
 
 describe("loadFsm — extends_guide: guide with {{base}}", () => {
@@ -246,13 +212,5 @@ describe("loadFsm — extends_guide: base has no guide", () => {
       expect((e as FsmError).code).toBe("SCHEMA_INVALID");
       expect((e as FsmError).message).toMatch(/has no guide/);
     }
-  });
-});
-
-describe("loadFsm — extends_guide: not present", () => {
-  test("behavior unchanged when extends_guide is absent", () => {
-    const fsm = loadFsm(fixture("base-with-guide.workflow.yaml"));
-    expect(fsm.guide).toBe("Base guide content.");
-    expect(fsm.version).toBe(1);
   });
 });

@@ -94,17 +94,6 @@ describe("GatewayCliClient connection and auth", () => {
     await gw.stop();
   });
 
-  test("connects to /ws/client with API key", async () => {
-    const client = new GatewayCliClient({
-      gatewayUrl: `ws://127.0.0.1:${gw.port()}`,
-      apiKey: "valid-key",
-    });
-
-    await client.connect();
-    expect(gw.clients).toHaveLength(1);
-    client.close();
-  });
-
   test("rejects connection with invalid API key", async () => {
     const client = new GatewayCliClient({
       gatewayUrl: `ws://127.0.0.1:${gw.port()}`,

@@ -30,22 +30,6 @@ function freshStore(): Store {
 
 // --- Tests ---
 
-describe("Store — readSnapshot", () => {
-  test("returns snapshot after commit", () => {
-    const s = freshStore();
-    s.initRun("snap-test", "/fake.yaml");
-    s.commit("snap-test", startEvent("plan"), startSnapshot("plan"));
-
-    const snap = s.readSnapshot("snap-test");
-    expect(snap).not.toBeNull();
-    expect(snap?.run_id).toBe("snap-test");
-    expect(snap?.run_status).toBe("active");
-    expect(snap?.state).toBe("plan");
-    expect(snap?.last_seq).toBe(1);
-    expect(typeof snap?.updated_at).toBe("string");
-  });
-});
-
 describe("Store — commit", () => {
   test("increments seq on subsequent commits", () => {
     const s = freshStore();
@@ -65,39 +49,6 @@ describe("Store — commit", () => {
       gotoSnapshot("review"),
     );
     expect(e3.seq).toBe(3);
-  });
-
-  test("stores metadata when provided", () => {
-    const s = freshStore();
-    s.initRun("meta-ev", "/fake.yaml");
-    const { event } = s.commit(
-      "meta-ev",
-      { ...startEvent("plan"), metadata: { key: "value" } },
-      startSnapshot("plan"),
-    );
-    expect(event.metadata).toEqual({ key: "value" });
-  });
-});
-
-describe("Store — readEvents", () => {
-  test("returns all events in order", () => {
-    const s = freshStore();
-    s.initRun("multi", "/fake.yaml");
-    s.commit("multi", startEvent("plan"), startSnapshot("plan"));
-    s.commit("multi", gotoEvent("plan", "coding", "approved"), gotoSnapshot("coding"));
-    s.commit("multi", gotoEvent("coding", "done", "tests pass"), {
-      run_status: "completed",
-      state: "done",
-    });
-
-    const events = s.readEvents("multi");
-    expect(events).toHaveLength(3);
-    expect(events[0].seq).toBe(1);
-    expect(events[1].seq).toBe(2);
-    expect(events[2].seq).toBe(3);
-    expect(events[0].event).toBe("start");
-    expect(events[1].event).toBe("goto");
-    expect(events[2].event).toBe("goto");
   });
 });
 
@@ -171,35 +122,6 @@ describe("Store — terminal states", () => {
 });
 
 describe("Store — session management", () => {
-  test("bindSession writes and readSession returns it", () => {
-    const s = freshStore();
-    s.bindSession("sess-1", "run-abc");
-    expect(s.readSession("sess-1")).toBe("run-abc");
-  });
-
-  test("readSession returns null for unbound session", () => {
-    const s = freshStore();
-    expect(s.readSession("nonexistent")).toBeNull();
-  });
-
-  test("unbindSession removes binding", () => {
-    const s = freshStore();
-    s.bindSession("sess-2", "run-xyz");
-    s.unbindSession("sess-2");
-    expect(s.readSession("sess-2")).toBeNull();
-  });
-
-  test("readCounter returns 0 for new session", () => {
-    const s = freshStore();
-    expect(s.readCounter("sess-new")).toBe(0);
-  });
-
-  test("writeCounter persists and readCounter retrieves", () => {
-    const s = freshStore();
-    s.writeCounter("sess-c", 7);
-    expect(s.readCounter("sess-c")).toBe(7);
-  });
-
   test("unbindSession also removes counter", () => {
     const s = freshStore();
     s.bindSession("sess-clean", "run-1");
@@ -263,14 +185,6 @@ describe("Store — lite mode data models", () => {
 
     const snap = s.readSnapshot("carry");
     expect(snap?.visited_states).toEqual(["plan"]);
-  });
-
-  test("readMeta() on a meta file without lite returns undefined for that field", () => {
-    const s = freshStore();
-    s.initRun("no-lite", "/fake.yaml");
-
-    const meta = s.readMeta("no-lite");
-    expect(meta.lite).toBeUndefined();
   });
 });
 

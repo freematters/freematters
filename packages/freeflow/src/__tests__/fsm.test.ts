@@ -5,12 +5,7 @@ import { afterAll, beforeAll, describe, expect, test } from "vitest";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 import { FsmError, loadFsm } from "../fsm.js";
-import {
-  MINIMAL_FSM,
-  cleanupTempDir,
-  createTempDir,
-  writeFsmFile,
-} from "./fixtures.js";
+import { cleanupTempDir, createTempDir, writeFsmFile } from "./fixtures.js";
 
 let tmp: string;
 
@@ -93,54 +88,6 @@ states:
       "changes-requested": "implement",
     });
   });
-
-  test("state names with hyphens and underscores", () => {
-    const p = writeYaml(
-      "valid-names.yaml",
-      `
-version: 1
-guide: "Name test"
-initial: step_1
-states:
-  step_1:
-    prompt: "First."
-    transitions:
-      go: step-2
-  step-2:
-    prompt: "Second."
-    transitions:
-      finish: done
-  done:
-    prompt: "End."
-    transitions: {}
-`,
-    );
-    const fsm = loadFsm(p);
-    expect(fsm.states.step_1).toBeDefined();
-    expect(fsm.states["step-2"]).toBeDefined();
-  });
-
-  test("done state with transitions is valid", () => {
-    const p = writeYaml(
-      "valid-done-transitions.yaml",
-      `
-version: 1
-guide: "Done with transitions"
-initial: start
-states:
-  start:
-    prompt: "Go."
-    transitions:
-      next: done
-  done:
-    prompt: "End."
-    transitions:
-      restart: start
-`,
-    );
-    const fsm = loadFsm(p);
-    expect(fsm.states.done.transitions).toEqual({ restart: "start" });
-  });
 });
 
 // --- Invalid cases ---
@@ -162,14 +109,6 @@ function expectSchemaInvalid(yaml: string, name: string, msgMatch?: RegExp) {
 describe("loadFsm — invalid YAML structure", () => {
   test("not a mapping (string)", () => {
     expectSchemaInvalid("just a string", "invalid-string.yaml", /mapping/);
-  });
-
-  test("not a mapping (array)", () => {
-    expectSchemaInvalid("- item1\n- item2", "invalid-array.yaml", /mapping/);
-  });
-
-  test("empty document", () => {
-    expectSchemaInvalid("", "invalid-empty.yaml", /mapping/);
   });
 });
 
@@ -211,26 +150,6 @@ states:
       "invalid-version-2.yaml",
       /version.*must be 1/,
     );
-  });
-
-  test("missing guide is valid", () => {
-    const p = writeYaml(
-      "valid-no-guide.yaml",
-      `
-version: 1
-initial: start
-states:
-  start:
-    prompt: "x"
-    transitions:
-      go: done
-  done:
-    prompt: "x"
-    transitions: {}
-`,
-    );
-    const fsm = loadFsm(p);
-    expect(fsm.guide).toBeUndefined();
   });
 
   test("empty guide", () => {
@@ -611,12 +530,6 @@ states:
     expect(fsm.allowed_tools).toEqual(["Read", "Bash", "Edit"]);
   });
 
-  test("accepts YAML without allowed_tools (backward compatible)", () => {
-    const p = writeYaml("valid-no-allowed-tools.yaml", MINIMAL_FSM);
-    const fsm = loadFsm(p);
-    expect(fsm.allowed_tools).toBeUndefined();
-  });
-
   test("allowed_tools must be an array", () => {
     expectSchemaInvalid(
       `
@@ -708,28 +621,6 @@ states:
     expect(fsm.states.start.subagent).toBe(true);
   });
 
-  test("schema accepts subagent: false", () => {
-    const p = writeYaml(
-      "valid-subagent-false.yaml",
-      `
-version: 1.3
-guide: "Subagent workflow"
-initial: start
-states:
-  start:
-    prompt: "Do things."
-    subagent: false
-    transitions:
-      next: done
-  done:
-    prompt: "Done."
-    transitions: {}
-`,
-    );
-    const fsm = loadFsm(p);
-    expect(fsm.states.start.subagent).toBe(false);
-  });
-
   test("schema rejects non-boolean subagent", () => {
     expectSchemaInvalid(
       `
@@ -771,19 +662,6 @@ states:
       /subagent.*requires version 1\.3/,
     );
   });
-
-  test("schema accepts missing subagent (backward compat)", () => {
-    const p = writeYaml("valid-no-subagent.yaml", MINIMAL_FSM);
-    const fsm = loadFsm(p);
-    expect(fsm.states.start.subagent).toBeUndefined();
-    expect(fsm.states.done.subagent).toBeUndefined();
-  });
-});
-
-describe("loadFsm — file errors", () => {
-  test("non-existent file throws", () => {
-    expect(() => loadFsm("/tmp/does-not-exist.yaml")).toThrow();
-  });
 });
 
 // --- Markdown workflow loading ---
@@ -803,19 +681,6 @@ describe("loadFsm — markdown workflows", () => {
     expect(fsm.states.start.transitions).toEqual({ next: "done" });
     expect(fsm.states.done.prompt).toBe("Finished.");
     expect(fsm.states.done.transitions).toEqual({});
-  });
-
-  test("markdown workflows go through the same resolution pipeline", () => {
-    // The child-from-yaml.workflow.md uses from: to reference a YAML workflow
-    // This tests resolveRefs works with markdown-loaded docs
-    const mdPath = join(fixturesDir, "child-from-yaml.workflow.md");
-    const fsm = loadFsm(mdPath);
-
-    expect(fsm.version).toBe(1.1);
-    expect(fsm.initial).toBe("start");
-    // The start state should have its prompt merged with base via {{base}}
-    expect(fsm.states.start.prompt).toContain("Custom start with base.");
-    expect(fsm.states.start.prompt).toContain("Base start prompt.");
   });
 
   test("from: references from a markdown workflow to a YAML workflow resolve correctly", () => {

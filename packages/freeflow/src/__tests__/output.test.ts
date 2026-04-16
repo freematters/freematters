@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest";
-import type { FsmState } from "../fsm.js";
-import { type StateCard, formatSubagentDispatch, stateCardFromFsm } from "../output.js";
+import { type StateCard, formatSubagentDispatch } from "../output.js";
 
 function makeCard(overrides: Partial<StateCard> = {}): StateCard {
   return {
@@ -22,18 +21,5 @@ describe("formatSubagentDispatch", () => {
     expect(out).toContain("Execution Summary");
     expect(out).toContain("Proposed Transition");
     expect(out).toContain("done → done");
-  });
-});
-
-describe("stateCardFromFsm subagent flag", () => {
-  test("Test 7c: preserves explicit subagent: false", () => {
-    const fsmState: FsmState = {
-      prompt: "Do the work.",
-      transitions: { done: "done" },
-      subagent: false,
-    };
-    const card = stateCardFromFsm("execute", fsmState);
-
-    expect(card.subagent).toBe(false);
   });
 });

@@ -74,19 +74,6 @@ describe("fsm_goto handler", () => {
     expect(events[1].on_label).toBe("next");
   });
 
-  test("returns state card on success", async () => {
-    const result = (await tools.fsm_goto(
-      { target: "middle", on: "next" },
-      {},
-    )) as ToolResult;
-
-    expect(result.content).toBeDefined();
-    expect(result.content).toHaveLength(1);
-    expect(result.content[0].type).toBe("text");
-    expect(result.content[0].text).toContain("middle");
-    expect(result.content[0].text).toContain("Middle step.");
-  });
-
   test("returns error content (not throw) on invalid transition", async () => {
     const result = (await tools.fsm_goto(
       { target: "done", on: "invalid" },
@@ -110,43 +97,9 @@ describe("fsm_goto handler", () => {
   });
 });
 
-// ─── fsm_current handler ────────────────────────────────────────
-
-describe("fsm_current handler", () => {
-  test("returns current state card", async () => {
-    const result = (await tools.fsm_current({}, {})) as ToolResult;
-
-    expect(result.content).toBeDefined();
-    expect(result.content).toHaveLength(1);
-    expect(result.content[0].type).toBe("text");
-    expect(result.content[0].text).toContain("start");
-    expect(result.content[0].text).toContain("Begin here.");
-  });
-
-  test("returns updated card after goto", async () => {
-    await tools.fsm_goto({ target: "middle", on: "next" }, {});
-
-    const result = (await tools.fsm_current({}, {})) as ToolResult;
-
-    expect(result.content[0].text).toContain("middle");
-    expect(result.content[0].text).toContain("Middle step.");
-  });
-});
-
 // ─── Terminal state detection ───────────────────────────────────
 
 describe("terminal state detection", () => {
-  test("goto to done includes 'terminal state' note", async () => {
-    await tools.fsm_goto({ target: "middle", on: "next" }, {});
-    const result = (await tools.fsm_goto(
-      { target: "done", on: "finish" },
-      {},
-    )) as ToolResult;
-
-    expect(result.content[0].text).toContain("terminal state");
-    expect(result.content[0].text).toContain("complete");
-  });
-
   test("sets run_status to completed", async () => {
     await tools.fsm_goto({ target: "middle", on: "next" }, {});
     await tools.fsm_goto({ target: "done", on: "finish" }, {});

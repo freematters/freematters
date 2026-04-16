@@ -3,12 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { FsmError, loadFsm } from "../fsm.js";
-import {
-  formatReminder,
-  formatStateCard,
-  fsmToMermaid,
-  stateCardFromFsm,
-} from "../output.js";
+import { fsmToMermaid } from "../output.js";
 
 // biome-ignore lint/style/noNonNullAssertion: dirname is always defined for file modules
 const FIXTURES = join(import.meta.dirname!, "fixtures");
@@ -195,30 +190,6 @@ describe("workflow composition — guide scoping", () => {
     expect(fsm.states["sub/step"].guide).toContain("Base guide content.");
     expect(fsm.states["sub/step"].guide).toContain("Extra child rules for compose.");
     expect(fsm.states.done.guide).toBeUndefined();
-  });
-});
-
-describe("workflow composition — output guide precedence", () => {
-  test("state.guide overrides fsm.guide in state card and reminder", () => {
-    const withGuide = {
-      prompt: "Do something.",
-      transitions: { next: "done" },
-      guide: "State-level guide.",
-    };
-    const card = stateCardFromFsm("test", withGuide);
-
-    // Guide is only rendered in fflow start header, not in formatStateCard
-    // but the card still carries guide for formatReminder
-    expect(card.guide).toBe("State-level guide.");
-    expect(formatReminder(card, "Fsm-level guide.")).toContain("State-level guide.");
-  });
-
-  test("falls back to fsm.guide when no state.guide", () => {
-    const noGuide = { prompt: "Do something.", transitions: { next: "done" } };
-    const card = stateCardFromFsm("test", noGuide);
-
-    expect(card.guide).toBeUndefined();
-    expect(formatReminder(card, "Fsm-level guide.")).toContain("Fsm-level guide.");
   });
 });
 

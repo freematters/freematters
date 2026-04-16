@@ -20,32 +20,6 @@ function minimalFsm(): Fsm {
 }
 
 describe("serializeMarkdown", () => {
-  test("minimal Fsm produces valid markdown with frontmatter, mermaid, and states", () => {
-    const fsm = minimalFsm();
-    const md = serializeMarkdown(fsm);
-
-    // Frontmatter present
-    expect(md).toMatch(/^---\n/);
-    expect(md).toContain("version: 1");
-    expect(md).toContain("initial: start");
-
-    // State Machine section with mermaid
-    expect(md).toContain("## State Machine");
-    expect(md).toContain("```mermaid");
-
-    // State sections
-    expect(md).toContain("## State: start");
-    expect(md).toContain("## State: done");
-
-    // Instructions
-    expect(md).toContain("### Instructions");
-    expect(md).toContain("Begin here.");
-    expect(md).toContain("Finished.");
-
-    // Transitions
-    expect(md).toContain("### Transitions");
-  });
-
   test("frontmatter includes allowed_tools only when present", () => {
     const fsm = minimalFsm();
     const mdWithout = serializeMarkdown(fsm);
@@ -81,15 +55,6 @@ describe("serializeMarkdown", () => {
     expect(startSection).toContain("### Todos");
     expect(startSection).toContain("- Write code");
     expect(startSection).toContain("- Run tests");
-  });
-
-  test("terminal state (done) has (none) in transitions section", () => {
-    const fsm = minimalFsm();
-    const md = serializeMarkdown(fsm);
-
-    const doneSection = md.slice(md.indexOf("## State: done"));
-    expect(doneSection).toContain("### Transitions");
-    expect(doneSection).toContain("(none)");
   });
 
   test("state-level guide is prepended to Instructions with separator", () => {

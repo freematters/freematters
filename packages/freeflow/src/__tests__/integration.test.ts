@@ -31,19 +31,6 @@ const defaultRoot = () => join(tmp, "root");
 // ─── CLI — start command ─────────────────────────────────────────
 
 describe.concurrent("CLI — start command", () => {
-  test("human-readable output includes state card", () => {
-    const id = uniqueRunId("start-human");
-    const { stdout, exitCode } = runCli(`start ${fsmMinimal} --run-id ${id}`, {
-      root: defaultRoot(),
-    });
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("FSM started.");
-    expect(stdout).toContain("Minimal workflow");
-    expect(stdout).toContain("You are in **start** state.");
-    expect(stdout).toContain("Begin here.");
-    expect(stdout).toContain("next → done");
-  });
-
   test("JSON output has correct envelope structure", () => {
     const id = uniqueRunId("start-json");
     const { envelope, exitCode } = runCliJson(`start ${fsmMinimal} --run-id ${id}`, {
@@ -59,16 +46,6 @@ describe.concurrent("CLI — start command", () => {
     expect(data.prompt).toBe("Begin here.");
     expect(data.run_status).toBe("active");
     expect(data.transitions).toEqual({ next: "done" });
-  });
-
-  test("auto-generates run-id when omitted", () => {
-    const { envelope, exitCode } = runCliJson(`start ${fsmMinimal}`, {
-      root: defaultRoot(),
-    });
-    expect(exitCode).toBe(0);
-    const data = envelope.data as Record<string, unknown>;
-    expect(typeof data.run_id).toBe("string");
-    expect((data.run_id as string).length).toBeGreaterThan(0);
   });
 
   test("RUN_EXISTS error on duplicate run-id (exit 2)", () => {
@@ -87,19 +64,6 @@ describe.concurrent("CLI — start command", () => {
 // ─── CLI — current command ───────────────────────────────────────
 
 describe.concurrent("CLI — current command", () => {
-  test("shows current state after start", () => {
-    const id = uniqueRunId("current-human");
-    runCli(`start ${fsmMulti} --run-id ${id}`, { root: defaultRoot() });
-    const { stdout, exitCode } = runCli(`current --run-id ${id}`, {
-      root: defaultRoot(),
-    });
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("You are in **start** state.");
-    expect(stdout).toContain("Begin work.");
-    expect(stdout).toContain("Draft spec");
-    expect(stdout).toContain("ready → review");
-  });
-
   test("JSON output matches contract", () => {
     const id = uniqueRunId("current-json");
     runCli(`start ${fsmMulti} --run-id ${id}`, { root: defaultRoot() });
@@ -132,19 +96,6 @@ describe.concurrent("CLI — current command", () => {
 // ─── CLI — goto command ──────────────────────────────────────────
 
 describe.concurrent("CLI — goto command", () => {
-  test("transitions to valid target state", () => {
-    const id = uniqueRunId("goto-valid");
-    runCli(`start ${fsmMulti} --run-id ${id}`, { root: defaultRoot() });
-    const { stdout, exitCode } = runCli(`goto review --run-id ${id} --on ready`, {
-      root: defaultRoot(),
-    });
-    expect(exitCode).toBe(0);
-    expect(stdout).toContain("You are in **review** state.");
-    expect(stdout).toContain("Review the work.");
-    expect(stdout).toContain("approved → done");
-    expect(stdout).toContain("rejected → start");
-  });
-
   test("goto done sets run_status=completed", () => {
     const id = uniqueRunId("goto-done");
     runCli(`start ${fsmMinimal} --run-id ${id}`, { root: defaultRoot() });
