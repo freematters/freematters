@@ -8,6 +8,10 @@ dist/
 docs/plans/
 specs/
 
+# pr-lifecycle poll script state
+/pr_status.json
+/mr_status.json
+
 # skills CLI runtime state (per-agent install artifacts, lockfile, pi runtime)
 /skills/
 /skills-lock.json
