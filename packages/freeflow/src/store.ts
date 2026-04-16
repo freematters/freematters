@@ -226,9 +226,10 @@ export class Store {
    * lock (via `withLock`) if they need exclusion against concurrent writers.
    */
   writeSnapshot(snapshot: Snapshot): void {
+    const refreshed: Snapshot = { ...snapshot, updated_at: nowISO() };
     writeFileSync(
-      this.snapshotPath(snapshot.run_id),
-      JSON.stringify(snapshot, null, 2),
+      this.snapshotPath(refreshed.run_id),
+      JSON.stringify(refreshed, null, 2),
       "utf-8",
     );
   }

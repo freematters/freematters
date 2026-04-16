@@ -87,6 +87,11 @@ describe("loadFsm — extends: {{ super }} with no parent content", () => {
     const fsm = loadFsm(fixture("t7-child.workflow.yaml"));
     expect(fsm.states.z.prompt).toBe("\nhello");
   });
+
+  test("T7b: brand-new child state's guide {{ super }} expands to empty", () => {
+    const fsm = loadFsm(fixture("t7b-child.workflow.yaml"));
+    expect(fsm.states.z.guide).toBe("\nnew stuff");
+  });
 });
 
 // --- T8: Circular extends detected ---

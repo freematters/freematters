@@ -778,6 +778,28 @@ states:
     expect(fsm.states.start.subagent).toBeUndefined();
     expect(fsm.states.done.subagent).toBeUndefined();
   });
+
+  test("schema accepts subagent: true on version 1.4", () => {
+    const p = writeYaml(
+      "valid-subagent-v1.4.yaml",
+      `
+version: 1.4
+guide: "Subagent workflow"
+initial: start
+states:
+  start:
+    prompt: "Do things."
+    subagent: true
+    transitions:
+      next: done
+  done:
+    prompt: "Done."
+    transitions: {}
+`,
+    );
+    const fsm = loadFsm(p);
+    expect(fsm.states.start.subagent).toBe(true);
+  });
 });
 
 describe("loadFsm — file errors", () => {

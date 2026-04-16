@@ -1,0 +1,11 @@
+version: 1
+guide: "T7b parent"
+initial: a
+states:
+  a:
+    prompt: "A"
+    transitions:
+      next: done
+  done:
+    prompt: "Done"
+    transitions: {}

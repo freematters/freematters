@@ -235,10 +235,13 @@ function resolveExtends(
     const parentState = mergedStates[childName];
 
     if (parentState === undefined) {
-      // New state — keep as-is, but substitute {{ super }} in prompt with empty.
+      // New state — keep as-is, but substitute {{ super }} in prompt/guide with empty.
       const newState: Record<string, unknown> = { ...childState };
       if (typeof newState.prompt === "string") {
         newState.prompt = substituteSuper(newState.prompt, undefined);
+      }
+      if (typeof newState.guide === "string") {
+        newState.guide = substituteSuper(newState.guide, undefined);
       }
       mergedStates[childName] = newState;
       continue;
@@ -664,7 +667,7 @@ function loadFsmInternal(path: string, visited: Set<string>): Fsm {
       if (typeof s.subagent !== "boolean") {
         fail(`state "${name}": "subagent" must be a boolean`);
       }
-      if (obj.version !== 1.3) {
+      if (obj.version !== 1.3 && obj.version !== 1.4) {
         fail(`state "${name}": "subagent" requires version 1.3 or higher`);
       }
       states[name].subagent = s.subagent;

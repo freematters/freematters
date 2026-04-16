@@ -330,6 +330,26 @@ describe("Store — shown_guides", () => {
   });
 });
 
+describe("Store — writeSnapshot", () => {
+  test("refreshes updated_at on each write", async () => {
+    const s = freshStore();
+    s.initRun("ws-refresh", "/fake.yaml");
+    s.commit("ws-refresh", startEvent("plan"), startSnapshot("plan"));
+
+    const initial = s.readSnapshot("ws-refresh");
+    if (initial === null) throw new Error("initial snapshot missing");
+    const before = initial.updated_at;
+
+    // Wait long enough to guarantee a distinct ISO timestamp.
+    await new Promise((resolve) => setTimeout(resolve, 5));
+
+    s.writeSnapshot(initial);
+    const after = s.readSnapshot("ws-refresh");
+    if (after === null) throw new Error("snapshot missing after write");
+    expect(after.updated_at > before).toBe(true);
+  });
+});
+
 describe("Store — concurrent writes", () => {
   test("parallel commits produce monotonic seq with no corruption", async () => {
     const root = join(tmp, "concurrent-root");
