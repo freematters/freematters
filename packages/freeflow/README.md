@@ -26,12 +26,15 @@ Or install manually:
 ```bash
 npm install -g @freematters/freeflow
 
-# Claude Code — registers skills + PostToolUse hook
+# Claude Code — registers the PostToolUse hook + installs skills and workflows
 fflow install claude
 
-# Codex — links skills (no hook support)
+# Codex — installs skills and workflows (no hook support)
 fflow install codex
 ```
+
+Both commands register the bundled skills and workflows into the agent's skill
+directories.
 
 ### For Contributors
 

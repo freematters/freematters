@@ -28,6 +28,7 @@
     "marked-terminal": "^7.3.0",
     "remark-frontmatter": "^5.0.0",
     "remark-parse": "^11.0.0",
+    "skills": "^1.5.0",
     "unified": "^11.0.5",
     "ws": "^8.20.0",
     "zod": "^4.3.6"
