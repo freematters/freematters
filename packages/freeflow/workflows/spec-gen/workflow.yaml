@@ -30,6 +30,9 @@ guide: |
     content at the end of a phase.
   - Planning only: This workflow produces planning artifacts. You MUST NOT implement code,
     run containers, execute scripts, or begin any implementation work.
+  - No AskUserQuestion tool: You MUST NOT use Claude Code's `AskUserQuestion` tool anywhere
+    in this workflow. Present questions and numbered options as plain chat messages and wait
+    for the user's reply in the normal message stream.
 
   ### Artifact Output
 
@@ -111,6 +114,17 @@ states:
       model, then based on gathered requirements, recommend e2e options: which user scenarios
       to cover, what setup the executor needs, and whether e2e is worth it for this feature
       (it's slow — two agent sessions per run). Record decisions in requirements.md.
+
+      **If the user opts out of e2e testing**, do NOT expand the Q&A with scenarios, setup,
+      or rationale. Record a single clean line in requirements.md under its own heading:
+
+      ```
+      ### E2E Testing
+
+      E2E testing is opt out for this spec.
+      ```
+
+      Skip the e2e-gen state later (the design will have no E2E Testing section).
 
       **CRITICAL: If the user requires e2e tests, this is a hard constraint on the entire spec.**
       E2E tests are the primary way humans review the feature — they will NOT read all the code.

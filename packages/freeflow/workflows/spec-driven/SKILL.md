@@ -1,6 +1,6 @@
 ---
 name: spec-driven
-description: End-to-end pipeline from rough idea to merged pull request.
+description: End-to-end pipeline from rough idea to merged pull request. Passing --quick forwards the flag to the spec-gen sub workflow.
 ---
 
 # Spec Driven
