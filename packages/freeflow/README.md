@@ -15,17 +15,33 @@ FreeFlow resolves this by separating **what the agent does** (flexible, LLM-driv
 
 ## Install
 
-Install FreeFlow into your agent of choice:
+FreeFlow installs in two steps: the Claude Code plugin (skills + hooks), then workflow templates.
 
 ```bash
-npx fflow init [--local | --global] [--no-hooks] [--agent <list>]
+# 1. Install the FreeFlow plugin into Claude Code (skills + hooks bundled)
+npx fflow init
+
+# 2. Install workflow templates (every workflow + every agent pre-selected)
+npx fflow install-workflow [--local | --global] [-y]
 ```
 
-Uninstall with:
+`init` registers the plugin with Claude Code (skills + hooks ship inside it)
+and also lays down the same skills globally for Codex via `npx skills add -g
+--agent codex`. Restart Claude Code afterwards to activate hooks.
+`install-workflow` shells out to `npx skills add` with every workflow and
+every agent pre-selected (`--skill '*' --agent '*'`); the skills CLI still
+shows its confirmation picker so you can review what will be installed. Pass
+`-y` to skip the confirmation for non-interactive runs.
+
+To undo `init`:
 
 ```bash
-npx fflow deinit [--local | --global | --all]
+npx fflow init --uninstall
 ```
+
+This removes the Claude plugin + the `freeflow-local` marketplace entry and
+deletes the bundled skills from the global Codex skills dir. It's a
+best-effort cleanup — missing pieces are skipped rather than fatal.
 
 ### For Contributors
 
@@ -36,6 +52,7 @@ npm install && npm run build
 npm link -w packages/freeflow
 
 fflow init
+fflow install-workflow
 ```
 
 ## Usage

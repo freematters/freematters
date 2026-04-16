@@ -1,140 +1,79 @@
 import { join } from "node:path";
-import prompts from "prompts";
 import { CliError } from "../errors.js";
-import { claudeAvailable, detectInstalled } from "../install-detect.js";
+import { claudeAvailable } from "../install-detect.js";
 import {
-  type Scope,
   claudeInstallPlugin,
+  claudeRemoveMarketplace,
+  claudeUninstallPlugin,
   getPackageRoot,
+  listBundledSkills,
   skillsAdd,
+  skillsRemove,
 } from "../runners.js";
-import { runDeinit } from "./deinit.js";
 
-export interface InitOptions {
-  scope?: Scope;
-  noHooks?: boolean;
-  yes?: boolean;
-  /** Forwarded verbatim to the `skills` CLI's `--agent` flag. */
-  agent?: string;
+export type InitOptions = { uninstall?: boolean };
+
+export async function runInit(opts: InitOptions = {}): Promise<void> {
+  if (!claudeAvailable()) {
+    throw new CliError(
+      "CLAUDE_NOT_FOUND",
+      "`claude` CLI is not on PATH. Install Claude Code first: https://claude.com/claude-code",
+    );
+  }
+
+  const packageRoot = getPackageRoot();
+
+  if (opts.uninstall) {
+    runUninstall(packageRoot);
+    return;
+  }
+
+  // 1. Install the Claude plugin (skills + hooks bundled via .claude-plugin/).
+  console.log("Installing FreeFlow plugin (Claude Code)…");
+  claudeInstallPlugin(packageRoot);
+  console.log("✓ FreeFlow plugin installed");
+
+  // 2. Install the same skills globally for codex — it doesn't speak the
+  //    Claude plugin manifest, so we lay them down via `npx skills` instead.
+  //    Run quiet: the skills CLI is chatty, we bracket it with our own
+  //    before/after status lines below.
+  console.log("Installing Codex skills globally…");
+  skillsAdd(join(packageRoot, "skills"), {
+    scope: "global",
+    agent: "codex",
+    interactive: false,
+    quiet: true,
+  });
+  console.log("✓ Codex skills installed");
+
+  console.log("");
+  console.log("Restart Claude Code to activate skills and hooks.");
+  console.log("To install workflows: npx fflow install-workflow");
 }
 
-async function resolveScope(opts: InitOptions): Promise<Scope> {
-  if (opts.scope === "local" || opts.scope === "global") {
-    return opts.scope;
-  }
+/**
+ * Reverse of install. Each step is best-effort so a partial install can still
+ * be cleaned up without the user having to manually unwind each piece.
+ */
+function runUninstall(packageRoot: string): void {
+  console.log("Uninstalling FreeFlow plugin (Claude Code)…");
+  bestEffort(claudeUninstallPlugin, "✓ FreeFlow plugin uninstalled");
+  bestEffort(claudeRemoveMarketplace, "✓ freeflow-local marketplace removed");
 
-  if (process.stdin.isTTY === true) {
-    const response = (await prompts({
-      type: "select",
-      name: "scope",
-      message: "Install scope?",
-      choices: [
-        { title: "local (project)", value: "local" },
-        { title: "global (user)", value: "global" },
-      ],
-    })) as { scope?: Scope };
-
-    if (response.scope === "local" || response.scope === "global") {
-      return response.scope;
-    }
-    throw new CliError("ARGS_INVALID", "Install scope is required");
-  }
-
-  if (opts.yes) {
-    return "local";
-  }
-
-  throw new CliError("ARGS_INVALID", "Non-TTY init requires --local, --global, or -y");
-}
-
-async function shouldInstallHooks(opts: InitOptions): Promise<boolean> {
-  if (opts.noHooks) return false;
-  if (!claudeAvailable()) return false;
-  if (opts.yes) return true;
-
-  if (process.stdin.isTTY === true) {
-    const response = (await prompts({
-      type: "confirm",
-      name: "installHook",
-      message: "Install Claude Code hook? (enables PostToolUse state reminders)",
-      initial: true,
-    })) as { installHook?: boolean };
-    return response.installHook === true;
-  }
-
-  throw new CliError(
-    "ARGS_INVALID",
-    "Non-TTY init requires -y or --no-hooks when claude is on PATH",
+  console.log("Removing Codex skills globally…");
+  const skills = listBundledSkills(packageRoot);
+  bestEffort(
+    () => skillsRemove({ scope: "global", agent: "codex", skills, quiet: true }),
+    "✓ Codex skills removed",
   );
 }
 
-export async function runInit(opts: InitOptions): Promise<void> {
-  const scope = await resolveScope(opts);
-  const isTTY = process.stdin.isTTY === true;
-
-  // ── Reinstall check ─────────────────────────────────────────────────
-  if (detectInstalled(scope)) {
-    let confirmed: boolean;
-    if (opts.yes) {
-      confirmed = true;
-    } else if (isTTY) {
-      const response = (await prompts({
-        type: "confirm",
-        name: "reinstall",
-        message: `FreeFlow is already installed in ${scope}. Reinstall?`,
-        initial: false,
-      })) as { reinstall?: boolean };
-      confirmed = response.reinstall === true;
-    } else {
-      throw new CliError(
-        "ARGS_INVALID",
-        `FreeFlow is already installed in ${scope}; non-TTY reinstall requires -y to confirm`,
-      );
-    }
-
-    if (!confirmed) {
-      console.log("Skipping install");
-      return;
-    }
-
-    await runDeinit({ scope, yes: true, skipConfirm: true });
-  }
-
-  // ── Hook decision ───────────────────────────────────────────────────
-  const installHook = await shouldInstallHooks(opts);
-
-  // ── Effect region with rollback on failure ──────────────────────────
-  const packageRoot = getPackageRoot();
+function bestEffort(fn: () => void, successMsg: string): void {
   try {
-    if (installHook) {
-      claudeInstallPlugin(packageRoot);
-    }
-    skillsAdd(join(packageRoot, "skills"), {
-      scope,
-      agent: opts.agent,
-    });
-    skillsAdd(join(packageRoot, "workflows"), {
-      scope,
-      agent: opts.agent,
-    });
-  } catch (error) {
-    try {
-      await runDeinit({ scope, yes: true, skipConfirm: true });
-    } catch (rollbackErr) {
-      console.warn(
-        `Rollback failed: ${
-          rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr)
-        }`,
-      );
-    }
-    throw error;
-  }
-
-  // ── Success summary ─────────────────────────────────────────────────
-  console.log(`FreeFlow installed (${scope}).`);
-  console.log("Skills: /fflow-author, /fflow, /e2e-run");
-  if (installHook) {
-    console.log("Hook: PostToolUse state reminder");
-    console.log("Restart Claude Code to activate the plugin.");
+    fn();
+    console.log(successMsg);
+  } catch (err) {
+    const firstLine = (err instanceof Error ? err.message : String(err)).split("\n")[0];
+    console.log(`!  skipped (${firstLine})`);
   }
 }

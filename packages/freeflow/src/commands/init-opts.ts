@@ -1,40 +1,25 @@
 import { CliError } from "../errors.js";
 import type { Scope } from "../runners.js";
-import type { DeinitOptions } from "./deinit.js";
 import type { InitOptions } from "./init.js";
+import type { InstallWorkflowOptions } from "./install-workflow.js";
 
 export function normalizeInitOpts(raw: Record<string, unknown>): InitOptions {
+  // Only `--uninstall` is recognized today. Unknown flags are ignored rather
+  // than rejected so the CLI stays forgiving.
+  return raw.uninstall === true ? { uninstall: true } : {};
+}
+
+export function normalizeInstallWorkflowOpts(
+  raw: Record<string, unknown>,
+): InstallWorkflowOptions {
   const local = raw.local === true;
   const global = raw.global === true;
   if (local && global) {
     throw new CliError("ARGS_INVALID", "cannot combine --local and --global");
   }
   const scope: Scope | undefined = local ? "local" : global ? "global" : undefined;
-  const noHooks = raw.hooks === false;
   return {
     scope,
-    noHooks,
     yes: raw.yes === true,
-    agent: typeof raw.agent === "string" ? raw.agent : undefined,
   };
-}
-
-export function normalizeDeinitOpts(raw: Record<string, unknown>): DeinitOptions {
-  const local = raw.local === true;
-  const global = raw.global === true;
-  const all = raw.all === true;
-  if (local && global) {
-    throw new CliError("ARGS_INVALID", "cannot combine --local and --global");
-  }
-  if (all && (local || global)) {
-    throw new CliError("ARGS_INVALID", "cannot combine --all with --local or --global");
-  }
-  const scope: Scope | "all" | undefined = all
-    ? "all"
-    : local
-      ? "local"
-      : global
-        ? "global"
-        : undefined;
-  return { scope, yes: raw.yes === true };
 }

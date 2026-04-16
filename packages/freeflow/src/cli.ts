@@ -9,11 +9,14 @@ const { version } = require("../package.json") as { version: string };
 import { Command } from "commander";
 import { abort } from "./commands/abort.js";
 import { current } from "./commands/current.js";
-import { runDeinit } from "./commands/deinit.js";
 import { goto } from "./commands/goto.js";
 import { history } from "./commands/history.js";
-import { normalizeDeinitOpts, normalizeInitOpts } from "./commands/init-opts.js";
+import {
+  normalizeInitOpts,
+  normalizeInstallWorkflowOpts,
+} from "./commands/init-opts.js";
 import { runInit } from "./commands/init.js";
+import { runInstallWorkflow } from "./commands/install-workflow.js";
 import { list } from "./commands/list.js";
 import { render } from "./commands/render.js";
 import { start } from "./commands/start.js";
@@ -243,14 +246,10 @@ program
 
 program
   .command("init")
-  .description("install FreeFlow skills, workflows, and (optionally) Claude hooks")
-  .option("--local", "install at project scope")
-  .option("--global", "install at user scope")
-  .option("--no-hooks", "skip Claude PostToolUse hook installation")
-  .option("--agent <list>", "comma-separated agent list forwarded to skills CLI")
+  .description("install the FreeFlow Claude Code plugin (skills + hooks bundled)")
   .option(
-    "-y, --yes",
-    "skip all interactive prompts (defaults: local scope, hooks yes)",
+    "--uninstall",
+    "remove the FreeFlow Claude plugin and the global Codex skills",
   )
   .action(async (opts: Record<string, unknown>, cmd: Command) => {
     const { json } = getGlobalOpts(cmd);
@@ -262,16 +261,17 @@ program
   });
 
 program
-  .command("deinit")
-  .description("uninstall FreeFlow")
-  .option("--local", "uninstall project scope only")
-  .option("--global", "uninstall user scope only")
-  .option("--all", "uninstall both scopes")
-  .option("-y, --yes", "skip destructive confirmation")
+  .command("install-workflow")
+  .description(
+    "install FreeFlow workflows (all skills + all agents pre-selected; -y to skip confirmation)",
+  )
+  .option("--local", "install at project scope")
+  .option("--global", "install at user scope")
+  .option("-y, --yes", "skip all interactive prompts (defaults: local scope)")
   .action(async (opts: Record<string, unknown>, cmd: Command) => {
     const { json } = getGlobalOpts(cmd);
     try {
-      await runDeinit(normalizeDeinitOpts(opts));
+      await runInstallWorkflow(normalizeInstallWorkflowOpts(opts));
     } catch (err: unknown) {
       handleError(err, json ?? false);
     }
