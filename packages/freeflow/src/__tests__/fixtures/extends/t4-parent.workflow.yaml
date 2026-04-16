@@ -1,0 +1,11 @@
+version: 1
+guide: "T4 parent"
+initial: a
+states:
+  a:
+    prompt: "ORIGINAL"
+    transitions:
+      next: done
+  done:
+    prompt: "Done"
+    transitions: {}

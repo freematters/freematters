@@ -31,7 +31,7 @@ function tmpYaml(content: string): string {
 // --- Schema & Validation ---
 
 describe("workflow composition — schema validation", () => {
-  test("version 1.2 and 1.3 accepted, 1.4 rejected", () => {
+  test("versions 1.2, 1.3, 1.4 accepted, 1.5 rejected", () => {
     const fsm = loadFsm(fixture("compose-basic.workflow.yaml"));
     expect(fsm.version).toBe(1.2);
 
@@ -43,7 +43,12 @@ describe("workflow composition — schema validation", () => {
     const v14 = tmpYaml(
       "version: 1.4\ninitial: s\nstates:\n  s:\n    prompt: x\n    transitions:\n      n: done\n  done:\n    prompt: d\n    transitions: {}\n",
     );
-    expect(() => loadFsm(v14)).toThrow(FsmError);
+    expect(() => loadFsm(v14)).not.toThrow();
+
+    const v15 = tmpYaml(
+      "version: 1.5\ninitial: s\nstates:\n  s:\n    prompt: x\n    transitions:\n      n: done\n  done:\n    prompt: d\n    transitions: {}\n",
+    );
+    expect(() => loadFsm(v15)).toThrow(FsmError);
   });
 
   test("rejects forbidden field combinations on workflow states", () => {

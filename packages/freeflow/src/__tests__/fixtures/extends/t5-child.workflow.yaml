@@ -1,0 +1,11 @@
+version: 1.4
+extends: ./t5-parent.workflow.yaml
+states:
+  a:
+    transitions:
+      next: c
+      done: done
+  c:
+    prompt: "C"
+    transitions:
+      back: b
