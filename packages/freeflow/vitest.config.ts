@@ -7,8 +7,6 @@ export default defineConfig({
       "**/dist/**",
       "**/.fc-worktrees/**",
       "**/.claude/worktrees/**",
-      "**/install.test.ts",
-      "**/*.real.test.ts",
     ],
     testTimeout: 30000,
   },
