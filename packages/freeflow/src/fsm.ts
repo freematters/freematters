@@ -352,8 +352,8 @@ function resolveWorkflowStates(
         expandedState.transitions = rewrittenTransitions;
       }
 
-      // Apply child guide as per-state guide override
-      if (childFsm.guide) {
+      // Apply child guide only to the expanded child initial state
+      if (childFsm.guide && childStateName === childFsm.initial) {
         expandedState.guide = childFsm.guide;
       }
 
