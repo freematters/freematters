@@ -24,20 +24,29 @@ describe("runners", () => {
     execFileSyncMock.mockImplementation(() => Buffer.from(""));
   });
 
-  test("skillsAdd local scope: npx skills add <dir> --skill '*' (no -g)", () => {
+  test("skillsAdd local scope: npx skills add <dir> --skill '*' -y (no -g)", () => {
     skillsAdd("/some/dir", { scope: "local" });
 
     expect(execFileSyncMock).toHaveBeenCalledTimes(1);
     const [cmd, args] = execFileSyncMock.mock.calls[0];
     expect(cmd).toBe("npx");
-    expect(args).toEqual(["--yes", "skills", "add", "/some/dir", "--skill", "*"]);
+    expect(args).toEqual(["--yes", "skills", "add", "/some/dir", "--skill", "*", "-y"]);
   });
 
   test("skillsAdd global scope includes -g", () => {
     skillsAdd("/some/dir", { scope: "global" });
 
     const [, args] = execFileSyncMock.mock.calls[0];
-    expect(args).toEqual(["--yes", "skills", "add", "/some/dir", "--skill", "*", "-g"]);
+    expect(args).toEqual([
+      "--yes",
+      "skills",
+      "add",
+      "/some/dir",
+      "--skill",
+      "*",
+      "-y",
+      "-g",
+    ]);
   });
 
   test("skillsAdd with agent appends --agent <list> verbatim", () => {
@@ -51,28 +60,19 @@ describe("runners", () => {
       "/some/dir",
       "--skill",
       "*",
+      "-y",
       "--agent",
       "claude-code,cursor",
     ]);
   });
 
-  test("skillsRemove local scope: npx skills remove <dir> --skill '*' --agent '*' -y", () => {
+  test("skillsRemove local scope: npx skills remove <dir> --all -y", () => {
     skillsRemove("/some/dir", { scope: "local" });
 
     expect(execFileSyncMock).toHaveBeenCalledTimes(1);
     const [cmd, args] = execFileSyncMock.mock.calls[0];
     expect(cmd).toBe("npx");
-    expect(args).toEqual([
-      "--yes",
-      "skills",
-      "remove",
-      "/some/dir",
-      "--skill",
-      "*",
-      "--agent",
-      "*",
-      "-y",
-    ]);
+    expect(args).toEqual(["--yes", "skills", "remove", "/some/dir", "--all", "-y"]);
   });
 
   test("claudeInstallPlugin: marketplace add THEN plugin install in order", () => {

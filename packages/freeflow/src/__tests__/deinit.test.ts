@@ -91,10 +91,7 @@ describe("runDeinit", () => {
       "skills",
       "remove",
       SKILLS_DIR,
-      "--skill",
-      "*",
-      "--agent",
-      "*",
+      "--all",
       "-y",
     ]);
 
@@ -104,10 +101,7 @@ describe("runDeinit", () => {
       "skills",
       "remove",
       WORKFLOWS_DIR,
-      "--skill",
-      "*",
-      "--agent",
-      "*",
+      "--all",
       "-y",
     ]);
 
@@ -128,10 +122,7 @@ describe("runDeinit", () => {
       "skills",
       "remove",
       SKILLS_DIR,
-      "--skill",
-      "*",
-      "--agent",
-      "*",
+      "--all",
       "-y",
       "-g",
     ]);
@@ -142,10 +133,7 @@ describe("runDeinit", () => {
       "skills",
       "remove",
       WORKFLOWS_DIR,
-      "--skill",
-      "*",
-      "--agent",
-      "*",
+      "--all",
       "-y",
       "-g",
     ]);

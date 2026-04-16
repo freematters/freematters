@@ -29,7 +29,7 @@ export function getPackageRoot(): string {
 }
 
 export function skillsAdd(dir: string, opts: SkillsAddOptions): void {
-  const argv: string[] = ["--yes", "skills", "add", dir, "--skill", "*"];
+  const argv: string[] = ["--yes", "skills", "add", dir, "--skill", "*", "-y"];
   if (opts.agent) {
     argv.push("--agent", opts.agent);
   }
@@ -40,17 +40,11 @@ export function skillsAdd(dir: string, opts: SkillsAddOptions): void {
 }
 
 export function skillsRemove(dir: string, opts: SkillsRemoveOptions): void {
-  const argv: string[] = [
-    "--yes",
-    "skills",
-    "remove",
-    dir,
-    "--skill",
-    "*",
-    "--agent",
-    "*",
-    "-y",
-  ];
+  // `--all` is the shorthand skills@1.5 accepts for "every skill, every agent".
+  // Spelling it out as `--skill '*' --agent '*'` trips the CLI's agent validator
+  // ("Invalid agents: *") despite the help text. `-y` is passed explicitly
+  // because `--all` should imply it per docs but in practice still prompts.
+  const argv: string[] = ["--yes", "skills", "remove", dir, "--all", "-y"];
   if (opts.scope === "global") {
     argv.push("-g");
   }
