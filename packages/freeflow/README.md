@@ -15,22 +15,17 @@ FreeFlow resolves this by separating **what the agent does** (flexible, LLM-driv
 
 ## Install
 
-Tell this to your coding agent:
-
-```
-Read https://github.com/freematters/freematters/blob/main/packages/freeflow/README.md to install freeflow
-```
-
-Or install manually:
+Install FreeFlow into your agent of choice:
 
 ```bash
-npm install -g @freematters/freeflow
-
-fflow install
+npx fflow init [--local | --global] [--no-hooks] [--agent <list>]
 ```
 
-This registers the bundled skills and workflows into Claude Code, along with
-the PostToolUse hook.
+Uninstall with:
+
+```bash
+npx fflow deinit [--local | --global | --all]
+```
 
 ### For Contributors
 
@@ -40,7 +35,7 @@ cd freematters
 npm install && npm run build
 npm link -w packages/freeflow
 
-fflow install
+fflow init
 ```
 
 ## Usage
