@@ -90,13 +90,10 @@ describe("T14 — migration equivalence", () => {
     );
   });
 
-  it("issue-to-pr: migrated FSM matches pre-migration golden fixture", () => {
-    assertEquivalent(
-      "issue-to-pr",
-      "packages/freeflow/workflows/issue-to-pr/workflow.yaml",
-      "issue-to-pr.golden.json",
-    );
-  });
+  // issue-to-pr equivalence intentionally dropped: the workflow was
+  // subsequently refactored to `extends: ../spec-driven/workflow.yaml`,
+  // changing the spec phase from issue-to-spec → spec-gen. The runtime smoke
+  // test below still pins loadFsm success and initial state.
 });
 
 describe("runtime smoke test — migrated workflows load cleanly", () => {
