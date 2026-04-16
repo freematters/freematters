@@ -52,7 +52,7 @@ jobs:
         run: curl -fsSL https://claude.ai/install.sh | bash
 
       - name: Install freeflow plugin
-        run: fflow install
+        run: fflow init
 
       - name: Run code review
         timeout-minutes: 15
