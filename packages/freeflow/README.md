@@ -86,12 +86,13 @@ fflow install-workflow
 
 ## Bundled Workflows
 
-- `spec-gen` — generates a complete specification: interactive requirements, research, design, and planning
-- `spec-to-code` — implements a spec directory (from spec-gen) into working code via TDD
-- `mr-lifecycle` — merge request lifecycle management
+- `spec-gen` — generate a complete specification: interactive requirements, research, design, and planning
+- `spec-to-code` — implement a spec directory (from spec-gen) into working code, one plan.md step at a time
+- `pr-lifecycle` — monitor a PR/MR until merged or closed: auto-fix CI, rebase, and address review threads / `@bot` mentions
 
-Each workflow is a YAML file — inspect or edit them in `skills/` after
-running `install-workflow`, or run `/fflow-author` to build your own.
+Each workflow is a YAML file — inspect or edit them in the installed
+skills directory (`.claude/skills/` for `--local`, `~/.claude/skills/` for
+`--global`), or run `/fflow-author` to build your own.
 
 ## How It Works
 
