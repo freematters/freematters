@@ -40,8 +40,9 @@ export async function runInit(opts: InitOptions = {}): Promise<void> {
   console.log("Installing Codex skills globally…");
   skillsAdd(join(packageRoot, "skills"), {
     scope: "global",
-    agent: "codex",
+    agents: ["codex"],
     interactive: false,
+    yes: true,
     quiet: true,
   });
   console.log("✓ Codex skills installed");

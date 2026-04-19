@@ -263,11 +263,14 @@ program
 program
   .command("install-workflow")
   .description(
-    "install FreeFlow workflows (all skills + all agents pre-selected; -y to skip confirmation)",
+    "install FreeFlow workflows (interactively pick workflows + agents; -y installs everything for claude-code + codex)",
   )
   .option("--local", "install at project scope")
   .option("--global", "install at user scope")
-  .option("-y, --yes", "skip all interactive prompts (defaults: local scope)")
+  .option(
+    "-y, --yes",
+    "skip prompts and install every workflow for claude-code + codex (default scope: local)",
+  )
   .action(async (opts: Record<string, unknown>, cmd: Command) => {
     const { json } = getGlobalOpts(cmd);
     try {
