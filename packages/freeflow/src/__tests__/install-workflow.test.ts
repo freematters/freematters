@@ -52,7 +52,7 @@ describe("runInstallWorkflow", () => {
     });
   });
 
-  test("--local pre-selects every skill and every agent; confirmation picker still shows", async () => {
+  test("--local lets the skills CLI prompt for workflow + agent selection", async () => {
     await runInstallWorkflow({ scope: "local" });
 
     const call = findSkillsAddCall();
@@ -62,29 +62,27 @@ describe("runInstallWorkflow", () => {
     // target dir is the bundled workflows/
     expect(args[3]).toBe(WORKFLOWS_DIR);
 
-    // skill + agent are pre-selected
-    expect(args.slice(4)).toContain("--skill");
-    expect(args[args.indexOf("--skill") + 1]).toBe("*");
-    expect(args).toContain("--agent");
-    expect(args[args.indexOf("--agent") + 1]).toBe("*");
+    // no --skill / --agent → skills CLI runs its own interactive pickers
+    expect(args).not.toContain("--skill");
+    expect(args).not.toContain("--agent");
 
-    // no -y → skills CLI still shows its confirmation picker
+    // no -y → skills CLI confirmation stays live
     expect(args).not.toContain("-y");
 
     // local scope → no -g
     expect(args).not.toContain("-g");
   });
 
-  test("--global adds -g and keeps the pre-selection", async () => {
+  test("--global adds -g and keeps the interactive pickers", async () => {
     await runInstallWorkflow({ scope: "global" });
 
     const args = findSkillsAddCall()?.[1] as string[];
-    expect(args).toContain("--skill");
-    expect(args).toContain("--agent");
+    expect(args).not.toContain("--skill");
+    expect(args).not.toContain("--agent");
     expect(args).toContain("-g");
   });
 
-  test("-y skips the scope prompt and the skills CLI confirmation", async () => {
+  test("-y installs every workflow for claude-code + codex and skips prompts", async () => {
     await runInstallWorkflow({ yes: true });
 
     expect(promptsMock).not.toHaveBeenCalled();
@@ -92,8 +90,10 @@ describe("runInstallWorkflow", () => {
     const args = findSkillsAddCall()?.[1] as string[];
     expect(args).toContain("--skill");
     expect(args[args.indexOf("--skill") + 1]).toBe("*");
-    expect(args).toContain("--agent");
-    expect(args[args.indexOf("--agent") + 1]).toBe("*");
+    const agentIdx = args.indexOf("--agent");
+    expect(agentIdx).toBeGreaterThanOrEqual(0);
+    expect(args[agentIdx + 1]).toBe("claude-code");
+    expect(args[agentIdx + 2]).toBe("codex");
     expect(args).toContain("-y");
     // default scope under -y is local
     expect(args).not.toContain("-g");

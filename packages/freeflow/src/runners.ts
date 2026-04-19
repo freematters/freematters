@@ -6,21 +6,18 @@ export type Scope = "local" | "global";
 
 export interface SkillsAddOptions {
   scope: Scope;
-  agent?: string;
+  /**
+   * Agents to install into (e.g., `["claude-code", "codex"]`). When omitted,
+   * no `--agent` flag is passed — combine with `interactive: true` to let
+   * the skills CLI prompt for agent selection.
+   */
+  agents?: readonly string[];
   /**
    * When true, let the `skills` CLI drive its own interactive prompts
-   * (skill picker, agent picker) by omitting `--skill '*'` and `-y`.
-   * When false (default), install every skill non-interactively.
+   * (skill picker, agent picker) by omitting `--skill '*'`.
+   * When false (default), install every skill via `--skill '*'`.
    */
   interactive?: boolean;
-  /**
-   * When true, pre-select every skill and every agent (`--skill '*'
-   * --agent '*'`) so the skills CLI still shows its confirmation prompt
-   * but doesn't ask the user to pick individual skills or agents.
-   * Combine with `yes: true` for a fully non-interactive `--all`-like
-   * install. Overrides `agent` and `interactive`.
-   */
-  all?: boolean;
   /** Append `-y` to skip the skills CLI's confirmation prompt. */
   yes?: boolean;
   /**
@@ -75,18 +72,14 @@ function runMaybeQuiet(cmd: string, argv: string[], quiet: boolean): void {
 
 export function skillsAdd(dir: string, opts: SkillsAddOptions): void {
   const argv: string[] = ["--yes", "skills", "add", dir];
-  if (opts.all) {
-    argv.push("--skill", "*", "--agent", "*");
-    if (opts.yes) {
-      argv.push("-y");
-    }
-  } else {
-    if (!opts.interactive) {
-      argv.push("--skill", "*", "-y");
-    }
-    if (opts.agent) {
-      argv.push("--agent", opts.agent);
-    }
+  if (!opts.interactive) {
+    argv.push("--skill", "*");
+  }
+  if (opts.agents && opts.agents.length > 0) {
+    argv.push("--agent", ...opts.agents);
+  }
+  if (opts.yes) {
+    argv.push("-y");
   }
   if (opts.scope === "global") {
     argv.push("-g");

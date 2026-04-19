@@ -30,7 +30,7 @@ the workflow templates you'll actually run.
 # 1. Install the FreeFlow plugin into Claude Code (skills + hooks bundled)
 npx fflow init
 
-# 2. Install workflow templates (every workflow + every agent pre-selected)
+# 2. Install workflow templates (pick workflows + agents interactively)
 npx fflow install-workflow [--local | --global] [-y]
 ```
 
@@ -39,12 +39,12 @@ and also lays down the same skills globally for Codex via
 `npx skills add -g --agent codex`. **Restart Claude Code** afterwards so the
 PostToolUse hook activates.
 
-`install-workflow` shells out to `npx skills add` with every workflow and
-every agent pre-selected (`--skill '*' --agent '*'`); the skills CLI still
-shows its confirmation picker so you can review what will be installed. Pass
-`-y` to skip the confirmation for non-interactive runs. Use `--local` to
-install workflows into the current repo (default in `-y` mode) or `--global`
-to make them available everywhere.
+`install-workflow` shells out to `npx skills add` and lets the skills CLI
+prompt you to pick which workflows and which agents to install. Pass `-y` to
+skip the prompts and install every workflow into both claude-code and codex
+(`--skill '*' --agent claude-code codex -y`) — handy for CI or scripts. Use
+`--local` to install workflows into the current repo (default in `-y` mode)
+or `--global` to make them available everywhere.
 
 ### Your first workflow
 

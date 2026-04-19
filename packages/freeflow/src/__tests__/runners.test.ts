@@ -17,8 +17,12 @@ describe("runners", () => {
     execFileSyncMock.mockImplementation(() => Buffer.from(""));
   });
 
-  test("skillsAdd all: true pre-fills --skill '*' --agent '*' and honors yes for -y", () => {
-    skillsAdd("/some/dir", { scope: "global", all: true, yes: true });
+  test("skillsAdd non-interactive with multiple agents emits --skill '*' --agent a b and -y", () => {
+    skillsAdd("/some/dir", {
+      scope: "global",
+      agents: ["claude-code", "codex"],
+      yes: true,
+    });
 
     const [, args] = execFileSyncMock.mock.calls[0];
     expect(args).toEqual([
@@ -29,19 +33,30 @@ describe("runners", () => {
       "--skill",
       "*",
       "--agent",
-      "*",
+      "claude-code",
+      "codex",
       "-y",
       "-g",
     ]);
   });
 
+  test("skillsAdd interactive omits --skill and --agent so the skills CLI prompts", () => {
+    skillsAdd("/some/dir", { scope: "local", interactive: true });
+
+    const [, args] = execFileSyncMock.mock.calls[0];
+    expect(args).not.toContain("--skill");
+    expect(args).not.toContain("--agent");
+    expect(args).not.toContain("-y");
+    expect(args).not.toContain("-g");
+  });
+
   test("skillsAdd quiet pipes stdio; default inherits", () => {
-    skillsAdd("/a", { scope: "local", all: true, yes: true, quiet: true });
+    skillsAdd("/a", { scope: "local", agents: ["codex"], yes: true, quiet: true });
     const quietStdio = (execFileSyncMock.mock.calls[0][2] as { stdio?: string }).stdio;
     expect(quietStdio).toBe("pipe");
 
     execFileSyncMock.mockReset();
-    skillsAdd("/a", { scope: "local", all: true, yes: true });
+    skillsAdd("/a", { scope: "local", agents: ["codex"], yes: true });
     const defaultStdio = (execFileSyncMock.mock.calls[0][2] as { stdio?: string })
       .stdio;
     expect(defaultStdio).toBe("inherit");

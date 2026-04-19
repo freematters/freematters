@@ -44,12 +44,13 @@ async function resolveScope(opts: InstallWorkflowOptions): Promise<Scope> {
 export async function runInstallWorkflow(opts: InstallWorkflowOptions): Promise<void> {
   const scope = await resolveScope(opts);
 
-  // Pre-select every workflow and every agent (`--skill '*' --agent '*'`).
-  // The skills CLI still renders its confirmation picker so the user can
-  // see what's about to land; `-y` skips it for non-interactive runs.
+  // Default: let the skills CLI prompt for both workflow and agent
+  // selection. `-y` short-circuits the prompts and installs every workflow
+  // for both claude-code and codex — handy for CI and scripts.
   skillsAdd(join(getPackageRoot(), "workflows"), {
     scope,
-    all: true,
+    interactive: opts.yes !== true,
+    agents: opts.yes === true ? ["claude-code", "codex"] : undefined,
     yes: opts.yes,
   });
 
