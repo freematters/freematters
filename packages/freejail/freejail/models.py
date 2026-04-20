@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from freejail.constants import DEFAULT_COMMAND, DEFAULT_IMAGE
+
 
 class EgressRule(BaseModel):
     host: str
@@ -42,8 +44,8 @@ class SiteConfig(BaseModel):
 
 
 class ContainerConfig(BaseModel):
-    image: str = "freematters/freejail:local_latest"
-    command: list[str] = ["sleep", "infinity"]
+    image: str = DEFAULT_IMAGE
+    command: list[str] = DEFAULT_COMMAND
     mounts: list[Mount] = []
     egress: EgressPolicy = EgressPolicy()
     resources: Resources = Resources()

@@ -73,7 +73,9 @@ class JailEgress:
             parts = rule["to_url"].split("/", 1)
             flow.request.host = parts[0]
             if len(parts) > 1:
-                flow.request.path = "/" + parts[1] + flow.request.path.lstrip("/")
+                prefix = parts[1].rstrip("/")
+                if prefix:
+                    flow.request.path = "/" + prefix + "/" + flow.request.path.lstrip("/")
             for k, v in rule.get("headers", {{}}).items():
                 flow.request.headers[k] = v
 

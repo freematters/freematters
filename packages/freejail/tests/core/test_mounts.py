@@ -1,4 +1,5 @@
-from freejail.core.mounts import resolve_mounts
+import pytest
+from freejail.core.mounts import resolve_mounts, validate_mounts
 from freejail.models import Mount
 
 SAMPLE_MOUNTS = [
@@ -129,3 +130,45 @@ def test_empty_default_mounts():
         cli_mounts=[],
     )
     assert len(result) == 2  # cwd + CA
+
+
+def test_validate_mounts_accepts_clean():
+    validate_mounts(
+        [
+            Mount(source="/host/path", target="/container/path", options="rw"),
+            Mount(source="/a", target="/b", options="ro,noexec"),
+        ]
+    )
+    validate_mounts([])
+
+
+@pytest.mark.parametrize("bad", ["path\nnew", "path\rnew", "path\x00nul"])
+def test_validate_mounts_rejects_unsafe_source(bad):
+    with pytest.raises(ValueError, match="source contains unsafe"):
+        validate_mounts([Mount(source=bad, target="/b", options="rw")])
+
+
+@pytest.mark.parametrize("bad", ["tgt\nnew", "tgt\rnew", "tgt\x00nul"])
+def test_validate_mounts_rejects_unsafe_target(bad):
+    with pytest.raises(ValueError, match="target contains unsafe"):
+        validate_mounts([Mount(source="/a", target=bad, options="rw")])
+
+
+def test_validate_mounts_rejects_unsafe_options():
+    with pytest.raises(ValueError, match="options contains unsafe"):
+        validate_mounts([Mount(source="/a", target="/b", options="rw\n")])
+
+
+def test_validate_mounts_rejects_comma_in_source():
+    with pytest.raises(ValueError, match="source contains comma"):
+        validate_mounts([Mount(source="/a,b", target="/c", options="rw")])
+
+
+def test_validate_mounts_rejects_comma_in_target():
+    with pytest.raises(ValueError, match="target contains comma"):
+        validate_mounts([Mount(source="/a", target="/b,c", options="rw")])
+
+
+def test_validate_mounts_allows_comma_in_options():
+    """Comma is valid in options (e.g., 'ro,noexec')."""
+    validate_mounts([Mount(source="/a", target="/b", options="ro,noexec,nosuid")])

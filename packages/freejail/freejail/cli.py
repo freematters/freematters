@@ -168,7 +168,7 @@ def _apply_inner(
         if run_dir.exists():
             shutil.rmtree(run_dir)
         console.print(f"[red]Error:[/red] {e}")
-        raise typer.Exit(1) from None
+        raise typer.Exit(1) from e
 
     # 11. Record in DB
     db.insert_container(

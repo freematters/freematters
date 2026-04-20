@@ -11,6 +11,8 @@ from freejail.constants import (
     PROXY_IMAGE,
     PROXY_PORT,
 )
+from freejail.core.env import validate_env_vars
+from freejail.core.mounts import validate_mounts
 from freejail.core.subnet import proxy_ip, subnet_cidr
 from freejail.models import ContainerConfig, Mount
 from freejail.profile import build_context, dockerfile_path
@@ -156,6 +158,10 @@ def start_app(
     dns_servers: list[str],
 ) -> str:
     """Start the app container. Returns container ID."""
+    validate_env_vars(env_vars)
+    validate_env_vars(container_env_vars)
+    validate_mounts(mounts)
+
     container_name = f"fj-app-{name}"
     ip = proxy_ip(subnet_index)
     proxy_url = f"http://{ip}:{PROXY_PORT}"
