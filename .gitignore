@@ -15,3 +15,11 @@ specs/
 # skills CLI runtime state (lockfile, local skills install dir)
 /skills/
 /skills-lock.json
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.venv/
+.ruff_cache/
+.pytest_cache/
