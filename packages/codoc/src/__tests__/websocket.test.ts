@@ -254,6 +254,8 @@ describe("HTTP SPA serving", () => {
   });
 
   it("GET /edit/:token should serve index.html from dist/static/ if it exists", async () => {
+    const indexPath = path.join(__dirname, "..", "..", "dist", "static", "index.html");
+    if (!fs.existsSync(indexPath)) return;
     const reg = tokenStore.register(testFilePath, false);
     const res = await new Promise<{ statusCode: number; body: string }>(
       (resolve, reject) => {
