@@ -5,7 +5,7 @@
  * and event builders used across multiple test files.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { EventInput, SnapshotInput } from "../store.js";
@@ -102,7 +102,7 @@ export function uniqueRunId(prefix = "run"): string {
 // ─── Temp Directory Helpers ──────────────────────────────────────
 
 export function createTempDir(prefix: string): string {
-  return mkdtempSync(join(tmpdir(), `freeflow-${prefix}-`));
+  return realpathSync(mkdtempSync(join(tmpdir(), `freeflow-${prefix}-`)));
 }
 
 export function cleanupTempDir(path: string): void {
