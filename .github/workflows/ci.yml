@@ -81,3 +81,34 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run test:integration
+
+  glove:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect glove changes (PR only)
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only origin/main...HEAD -- packages/glove/ .github/workflows/ci.yml | grep -q .; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.changed.outputs.run == 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.changed.outputs.run == 'true'
+        with:
+          workspaces: packages/glove
+      - name: Build
+        if: steps.changed.outputs.run == 'true'
+        working-directory: packages/glove
+        run: cargo build --release
+      - name: Test (LOCAL_MODE; real-mode is #[ignore])
+        if: steps.changed.outputs.run == 'true'
+        working-directory: packages/glove
+        run: cargo test --release -- --test-threads=1
