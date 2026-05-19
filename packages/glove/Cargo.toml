@@ -1,0 +1,39 @@
+[package]
+name = "glove"
+version = "0.1.0"
+edition = "2021"
+description = "Remote shell-exec + file-transfer agent over TryCloudflare websockets"
+
+[[bin]]
+name = "glove"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "0.7", features = ["ws"] }
+tokio = { version = "1", features = ["full"] }
+tokio-tungstenite = { version = "0.21", features = ["rustls-tls-native-roots"] }
+futures-util = "0.3"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+md5 = "0.7"
+rand = "0.8"
+hex = "0.4"
+anyhow = "1"
+bytes = "1"
+url = "2"
+hyper = { version = "1", features = ["server"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+tower = "0.5"
+
+[dev-dependencies]
+tempfile = "3"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"

@@ -8,6 +8,7 @@ Monorepo for FreeMatters — agent-native developer tools.
 |---------|-------------|-----|
 | [`@freematters/freeflow`](packages/freeflow/) | CLI-first workflow runtime for AI coding agents | [![npm](https://img.shields.io/npm/v/@freematters/freeflow)](https://www.npmjs.com/package/@freematters/freeflow) |
 | [`@freematters/codoc`](packages/codoc/) | Real-time collaborative markdown editing between AI agents and humans | [![npm](https://img.shields.io/npm/v/@freematters/codoc)](https://www.npmjs.com/package/@freematters/codoc) |
+| [`glove`](packages/glove/) | Remote shell-exec + file-transfer over zero-config TryCloudflare tunnels (Rust binary) | — |
 
 ## Quick Start
 
