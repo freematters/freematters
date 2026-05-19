@@ -108,9 +108,10 @@ describe("workflow composition — basic expansion", () => {
     // Non-workflow state transitions rewritten to entry point
     expect(fsm.states.setup.transitions.ready).toBe("build/create");
 
-    // Child guide propagated to expanded states
+    // Child guide attached only to the expanded child initial state
     expect(fsm.states["build/create"].guide).toBe("Child guide for simple workflow.");
-    expect(fsm.states["build/done"].guide).toBe("Child guide for simple workflow.");
+    expect(fsm.states["build/review"].guide).toBeUndefined();
+    expect(fsm.states["build/done"].guide).toBeUndefined();
   });
 });
 
@@ -190,6 +191,22 @@ describe("workflow composition — guide scoping", () => {
     expect(fsm.states["sub/step"].guide).toContain("Base guide content.");
     expect(fsm.states["sub/step"].guide).toContain("Extra child rules for compose.");
     expect(fsm.states.done.guide).toBeUndefined();
+  });
+
+  test("T11: sub-workflow guide attached to child initial state only", () => {
+    const dir = mkdtempSync(join(tmpdir(), "fflow-test-t11-"));
+    const childYaml =
+      'version: 1\nguide: "SUB GUIDE"\ninitial: inner_a\nstates:\n  inner_a:\n    prompt: "Inner A."\n    transitions:\n      next: done\n  done:\n    prompt: "Inner done."\n    transitions: {}\n';
+    writeFileSync(join(dir, "child.workflow.yaml"), childYaml);
+    const parentPath = join(dir, "parent.workflow.yaml");
+    writeFileSync(
+      parentPath,
+      "version: 1.2\ninitial: outer\nstates:\n  outer:\n    workflow: ./child.workflow.yaml\n    transitions:\n      completed: done\n  done:\n    prompt: d\n    transitions: {}\n",
+    );
+
+    const fsm = loadFsm(parentPath);
+    expect(fsm.states["outer/inner_a"].guide).toBe("SUB GUIDE");
+    expect(fsm.states["outer/done"].guide).toBeUndefined();
   });
 });
 
